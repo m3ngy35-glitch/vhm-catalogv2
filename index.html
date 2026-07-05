@@ -1,0 +1,2945 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VHM Club — Internal Catalog</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Archivo:wght@400;500;600;700&family=Space+Mono:wght@400;700&family=Noto+Sans+Khmer:wght@400;600;700&display=swap');
+
+  :root{
+    --ink:#1b1b1a; --paper:#f2ede4; --olive:#4a5240; --olive-dark:#333a2c;
+    --rust:#9c4b2e; --line:#c9c1b2; --card:#faf7f0;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:'Archivo','Noto Sans Khmer',sans-serif;}
+  ::selection{background:var(--olive);color:var(--paper);}
+
+  header{
+    position:sticky;top:0;z-index:50;background:var(--ink);color:var(--paper);
+    padding:14px 20px;display:flex;align-items:center;justify-content:space-between;
+    border-bottom:3px solid var(--olive);flex-wrap:wrap;gap:10px;
+  }
+  .brand{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:1px;display:flex;align-items:baseline;gap:8px;}
+  .brand small{font-family:'Space Mono',monospace;font-size:11px;color:#a9a396;letter-spacing:2px;}
+  nav{display:flex;gap:4px;}
+  nav button{
+    background:none;border:1px solid transparent;color:#cfc9bc;font-family:'Archivo',sans-serif;
+    font-weight:600;font-size:13px;padding:8px 14px;cursor:pointer;letter-spacing:.3px;transition:all .15s;
+  }
+  nav button:hover{color:var(--paper);}
+  nav button.active{background:var(--olive);color:var(--paper);border-radius:2px;}
+
+  main{max-width:1150px;margin:0 auto;padding:28px 20px 80px;}
+  .view{display:none;}
+  .view.active{display:block;}
+
+  h1.section-title{font-family:'Bebas Neue',sans-serif;font-size:34px;letter-spacing:.5px;margin:0 0 4px;color:var(--olive-dark);}
+  .section-sub{font-size:13px;color:#6b6558;margin-bottom:20px;font-family:'Space Mono',monospace;}
+
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px;align-items:center;}
+  .toolbar input, .toolbar select{
+    font-family:'Archivo',sans-serif;font-size:14px;padding:9px 12px;
+    border:1.5px solid var(--line);border-radius:2px;background:var(--card);color:var(--ink);
+  }
+  .toolbar input#search{flex:1;min-width:180px;}
+  .btn{
+    font-family:'Archivo',sans-serif;font-weight:700;font-size:13px;letter-spacing:.3px;
+    padding:10px 16px;border-radius:2px;border:none;cursor:pointer;transition:opacity .15s;
+  }
+  .btn:hover{opacity:.88;}
+  .btn-primary{background:var(--olive);color:var(--paper);}
+  .btn-ghost{background:transparent;border:1.5px solid var(--line);color:var(--ink);}
+  .btn-danger{background:var(--rust);color:var(--paper);}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;}
+  .pcard{background:var(--card);border:1.5px solid var(--line);border-radius:3px;padding:16px;position:relative;transition:border-color .15s;}
+  .pcard:hover{border-color:var(--olive);}
+  .pdelete, .pedit{
+    position:absolute;top:10px;background:rgba(250,247,240,.95);border:1px solid var(--line);
+    color:var(--ink);font-size:14px;cursor:pointer;line-height:1;width:28px;height:28px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.25);z-index:5;
+  }
+  .pdelete{right:10px;font-size:17px;}
+  .pdelete:hover{color:var(--paper);background:var(--rust);border-color:var(--rust);}
+  .pedit{right:44px;}
+  .pedit:hover{color:var(--paper);background:var(--olive);border-color:var(--olive);}
+
+  /* Edit-mode lock: these controls only appear once unlocked */
+  body:not(.edit-unlocked) #openAddModal,
+  body:not(.edit-unlocked) #openColorManage,
+  body:not(.edit-unlocked) #importBtn,
+  body:not(.edit-unlocked) .pdelete,
+  body:not(.edit-unlocked) .pedit {
+    display: none !important;
+  }
+  .pimg-wrap{
+    width:100%;aspect-ratio:4/3;background:#e8e2d3;border-radius:2px;overflow:hidden;margin-bottom:12px;
+    display:flex;align-items:center;justify-content:center;border:1px solid var(--line);cursor:pointer;
+  }
+  .pimg-wrap img{width:100%;height:100%;object-fit:cover;display:block;}
+  .pimg-placeholder{font-family:'Space Mono',monospace;font-size:10.5px;color:#a39c8c;text-align:center;padding:8px;}
+  .ptop-row{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px;}
+  .pcode{
+    font-family:'Space Mono',monospace;font-size:11px;background:var(--olive);color:var(--paper);
+    display:inline-block;padding:2px 8px;border-radius:2px;letter-spacing:1px;
+  }
+  .ptype{font-family:'Space Mono',monospace;font-size:10px;color:#8a8375;text-transform:uppercase;letter-spacing:1px;}
+  .pprice{font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--rust);}
+  .pname{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:.3px;margin:0 0 2px;}
+  .pname-kh{font-size:13px;color:#8a8375;margin-bottom:10px;}
+  .prow{display:flex;justify-content:space-between;font-size:12.5px;padding:5px 0;border-top:1px solid var(--line);gap:8px;}
+  .prow span:first-child{color:#7a7568;font-weight:600;flex-shrink:0;}
+  .prow span:last-child{text-align:right;}
+  .swatches{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px;}
+  .swatch{width:16px;height:16px;border-radius:50%;border:1px solid rgba(0,0,0,.25);}
+  .sizes{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap;}
+  .sizes span{font-family:'Space Mono',monospace;font-size:10.5px;border:1px solid var(--line);padding:2px 6px;border-radius:2px;color:#5c5749;}
+  .album-link{
+    display:inline-block;margin-top:8px;font-family:'Space Mono',monospace;font-size:11px;
+    color:var(--olive-dark);text-decoration:none;border-bottom:1px dashed var(--olive-dark);
+  }
+
+  .sizechart-toggle{
+    margin-top:10px;width:100%;background:none;border:1px dashed var(--line);color:var(--olive-dark);
+    font-family:'Space Mono',monospace;font-size:11px;padding:6px;border-radius:2px;cursor:pointer;
+  }
+  .sizechart-panel{display:none;margin-top:8px;}
+  .sizechart-panel.open{display:block;}
+  .sizechart-panel table{width:100%;border-collapse:collapse;font-size:10.5px;}
+  .sizechart-panel th,.sizechart-panel td{border:1px solid var(--line);padding:5px 3px;text-align:center;}
+  .sizechart-panel th{background:var(--olive-dark);color:var(--paper);font-family:'Space Mono',monospace;font-weight:400;}
+
+  .fabric-note{font-size:12px;color:#5c5749;margin-top:8px;line-height:1.4;border-top:1px solid var(--line);padding-top:8px;}
+  .fabric-note b{color:var(--rust);font-family:'Bebas Neue',sans-serif;font-size:14px;display:block;}
+
+  .measure-note{background:#efe8d8;border-left:3px solid var(--rust);padding:12px 14px;font-size:13px;margin-bottom:22px;line-height:1.5;}
+  table.big{width:100%;border-collapse:collapse;background:var(--card);font-size:13px;}
+  table.big th,table.big td{border:1px solid var(--line);padding:9px 8px;text-align:center;}
+  table.big th{background:var(--olive-dark);color:var(--paper);font-family:'Space Mono',monospace;font-weight:400;letter-spacing:.5px;font-size:10.5px;}
+  table.big tr:nth-child(even) td{background:#efe9dc;}
+
+  .fabric-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;}
+  .fcard{background:var(--card);border:1.5px solid var(--line);border-radius:3px;padding:15px;}
+  .fcard b{font-family:'Bebas Neue',sans-serif;font-size:19px;color:var(--rust);display:block;margin-bottom:2px;}
+  .fcard .fcode{font-family:'Space Mono',monospace;font-size:10.5px;color:#8a8375;display:block;margin-bottom:8px;}
+  .fcard p{font-size:12.5px;line-height:1.5;margin:0 0 8px;color:#4a4638;}
+  .fcard .care{font-family:'Space Mono',monospace;font-size:10.5px;color:#8a8375;}
+
+  .lightbox{display:none;position:fixed;inset:0;background:rgba(20,18,14,.88);z-index:100;align-items:center;justify-content:center;padding:24px;cursor:zoom-out;}
+  .lightbox.active{display:flex;}
+  .lightbox img{max-width:92vw;max-height:88vh;border-radius:3px;box-shadow:0 10px 40px rgba(0,0,0,.5);}
+
+  .modal-backdrop{display:none;position:fixed;inset:0;background:rgba(20,18,14,.6);z-index:200;align-items:flex-start;justify-content:center;overflow-y:auto;padding:30px 16px;}
+  .modal-backdrop.active{display:flex;}
+  .modal{background:var(--paper);border-radius:4px;max-width:680px;width:100%;padding:24px;border:1.5px solid var(--line);}
+  .modal h2{font-family:'Bebas Neue',sans-serif;font-size:26px;margin:0 0 4px;color:var(--olive-dark);}
+  .modal .sub{font-family:'Space Mono',monospace;font-size:11px;color:#8a8375;margin-bottom:18px;}
+  .field{margin-bottom:14px;}
+  .field label{display:block;font-size:12px;font-weight:700;margin-bottom:5px;color:#4a4638;}
+  .field input[type=text], .field textarea{
+    width:100%;font-family:'Archivo',sans-serif;font-size:14px;padding:9px 11px;
+    border:1.5px solid var(--line);border-radius:2px;background:var(--card);color:var(--ink);
+  }
+  .field textarea{resize:vertical;min-height:50px;}
+  .field-row{display:flex;gap:10px;}
+  .field-row .field{flex:1;}
+  .type-toggle{display:flex;gap:8px;margin-bottom:14px;}
+  .type-toggle label{
+    flex:1;text-align:center;border:1.5px solid var(--line);border-radius:2px;padding:10px;cursor:pointer;
+    font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:.5px;background:var(--card);
+  }
+  .type-toggle input{display:none;}
+  .type-toggle input:checked + span{color:var(--paper);}
+  .type-toggle label:has(input:checked){background:var(--olive);color:var(--paper);}
+  .size-check-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;}
+  .size-check-row label{
+    display:flex;align-items:center;gap:5px;font-family:'Space Mono',monospace;font-size:12px;
+    border:1.5px solid var(--line);padding:6px 10px;border-radius:2px;cursor:pointer;background:var(--card);
+  }
+  .size-check-row input{cursor:pointer;}
+  .color-check-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;}
+  .color-chip{
+    display:flex;align-items:center;gap:6px;font-family:'Noto Sans Khmer','Archivo',sans-serif;font-size:12.5px;
+    border:1.5px solid var(--line);padding:6px 12px;border-radius:20px;cursor:pointer;background:var(--card);
+  }
+  .color-chip input{cursor:pointer;}
+  .color-chip:has(input:checked){background:var(--olive);color:var(--paper);border-color:var(--olive);}
+  .chip-dot{width:14px;height:14px;border-radius:50%;border:1px solid rgba(0,0,0,.3);flex-shrink:0;}
+  .color-manage-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;}
+  .color-manage-row input[type=text]{flex:1;font-size:13px;padding:7px 9px;border:1.5px solid var(--line);border-radius:2px;background:var(--card);}
+  .color-manage-row input[type=color]{width:36px;height:36px;padding:0;border:1.5px solid var(--line);border-radius:4px;cursor:pointer;flex-shrink:0;}
+  .color-manage-row button{background:none;border:none;color:var(--rust);font-size:16px;cursor:pointer;flex-shrink:0;padding:4px 8px;}
+  .size-measure-block{border:1px solid var(--line);border-radius:2px;padding:10px;margin-bottom:8px;background:var(--card);}
+  .size-measure-block .sm-title{font-family:'Bebas Neue',sans-serif;font-size:16px;margin-bottom:6px;color:var(--olive-dark);}
+  .size-measure-block .sm-inputs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
+  .size-measure-block .sm-inputs div{display:flex;flex-direction:column;gap:2px;}
+  .size-measure-block .sm-inputs label{font-size:10px;color:#8a8375;font-family:'Space Mono',monospace;}
+  .size-measure-block .sm-inputs input{font-size:12px;padding:5px 6px;border:1px solid var(--line);border-radius:2px;}
+  .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;}
+  .form-error{color:var(--rust);font-size:12px;font-family:'Space Mono',monospace;margin-top:-6px;margin-bottom:12px;display:none;}
+  .form-error.show{display:block;}
+  .field-hint{font-size:11px;color:#8a8375;margin-top:4px;font-family:'Space Mono',monospace;}
+
+  .edit-hint{margin-top:36px;font-family:'Space Mono',monospace;font-size:11px;color:#8a8375;border-top:1px dashed var(--line);padding-top:14px;line-height:1.6;}
+
+  @media(max-width:640px){
+    header{flex-direction:column;align-items:flex-start;}
+    nav{width:100%;overflow-x:auto;}
+    .field-row{flex-direction:column;}
+    .size-measure-block .sm-inputs{grid-template-columns:1fr 1fr;}
+  }
+</style>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+</head>
+<body>
+
+<header>
+  <div class="brand">VHM CLUB <small>STAFF REFERENCE · <span id="versionTag">v2.8</span></small></div>
+  <div id="catalogConnStatus" style="font-size:12px;font-weight:600;padding:6px 12px;border-radius:100px;background:#333;color:#ccc;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;">
+    <span id="catalogConnDot" style="width:7px;height:7px;border-radius:50%;background:#999;display:inline-block;"></span>
+    <span id="catalogConnText">Checking cloud storage…</span>
+  </div>
+  <button id="editLockBtn" onclick="openEditLock()" style="font-size:12px;font-weight:700;padding:6px 14px;border-radius:100px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;white-space:nowrap;">🔒 Browse Only</button>
+  <nav>
+    <button class="active" data-view="catalog">Catalog</button>
+    <button data-view="sizing">Size Guide</button>
+    <button data-view="fabric">Fabric Info</button>
+  </nav>
+</header>
+
+<div class="lockscreen" id="editLockScreen" style="position:fixed;inset:0;background:rgba(20,20,20,.6);display:none;align-items:center;justify-content:center;z-index:200;padding:20px;">
+  <div style="background:var(--card);border-radius:10px;padding:26px;max-width:340px;width:100%;text-align:center;">
+    <h3 style="font-family:'Bebas Neue',sans-serif;letter-spacing:.03em;margin:0 0 6px;font-size:22px;">Edit Mode</h3>
+    <p style="font-size:13px;color:#777;margin:0 0 16px;">Enter the passcode to add, edit, or delete products.<br><span style="color:var(--rust)">This is a soft screen, not real security — anyone reading the page code can find it.</span></p>
+    <input type="text" id="editPinInput" placeholder="Passcode" autocomplete="off" style="width:100%;text-align:center;letter-spacing:4px;font-size:16px;padding:10px;margin-bottom:12px;border:1px solid var(--line);border-radius:6px;">
+    <div style="display:flex;gap:8px;">
+      <button onclick="closeEditLock()" style="flex:1;padding:10px;border-radius:6px;border:none;font-weight:700;cursor:pointer;background:var(--line);color:var(--ink);">Cancel</button>
+      <button onclick="tryUnlockEdit()" style="flex:1;padding:10px;border-radius:6px;border:none;font-weight:700;cursor:pointer;background:var(--olive);color:var(--paper);">Unlock</button>
+    </div>
+  </div>
+</div>
+
+<main>
+
+  <!-- CATALOG VIEW -->
+  <section id="catalog" class="view active">
+    <h1 class="section-title">Product Catalog</h1>
+    <div class="section-sub" id="catalogSub">// showing 10 of 10 products — searchable by code, name, keyword, color or fabric</div>
+
+    <div class="toolbar">
+      <input id="search" type="text" placeholder="Search: code, name, keyword, color, fabric...">
+      <select id="filterType"><option value="">All types</option><option value="shirt">Shirt (អាវ)</option><option value="pants">Pants (ខោ)</option></select>
+      <select id="filterColor"><option value="">All colors</option><option value=""></option><option value="Bic Blue">Bic Blue</option><option value="Black">Black</option><option value="Coffee">Coffee</option><option value="Earth">Earth</option><option value="Green">Green</option><option value="Grey">Grey</option><option value="Nude">Nude</option><option value="Red">Red</option><option value="Silver">Silver</option><option value="Sky Blue">Sky Blue</option><option value="White">White</option><option value="Yellow">Yellow</option></select>
+      <select id="filterSize"><option value="">All sizes</option><option value="S">S</option><option value="M">M</option><option value="L">L</option><option value="XL">XL</option><option value="2XL">2XL</option><option value="3XL">3XL</option><option value="4XL">4XL</option></select>
+      <button class="btn btn-primary" id="openAddModal">+ New Product</button>
+      <button class="btn btn-ghost" id="openColorManage">🎨 Manage Colors</button>
+      <button class="btn btn-ghost" id="exportBtn">⬇ Save Updated File</button>
+      <button class="btn btn-ghost" id="importBtn">📥 Import from Old File</button>
+      <input type="file" id="importFileInput" accept=".html,.htm" style="display:none;">
+    </div>
+
+    <div class="grid" id="grid"><div class="pcard">
+      <button class="pdelete" data-idx="0" title="Delete product">×</button>
+      <button class="pedit" data-idx="0" title="Edit product">✎</button>
+      <div class="pimg-wrap" data-full="https://i.ibb.co/RGH1JSPQ/photo-2026-07-04-00-52-45.jpg">
+           <img src="https://i.ibb.co/RGH1JSPQ/photo-2026-07-04-00-52-45.jpg" alt="Office Shirt" loading="lazy" decoding="async" data-fallbacks="[&quot;https://i.ibb.co/RGH1JSPQ/photo-2026-07-04-00-52-45.jpg&quot;]" data-fallback-idx="0" onerror="imgErrorHandler(this)">
+         </div>
+      <div class="ptop-row">
+        <div>
+          <span class="pcode">E90</span>
+          <div class="ptype">Shirt · អាវ</div>
+        </div>
+        <span class="pprice">$7.60</span>
+      </div>
+      <div class="pname">Office Shirt</div>
+      <div class="pname-kh">អាវសាច់ទឹកកក</div>
+      <div class="swatches"><span class="swatch" title="Black / ខ្មៅ" style="background:#1a1a1a"></span><span class="swatch" title="Grey / ប្រផេះ" style="background:#8a8a86"></span><span class="swatch" title="Bic Blue / ប៊ិច" style="background:#1c2b3a"></span><span class="swatch" title="White / ស" style="background:#f2ede0"></span><span class="swatch" title="ប្រាក់" style="background:hsl(259,35%,45%)"></span></div>
+      <div class="sizes"><span>M</span><span>L</span><span>XL</span><span>2XL</span><span>3XL</span><span>4XL</span></div>
+      <div class="prow"><span>Colors</span><span>Black (ខ្មៅ), Grey (ប្រផេះ), Bic Blue (ប៊ិច), White (ស), ប្រាក់</span></div>
+      
+      
+      
+      <button class="sizechart-toggle" data-panel="chart-0">View size chart ▾</button>
+      <div class="sizechart-panel" id="chart-0">
+        <table><thead><tr><th>Size</th><th>Chest cm</th><th>Shoulder cm</th><th>Length cm</th><th>Sleeve cm</th><th>Weight kg</th><th>Height cm</th></tr></thead><tbody><tr><td>M</td><td>104</td><td>46</td><td>68</td><td>60</td><td>55-65</td><td>160-170</td></tr><tr><td>L</td><td>110</td><td>48</td><td>70</td><td>61</td><td>65-75</td><td>165-175</td></tr><tr><td>XL</td><td>116</td><td>50</td><td>72</td><td>62</td><td>75-85</td><td>170-180</td></tr><tr><td>2XL</td><td>122</td><td>52</td><td>74</td><td>63</td><td>85-98</td><td>175-185</td></tr><tr><td>3XL</td><td>128</td><td>54</td><td>76</td><td>64</td><td>98-112</td><td>178-188</td></tr><tr><td>4XL</td><td>134</td><td>56</td><td>78</td><td>65</td><td>112-125</td><td>180-190</td></tr></tbody></table>
+      </div>
+
+      <button class="sizechart-toggle" data-panel="reco-0">View size recommendation ▾</button>
+      <div class="sizechart-panel" id="reco-0">
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <input type="text" class="reco-weight" data-idx="0" placeholder="Weight (kg)" style="flex:1;font-size:12px;padding:6px;border:1px solid var(--line);border-radius:2px;">
+          <input type="text" class="reco-height" data-idx="0" placeholder="Height (cm)" style="flex:1;font-size:12px;padding:6px;border:1px solid var(--line);border-radius:2px;">
+        </div>
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <input type="text" class="reco-bodycm" data-idx="0" placeholder="Chest cm (optional, precise)" style="flex:1;font-size:12px;padding:6px;border:1px solid var(--line);border-radius:2px;">
+          <select class="reco-fitpref" data-idx="0" style="font-size:12px;padding:6px;border:1px solid var(--line);border-radius:2px;">
+            <option value="slim">Slim</option>
+            <option value="regular" selected="">Regular</option>
+            <option value="relaxed">Relaxed</option>
+          </select>
+        </div>
+        <button class="btn btn-primary reco-find" data-idx="0" style="width:100%;margin-top:6px;font-size:12px;padding:7px;">Find Size</button>
+        <div class="reco-result" id="recoResult-0" style="display:none;font-size:12px;margin-top:8px;padding:8px;background:#efe8d8;border-left:3px solid var(--rust);line-height:1.4;"></div>
+      </div>
+    </div><div class="pcard">
+      <button class="pdelete" data-idx="1" title="Delete product">×</button>
+      <button class="pedit" data-idx="1" title="Edit product">✎</button>
+      <div class="pimg-wrap" data-full="https://i.ibb.co/DHD4qJ7X/photo-2026-07-04-11-27-59.jpg">
+           <img src="https://i.ibb.co/DHD4qJ7X/photo-2026-07-04-11-27-59.jpg" alt="Linen" loading="lazy" decoding="async" data-fallbacks="[&quot;https://i.ibb.co/DHD4qJ7X/photo-2026-07-04-11-27-59.jpg&quot;]" data-fallback-idx="0" onerror="imgErrorHandler(this)">
+         </div>
+      <div class="ptop-row">
+        <div>
+          <span class="pcode">E214</span>
+          <div class="ptype">Shirt · អាវ</div>
+        </div>
+        <span class="pprice">$8.80</span>
+      </div>
+      <div class="pname">Linen</div>
+      <div class="pname-kh">លីនីន</div>
+      <div class="swatches"><span class="swatch" title="Black / ខ្មៅ" style="background:#1a1a1a"></span><span class="swatch" title="Grey / ប្រផេះ" style="background:#8a8a86"></span><span class="swatch" title="Nude / សាច់" style="background:#dab08c"></span><span class="swatch" title="Coffee / កាហ្វេ" style="background:#4b3621"></span><span class="swatch" title="White / ស" style="background:#f2ede0"></span></div>
+      <div class="sizes"><span>S</span><span>M</span><span>L</span><span>XL</span></div>
+      <div class="prow"><span>Colors</span><span>Black (ខ្មៅ), Grey (ប្រផេះ), Nude (សាច់), Coffee (កាហ្វេ), White (ស)</span></div>
+      
+      
+      <div class="fabric-note"><b>សាច់ឬក្សី</b></div>
+    
+      
+      <button class="sizechart-toggle" data-panel="chart-1">View size chart ▾</button>
+      <div class="sizechart-panel" id="chart-1">
+        <table><thead><tr><th>Size</th><th>Chest cm</th><th>Shoulder cm</th><th>Length cm</th><th>Sleeve cm</th><th>Weight kg</th><th>Height cm</th></tr></thead><tbody><tr><td>S</td><td>98</td><td>44</td><td>64</td><td>58</td><td>45-55</td><td>150-160</td></tr><tr><td>M</td><td>104</td><td>46</td><td>68</td><td>60</td><td>55-65</td><td>160-170</td></tr><tr><td>L</td><td>110</td><td>48</td><td>70</td><td>61</td><td>65-75</td><td>165-175</td></tr><tr><td>XL</td><td>116</td><td>50</td><td>72</td><td>62</td><td>75-85</td><td>170-180</td></tr></tbody></table>
+      </div>
+
+      <button class="sizechart-toggle" data-panel="reco-1">View size recommendation ▾</button>
+      <div class="sizechart-panel" id="reco-1">
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <input type="text" class="reco-weight" data-idx="1" placeholder="Weight (kg)" style="flex:1;font-size:12px;padding:6px;border:1px solid var(--line);border-radius:2px;">
+          <input type="text" class="reco-height" data-idx="1" placeholder="Height (cm)" style="flex:1;font-size:12px;padding:6px;border:1px solid var(--line);border-radius:2px;">
+        </div>
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <input type="text" class="reco-bodycm" data-idx="1" placeholder="Chest cm (optional, precise)" style="flex:1;font-size:12px;padding:6px;border:1px solid var(--line);border-radius:2px;">
+          <select class="reco-fitpref" data-idx="1" style="font-size:12px;padding:6px;border:1px solid var(--line);border-radius:2px;">
+            <option value="slim">Slim</option>
+            <option value="regular" selected="">Regular</option>
+            <option value="relaxed">Relaxed</option>
+          </select>
+        </div>
+        <button class="btn btn-primary reco-find" data-idx="1" style="width:100%;margin-top:6px;font-size:12px;padding:7px;">Find Size</button>
+        <div class="reco-result" id="recoResult-1" style="display:none;font-size:12px;margin-top:8px;padding:8px;background:#efe8d8;border-left:3px solid var(--rust);line-height:1.4;"></div>
+      </div>
+    </div><div class="pcard">
+      <button class="pdelete" data-idx="2" title="Delete product">×</button>
+      <button class="pedit" data-idx="2" title="Edit product">✎</button>
+      <div class="pimg-wrap" data-full="https://i.ibb.co/PszhPtGV/photo-2026-07-04-13-12-41.jpg">
+           <img src="https://i.ibb.co/PszhPtGV/photo-2026-07-04-13-12-41.jpg" alt="KKV" loading="lazy" decoding="async" data-fallbacks="[&quot;https://i.ibb.co/PszhPtGV/photo-2026-07-04-13-12-41.jpg&quot;]" data-fallback-idx="0" onerror="imgErrorHandler(this)">
+         </div>
+      <div class="ptop-row">
+        <div>
+          <span class="pcode">E186</span>
+          <div class="ptype">Shirt · អាវ</div>
+        </div>
+        <span class="pprice">$9.60</span>
+      </div>
+      <div class="pname">KKV</div>
+      <div class="pname-kh">សាច់កាគី</div>
+      <div class="swatches"><span class="swatch" title="Black / ខ្មៅ" style="background:#1a1a1a"></span><span class="swatch" title="Green / បៃតង" style="background:#4a5c3a"></span><span class="swatch" title="Coffee / កាហ្វេ" style="background:#4b3621"></span><span class="swatch" title="Earth / ដី" style="background:#8b6b4a"></span><span class="swatch" title="White / ស" style="background:#f2ede0"></span></div>
+      <div class="sizes"><span>S</span><span>M</span><span>L</span><span>XL</span><span>2XL</span></div>
+      <div class="prow"><span>Colors</span><span>Black (ខ្មៅ), Green (បៃតង), Coffee (កាហ្វេ), Earth (ដី), White (ស)</span></div>
+      
+      
+      
+      <button class="sizechart-toggle" data-panel="chart-2">View size chart ▾</button>
+      <div class="sizechart-panel" id="chart-2">
+        <table><thead><tr><th>Size</th><th>Chest cm</th><th>Shoulder cm</th><th>Length cm</th><th>Sleeve cm</th><th>Weight kg</th><th>Height cm</th></tr></thead><tbody><tr><td>S</td><td>45</td><td>0</td><td>66</td><td>45</td><td>50-60</td><td>1.60 – 1.70</td></tr><tr><td>M</td><td>46</td><td>0</td><td>68</td><td>46</td><td>60 - 70</td><td>1.70 –1.75</td></tr><tr><td>L</td><td>47</td><td>0</td><td>70</td><td>47</td><td>70 - 80</td><td>1.75 –1.80</td></tr><tr><td>XL</td><td>48</td><td>0</td><td>71</td><td>48</td><td>80 - 85</td><td>1.80 – 1.85</td></tr><tr><td>2XL</td><td>49</td><td>0</td><td>76</td><td>49</td><td>85 - 90</td><td>1.85 –1.87</td></tr></tbody></table>
+      </div>
+
+      <button class="sizechart-toggle" data-panel="reco-2">View size recommendation ▾</button>
+      <div class="sizechart-panel" id="reco-2">
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <input type="text" class="reco-weight" data-idx="2" placeholder="Weight (kg)" style="flex:1;font-size:12px;padding:6px;border:1px solid var(--line);border-radius:2px;">
+          <input type="text" class="reco-height" data-idx="2" placeholder="Height (cm)" style="flex:1;font-size:12px;padding:6px;border:1px solid var(--line);border-radius:2px;">
+        </div>
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <input type="text" class="reco-bodycm" data-idx="2" placeholder="Chest cm (optional, precise)" style="flex:1;font-size:12px;padding:6px;border:1px solid var(--line);border-radius:2px;">
+          <select class="reco-fitpref" data-idx="2" style="font-size:12px;padding:6px;border:1px solid var(--line);border-radius:2px;">
+            <option value="slim">Slim</option>
+            <option value="regular" selected="">Regular</option>
+            <option value="relaxed">Relaxed</option>
+          </select>
+        </div>
+        <button class="btn btn-primary reco-find" data-idx="2" style="width:100%;margin-top:6px;font-size:12px;padding:7px;">Find Size</button>
+        <div class="reco-result" id="recoResult-2" style="display:none;font-size:12px;margin-top:8px;padding:8px;background:#efe8d8;border-left:3px solid var(--rust);line-height:1.4;"></div>
+      </div>
+    </div><div class="pcard">
+      <button class="pdelete" data-idx="3" title="Delete product">×</button>
+      <button class="pedit" data-idx="3" title="Edit product">✎</button>
+      <div class="pimg-wrap" data-full="https://i.ibb.co/gZ4kKpTy/photo-2026-07-04-14-41-37.jpg">
+           <img src="https://i.ibb.co/gZ4kKpTy/photo-2026-07-04-14-41-37.jpg" alt="Roundneck" loading="lazy" decoding="async" data-fallbacks="[&quot;https://i.ibb.co/gZ4kKpTy/photo-2026-07-04-14-41-37.jpg&quot;]" data-fallback-idx="0" onerror="imgErrorHandler(this)">
+         </div>
+      <div class="ptop-row">
+        <div>
+          <span class="pcode">E187</span>
+          <div class="ptype">Shirt · អាវ</div>
+        </div>
+        <span class="pprice">$6.60</span>
+      </div>
+      <div class="pname">Roundneck</div>
+      <div class="pname-kh">អាវយឺតកមូលលេវ</div>
+      <div class="swatches"><span class="swatch" title="Black / ខ្មៅ" style="background:#1a1a1a"></span><span class="swatch" title="Grey / ប្រផេះ" style="background:#8a8a86"></span><span class="swatch" title="Coffee / កាហ្វេ" style="background:#4b3621"></span><span class="swatch" title="White / ស" style="background:#f2ede0"></span></div>
+      <div class="sizes"><span>S</span><span>M</span><span>L</span><span>XL</span></div>
+      <div class="prow"><span>Colors</span><span>Black (ខ្មៅ), Grey (ប្រផេះ), Coffee (កាហ្វេ), White (ស)</span></div>
+      
+      
+      
+      <button class="sizechart-toggle" data-panel="chart-3">View size chart ▾</button>
+      <div class="sizechart-panel" id="chart-3">
+        <table><thead><tr><th>Size</th><th>Chest cm</th><th>Shoulder cm</th><th>Length cm</th><th>Sleeve cm</th><th>Weight kg</th><th>Height cm</th></tr></thead><tbody><tr><td>S</td><td>53</td><td>0</td><td>66</td><td>—</td><td>50 - 60</td><td>1.60 – 1.65</td></tr><tr><td>M</td><td>54</td><td>0</td><td>68</td><td>—</td><td>60 - 70</td><td>1.65–1.70</td></tr><tr><td>L</td><td>56</td><td>0</td><td>70</td><td>—</td><td>70 - 80</td><td>1.70 – 1.75</td></tr><tr><td>XL</td><td>58</td><td>0</td><td>73</td><td>62</td><td>80 - 90</td><td>170-185</td></tr></tbody></table>
+      </div>
+
+      <button class="sizechart-toggle" data-panel="reco-3">View size recommendation ▾</button>
+      <div class="sizechart-panel" id="reco-3">
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <input type="text" class="reco-weight" data-idx="3" placeholder="Weight (kg)" style="flex:1;font-size:12px;padding:6px;border:1px solid var(--line);border-radius:2px;">
+          <input type="text" class="reco-height" data-idx="3" placeholder="Height (cm)" style="flex:1;font-size:12px;padding:6px;border:1px solid var(--line);border-radius:2px;">
+        </div>
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <input type="text" class="reco-bodycm" data-idx="3" placeholder="Chest cm (optional, precise)" style="flex:1;font-size:12px;padding:6px;border:1px solid var(--line);border-radius:2px;">
+          <select class="reco-fitpref" data-idx="3" style="font-size:12px;padding:6px;border:1px solid var(--line);border-radius:2px;">
+            <option value="slim">Slim</option>
+            <option value="regular" selected="">Regular</option>
+            <option value="relaxed">Relaxed</option>
+          </select>
+        </div>
+        <button class="btn btn-primary reco-find" data-idx="3" style="width:100%;margin-top:6px;font-size:12px;padding:7px;">Find Size</button>
+        <div class="reco-result" id="recoResult-3" style="display:none;font-size:12px;margin-top:8px;padding:8px;background:#efe8d8;border-left:3px solid var(--rust);line-height:1.4;"></div>
+      </div>
+    </div><div class="pcard">
+      <button class="pdelete" data-idx="4" title="Delete product">×</button>
+      <button class="pedit" data-idx="4" title="Edit product">✎</button>
+      <div class="pimg-wrap" data-full="https://i.ibb.co/84s9bWpt/photo-2026-07-04-15-42-46.jpg">
+           <img src="https://i.ibb.co/84s9bWpt/photo-2026-07-04-15-42-46.jpg" alt="Short-sleeved striped" loading="lazy" decoding="async" data-fallbacks="[&quot;https://i.ibb.co/84s9bWpt/photo-2026-07-04-15-42-46.jpg&quot;]" data-fallback-idx="0" onerror="imgErrorHandler(this)">
+         </div>
+      <div class="ptop-row">
+        <div>
+          <span class="pcode">E192</span>
+          <div class="ptype">Shirt · អាវ</div>
+        </div>
+        <span class="pprice">$8.80</span>
+      </div>
+      <div class="pname">Short-sleeved striped</div>
+      <div class="pname-kh">អាវដៃខ្លីកបើកមានឆ្នូត</div>
+      <div class="swatches"><span class="swatch" title="Black / ខ្មៅ" style="background:#1a1a1a"></span><span class="swatch" title="Grey / ប្រផេះ" style="background:#8a8a86"></span><span class="swatch" title="Bic Blue / ប៊ិច" style="background:#1c2b3a"></span><span class="swatch" title="Sky Blue / មេឃ" style="background:#6fa3c7"></span><span class="swatch" title="White / ស" style="background:#f2ede0"></span></div>
+      <div class="sizes"><span>S</span><span>M</span><span>L</span><span>XL</span><span>2XL</span></div>
+      <div class="prow"><span>Colors</span><span>Black (ខ្មៅ), Grey (ប្រផេះ), Bic Blue (ប៊ិច), Sky Blue (មេឃ), White (ស)</span></div>
+      
+      
+      <a class="album-link" href="https://m.me/vhmen.khofficial" target="_blank" rel="noopener">📸 Open Album</a>
+      <button class="sizechart-toggle" data-panel="chart-4">View size chart ▾</button>
+      <div class="sizechart-panel" id="chart-4">
+        <table><thead><tr><th>Size</th><th>Chest cm</th><th>Shoulder cm</th><th>Length cm</th><th>Sleeve cm</th><th>Weight kg</th><th>Height cm</th></tr></thead><tbody><tr><td>S</td><td>51</td><td>0</td><td>69</td><td>—</td><td>50-60</td><td>160-170</td></tr><tr><td>M</td><td>53</td><td>0</td><td>72</td><td>—</td><td>60-70</td><td>160-175</td></tr><tr><td>L</td><td>54</td><td>0</td><td>72</td><td>—</td><td>70-80</td><td>165-175</td></tr><tr><td>XL</td><td>57</td><td>0</td><td>75</td><td>—</td><td>80-85</td><td>170-180</td></tr><tr><td>2XL</td><td>58</td><td>0</td><td>76</td><td>—</td><td>85-90</td><td>175-185</td></tr></tbody></table>
+      </div>
+
+      <button class="sizechart-toggle" data-panel="reco-4">View size recommendation ▾</button>
+      <div class="sizechart-panel" id="reco-4">
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <input type="text" class="reco-weight" data-idx="4" placeholder="Weight (kg)" style="flex:1;font-size:12px;padding:6px;border:1px solid var(--line);border-radius:2px;">
+          <input type="text" class="reco-height" data-idx="4" placeholder="Height (cm)" style="flex:1;font-size:12px;padding:6px;border:1px solid var(--line);border-radius:2px;">
+        </div>
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <input type="text" class="reco-bodycm" data-idx="4" placeholder="Chest cm (optional, precise)" style="flex:1;font-size:12px;padding:6px;border:1px solid var(--line);border-radius:2px;">
+          <select class="reco-fitpref" data-idx="4" style="font-size:12px;padding:6px;border:1px solid var(--line);border-radius:2px;">
+            <option value="slim">Slim</option>
+            <option value="regular" selected="">Regular</option>
+            <option value="relaxed">Relaxed</option>
+          </select>
+        </div>
+        <button class="btn btn-primary reco-find" data-idx="4" style="width:100%;margin-top:6px;font-size:12px;padding:7px;">Find Size</button>
+        <div class="reco-result" id="recoResult-4" style="display:none;font-size:12px;margin-top:8px;padding:8px;background:#efe8d8;border-left:3px solid var(--rust);line-height:1.4;"></div>
+      </div>
+    </div><div class="pcard">
+      <button class="pdelete" data-idx="5" title="Delete product">×</button>
+      <button class="pedit" data-idx="5" title="Edit product">✎</button>
+      <div class="pimg-wrap" data-full="https://i.ibb.co/RGNCtF0J/photo-2026-07-04-16-07-10.jpg">
+           <img src="https://i.ibb.co/RGNCtF0J/photo-2026-07-04-16-07-10.jpg" alt="Striped T-shirt" loading="lazy" decoding="async" data-fallbacks="[&quot;https://i.ibb.co/RGNCtF0J/photo-2026-07-04-16-07-10.jpg&quot;]" data-fallback-idx="0" onerror="imgErrorHandler(this)">
+         </div>
+      <div class="ptop-row">
+        <div>
+          <span class="pcode">E193</span>
+          <div class="ptype">Shirt · អាវ</div>
+        </div>
+        <span class="pprice">$6.40</span>
+      </div>
+      <div class="pname">Striped T-shirt</div>
+      <div class="pname-kh">អាវយឹតដៃបង្កង់</div>
+      <div class="swatches"><span class="swatch" title="Black / ខ្មៅ" style="background:#1a1a1a"></span><span class="swatch" title="Bic Blue / ប៊ិច" style="background:#1c2b3a"></span><span class="swatch" title="Nude / សាច់" style="background:#dab08c"></span><span class="swatch" title="Coffee / កាហ្វេ" style="background:#4b3621"></span><span class="swatch" title="Earth / ដី" style="background:#8b6b4a"></span></div>
+      <div class="sizes"><span>S</span><span>M</span><span>L</span><span>XL</span><span>2XL</span></div>
+      <div class="prow"><span>Colors</span><span>Black (ខ្មៅ), Bic Blue (ប៊ិច), Nude (សាច់), Coffee (កាហ្វេ), Earth (ដី)</span></div>
+      
+      
+      <a class="album-link" href="https://m.me/vhmen.khofficial" target="_blank" rel="noopener">📸 Open Album</a>
+      <button class="sizechart-toggle" data-panel="chart-5">View size chart ▾</button>
+      <div class="sizechart-panel" id="chart-5">
+        <table><thead><tr><th>Size</th><th>Chest cm</th><th>Shoulder cm</th><th>Length cm</th><th>Sleeve cm</th><th>Weight kg</th><th>Height cm</th></tr></thead><tbody><tr><td>S</td><td>50</td><td>0</td><td>66</td><td>—</td><td>50-60</td><td>160-170</td></tr><tr><td>M</td><td>51</td><td>0</td><td>67</td><td>—</td><td>60-70</td><td>170-175</td></tr><tr><td>L</td><td>53</td><td>0</td><td>71</td><td>—</td><td>70-80</td><td>175-180</td></tr><tr><td>XL</td><td>56</td><td>0</td><td>74</td><td>—</td><td>75-85</td><td>180-185</td></tr><tr><td>2XL</td><td>58</td><td>0</td><td>75</td><td>—</td><td>85-90</td><td>185-190</td></tr></tbody></table>
+      </div>
+
+      <button class="sizechart-toggle" data-panel="reco-5">View size recommendation ▾</button>
+      <div class="sizechart-panel" id="reco-5">
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <input type="text" class="reco-weight" data-idx="5" placeholder="Weight (kg)" style="flex:1;font-size:12px;padding:6px;border:1px solid var(--line);border-radius:2px;">
+          <input type="text" class="reco-height" data-idx="5" placeholder="Height (cm)" style="flex:1;font-size:12px;padding:6px;border:1px solid var(--line);border-radius:2px;">
+        </div>
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <input type="text" class="reco-bodycm" data-idx="5" placeholder="Chest cm (optional, precise)" style="flex:1;font-size:12px;padding:6px;border:1px solid var(--line);border-radius:2px;">
+          <select class="reco-fitpref" data-idx="5" style="font-size:12px;padding:6px;border:1px solid var(--line);border-radius:2px;">
+            <option value="slim">Slim</option>
+            <option value="regular" selected="">Regular</option>
+            <option value="relaxed">Relaxed</option>
+          </select>
+        </div>
+        <button class="btn btn-primary reco-find" data-idx="5" style="width:100%;margin-top:6px;font-size:12px;padding:7px;">Find Size</button>
+        <div class="reco-result" id="recoResult-5" style="display:none;font-size:12px;margin-top:8px;padding:8px;background:#efe8d8;border-left:3px solid var(--rust);line-height:1.4;"></div>
+      </div>
+    </div><div class="pcard">
+      <button class="pdelete" data-idx="6" title="Delete product">×</button>
+      <button class="pedit" data-idx="6" title="Edit product">✎</button>
+      <div class="pimg-wrap" data-full="https://i.ibb.co/NgMfVy30/photo-2026-07-04-16-15-57.jpg">
+           <img src="https://i.ibb.co/NgMfVy30/photo-2026-07-04-16-15-57.jpg" alt="Crew-neck T-shirt" loading="lazy" decoding="async" data-fallbacks="[&quot;https://i.ibb.co/NgMfVy30/photo-2026-07-04-16-15-57.jpg&quot;]" data-fallback-idx="0" onerror="imgErrorHandler(this)">
+         </div>
+      <div class="ptop-row">
+        <div>
+          <span class="pcode">E194</span>
+          <div class="ptype">Shirt · អាវ</div>
+        </div>
+        <span class="pprice">$6.40</span>
+      </div>
+      <div class="pname">Crew-neck T-shirt</div>
+      <div class="pname-kh">អាវយឺតកមូលដៃខ្លី​ម៉ូតបង្កង់POLO</div>
+      <div class="swatches"><span class="swatch" title="Black / ខ្មៅ" style="background:#1a1a1a"></span><span class="swatch" title="Grey / ប្រផេះ" style="background:#8a8a86"></span><span class="swatch" title="Bic Blue / ប៊ិច" style="background:#1c2b3a"></span><span class="swatch" title="Nude / សាច់" style="background:#dab08c"></span><span class="swatch" title="Yellow / លឿង" style="background:#c9a536"></span><span class="swatch" title="Silver / ប្រាក់" style="background:#b8b8b8"></span><span class="swatch" title="White / ស" style="background:#f2ede0"></span></div>
+      <div class="sizes"><span>S</span><span>M</span><span>L</span><span>XL</span><span>2XL</span></div>
+      <div class="prow"><span>Colors</span><span>Black (ខ្មៅ), Grey (ប្រផេះ), Bic Blue (ប៊ិច), Nude (សាច់), Yellow (លឿង), Silver (ប្រាក់), White (ស)</span></div>
+      
+      
+      <a class="album-link" href="https://m.me/vhmen.khofficial" target="_blank" rel="noopener">📸 Open Album</a>
+      <button class="sizechart-toggle" data-panel="chart-6">View size chart ▾</button>
+      <div class="sizechart-panel" id="chart-6">
+        <table><thead><tr><th>Size</th><th>Chest cm</th><th>Shoulder cm</th><th>Length cm</th><th>Sleeve cm</th><th>Weight kg</th><th>Height cm</th></tr></thead><tbody><tr><td>S</td><td>55</td><td>0</td><td>67</td><td>—</td><td>50-65</td><td>160-170</td></tr><tr><td>M</td><td>56</td><td>0</td><td>68</td><td>—</td><td>65-70</td><td>170-175</td></tr><tr><td>L</td><td>57</td><td>0</td><td>73</td><td>—</td><td>75-80</td><td>175-180</td></tr><tr><td>XL</td><td>58</td><td>0</td><td>74</td><td>—</td><td>85-90</td><td>180-185</td></tr><tr><td>2XL</td><td>59</td><td>0</td><td>75</td><td>—</td><td>90-95</td><td>185-190</td></tr></tbody></table>
+      </div>
+
+      <button class="sizechart-toggle" data-panel="reco-6">View size recommendation ▾</button>
+      <div class="sizechart-panel" id="reco-6">
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <input type="text" class="reco-weight" data-idx="6" placeholder="Weight (kg)" style="flex:1;font-size:12px;padding:6px;border:1px solid var(--line);border-radius:2px;">
+          <input type="text" class="reco-height" data-idx="6" placeholder="Height (cm)" style="flex:1;font-size:12px;padding:6px;border:1px solid var(--line);border-radius:2px;">
+        </div>
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <input type="text" class="reco-bodycm" data-idx="6" placeholder="Chest cm (optional, precise)" style="flex:1;font-size:12px;padding:6px;border:1px solid var(--line);border-radius:2px;">
+          <select class="reco-fitpref" data-idx="6" style="font-size:12px;padding:6px;border:1px solid var(--line);border-radius:2px;">
+            <option value="slim">Slim</option>
+            <option value="regular" selected="">Regular</option>
+            <option value="relaxed">Relaxed</option>
+          </select>
+        </div>
+        <button class="btn btn-primary reco-find" data-idx="6" style="width:100%;margin-top:6px;font-size:12px;padding:7px;">Find Size</button>
+        <div class="reco-result" id="recoResult-6" style="display:none;font-size:12px;margin-top:8px;padding:8px;background:#efe8d8;border-left:3px solid var(--rust);line-height:1.4;"></div>
+      </div>
+    </div><div class="pcard">
+      <button class="pdelete" data-idx="7" title="Delete product">×</button>
+      <button class="pedit" data-idx="7" title="Edit product">✎</button>
+      <div class="pimg-wrap" data-full="https://i.ibb.co/84s9bWpt/photo-2026-07-04-15-42-46.jpg">
+           <img src="https://i.ibb.co/84s9bWpt/photo-2026-07-04-15-42-46.jpg" alt="Short-sleeved striped" loading="lazy" decoding="async" data-fallbacks="[&quot;https://i.ibb.co/84s9bWpt/photo-2026-07-04-15-42-46.jpg&quot;]" data-fallback-idx="0" onerror="imgErrorHandler(this)">
+         </div>
+      <div class="ptop-row">
+        <div>
+          <span class="pcode">E195</span>
+          <div class="ptype">Shirt · អាវ</div>
+        </div>
+        <span class="pprice">$8.80</span>
+      </div>
+      <div class="pname">Short-sleeved striped</div>
+      <div class="pname-kh">អាវកបើកដៃខ្លី​ឆ្នូត</div>
+      <div class="swatches"><span class="swatch" title="Black / ខ្មៅ" style="background:#1a1a1a"></span><span class="swatch" title="Grey / ប្រផេះ" style="background:#8a8a86"></span><span class="swatch" title="Bic Blue / ប៊ិច" style="background:#1c2b3a"></span><span class="swatch" title="Sky Blue / មេឃ" style="background:#6fa3c7"></span><span class="swatch" title="White / ស" style="background:#f2ede0"></span></div>
+      <div class="sizes"><span>S</span><span>M</span><span>L</span><span>XL</span></div>
+      <div class="prow"><span>Colors</span><span>Black (ខ្មៅ), Grey (ប្រផេះ), Bic Blue (ប៊ិច), Sky Blue (មេឃ), White (ស)</span></div>
+      
+      
+      <a class="album-link" href="https://m.me/vhmen.khofficial" target="_blank" rel="noopener">📸 Open Album</a>
+      <button class="sizechart-toggle" data-panel="chart-7">View size chart ▾</button>
+      <div class="sizechart-panel" id="chart-7">
+        <table><thead><tr><th>Size</th><th>Chest cm</th><th>Shoulder cm</th><th>Length cm</th><th>Sleeve cm</th><th>Weight kg</th><th>Height cm</th></tr></thead><tbody><tr><td>S</td><td>48</td><td>0</td><td>67</td><td>—</td><td>50-60</td><td>155-165</td></tr><tr><td>M</td><td>49</td><td>0</td><td>69</td><td>—</td><td>60-70</td><td>165-170</td></tr><tr><td>L</td><td>52</td><td>0</td><td>72</td><td>—</td><td>70-80</td><td>170-175</td></tr><tr><td>XL</td><td>54</td><td>0</td><td>73</td><td>—</td><td>80-85</td><td>175-180</td></tr></tbody></table>
+      </div>
+
+      <button class="sizechart-toggle" data-panel="reco-7">View size recommendation ▾</button>
+      <div class="sizechart-panel" id="reco-7">
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <input type="text" class="reco-weight" data-idx="7" placeholder="Weight (kg)" style="flex:1;font-size:12px;padding:6px;border:1px solid var(--line);border-radius:2px;">
+          <input type="text" class="reco-height" data-idx="7" placeholder="Height (cm)" style="flex:1;font-size:12px;padding:6px;border:1px solid var(--line);border-radius:2px;">
+        </div>
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <input type="text" class="reco-bodycm" data-idx="7" placeholder="Chest cm (optional, precise)" style="flex:1;font-size:12px;padding:6px;border:1px solid var(--line);border-radius:2px;">
+          <select class="reco-fitpref" data-idx="7" style="font-size:12px;padding:6px;border:1px solid var(--line);border-radius:2px;">
+            <option value="slim">Slim</option>
+            <option value="regular" selected="">Regular</option>
+            <option value="relaxed">Relaxed</option>
+          </select>
+        </div>
+        <button class="btn btn-primary reco-find" data-idx="7" style="width:100%;margin-top:6px;font-size:12px;padding:7px;">Find Size</button>
+        <div class="reco-result" id="recoResult-7" style="display:none;font-size:12px;margin-top:8px;padding:8px;background:#efe8d8;border-left:3px solid var(--rust);line-height:1.4;"></div>
+      </div>
+    </div><div class="pcard">
+      <button class="pdelete" data-idx="8" title="Delete product">×</button>
+      <button class="pedit" data-idx="8" title="Edit product">✎</button>
+      <div class="pimg-wrap" data-full="https://i.ibb.co/5xf5BqBT/photo-2026-07-04-17-40-15.jpg">
+           <img src="https://i.ibb.co/5xf5BqBT/photo-2026-07-04-17-40-15.jpg" alt="Long-sleeved linen" loading="lazy" decoding="async" data-fallbacks="[&quot;https://i.ibb.co/5xf5BqBT/photo-2026-07-04-17-40-15.jpg&quot;]" data-fallback-idx="0" onerror="imgErrorHandler(this)">
+         </div>
+      <div class="ptop-row">
+        <div>
+          <span class="pcode">E196</span>
+          <div class="ptype">Shirt · អាវ</div>
+        </div>
+        <span class="pprice">$8.80</span>
+      </div>
+      <div class="pname">Long-sleeved linen</div>
+      <div class="pname-kh">អាវលីនីនដៃវែង</div>
+      <div class="swatches"><span class="swatch" title="Black / ខ្មៅ" style="background:#1a1a1a"></span><span class="swatch" title="Grey / ប្រផេះ" style="background:#8a8a86"></span><span class="swatch" title="Nude / សាច់" style="background:#dab08c"></span><span class="swatch" title="Green / បៃតង" style="background:#4a5c3a"></span><span class="swatch" title="White / ស" style="background:#f2ede0"></span></div>
+      <div class="sizes"><span>M</span><span>L</span><span>XL</span><span>2XL</span></div>
+      <div class="prow"><span>Colors</span><span>Black (ខ្មៅ), Grey (ប្រផេះ), Nude (សាច់), Green (បៃតង), White (ស)</span></div>
+      
+      
+      <a class="album-link" href="https://m.me/vhmen.khofficial" target="_blank" rel="noopener">📸 Open Album</a>
+      <button class="sizechart-toggle" data-panel="chart-8">View size chart ▾</button>
+      <div class="sizechart-panel" id="chart-8">
+        <table><thead><tr><th>Size</th><th>Chest cm</th><th>Shoulder cm</th><th>Length cm</th><th>Sleeve cm</th><th>Weight kg</th><th>Height cm</th></tr></thead><tbody><tr><td>M</td><td>50</td><td>0</td><td>68</td><td>50</td><td>50-60</td><td>160-170</td></tr><tr><td>L</td><td>52</td><td>0</td><td>69</td><td>51</td><td>60-68</td><td>170-175</td></tr><tr><td>XL</td><td>55</td><td>0</td><td>71</td><td>55</td><td>68-78</td><td>170-180</td></tr><tr><td>2XL</td><td>53</td><td>0</td><td>73</td><td>56</td><td>78-85</td><td>175-185</td></tr></tbody></table>
+      </div>
+
+      <button class="sizechart-toggle" data-panel="reco-8">View size recommendation ▾</button>
+      <div class="sizechart-panel" id="reco-8">
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <input type="text" class="reco-weight" data-idx="8" placeholder="Weight (kg)" style="flex:1;font-size:12px;padding:6px;border:1px solid var(--line);border-radius:2px;">
+          <input type="text" class="reco-height" data-idx="8" placeholder="Height (cm)" style="flex:1;font-size:12px;padding:6px;border:1px solid var(--line);border-radius:2px;">
+        </div>
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <input type="text" class="reco-bodycm" data-idx="8" placeholder="Chest cm (optional, precise)" style="flex:1;font-size:12px;padding:6px;border:1px solid var(--line);border-radius:2px;">
+          <select class="reco-fitpref" data-idx="8" style="font-size:12px;padding:6px;border:1px solid var(--line);border-radius:2px;">
+            <option value="slim">Slim</option>
+            <option value="regular" selected="">Regular</option>
+            <option value="relaxed">Relaxed</option>
+          </select>
+        </div>
+        <button class="btn btn-primary reco-find" data-idx="8" style="width:100%;margin-top:6px;font-size:12px;padding:7px;">Find Size</button>
+        <div class="reco-result" id="recoResult-8" style="display:none;font-size:12px;margin-top:8px;padding:8px;background:#efe8d8;border-left:3px solid var(--rust);line-height:1.4;"></div>
+      </div>
+    </div><div class="pcard">
+      <button class="pdelete" data-idx="9" title="Delete product">×</button>
+      <button class="pedit" data-idx="9" title="Edit product">✎</button>
+      <div class="pimg-wrap" data-full="https://i.ibb.co/rGwWnzS5/photo-2026-07-04-18-17-26.jpg">
+           <img src="https://i.ibb.co/rGwWnzS5/photo-2026-07-04-18-17-26.jpg" alt="Ice" loading="lazy" decoding="async" data-fallbacks="[&quot;https://i.ibb.co/rGwWnzS5/photo-2026-07-04-18-17-26.jpg&quot;]" data-fallback-idx="0" onerror="imgErrorHandler(this)">
+         </div>
+      <div class="ptop-row">
+        <div>
+          <span class="pcode">E197</span>
+          <div class="ptype">Shirt · អាវ</div>
+        </div>
+        <span class="pprice">$6.20</span>
+      </div>
+      <div class="pname">Ice</div>
+      <div class="pname-kh">អាវកបើកសាច់ទឹកកកម៉ូតឆ្នូត</div>
+      <div class="swatches"><span class="swatch" title="Black / ខ្មៅ" style="background:#1a1a1a"></span><span class="swatch" title="Red / ក្រហម" style="background:#7a2a2a"></span><span class="swatch" title="Silver / ប្រាក់" style="background:#b8b8b8"></span><span class="swatch" title="White / ស" style="background:#f2ede0"></span></div>
+      <div class="sizes"><span>M</span><span>L</span><span>XL</span><span>2XL</span><span>3XL</span></div>
+      <div class="prow"><span>Colors</span><span>Black (ខ្មៅ), Red (ក្រហម), Silver (ប្រាក់), White (ស)</span></div>
+      
+      
+      <a class="album-link" href="https://m.me/vhmen.khofficial" target="_blank" rel="noopener">📸 Open Album</a>
+      <button class="sizechart-toggle" data-panel="chart-9">View size chart ▾</button>
+      <div class="sizechart-panel" id="chart-9">
+        <table><thead><tr><th>Size</th><th>Chest cm</th><th>Shoulder cm</th><th>Length cm</th><th>Sleeve cm</th><th>Weight kg</th><th>Height cm</th></tr></thead><tbody><tr><td>M</td><td>49</td><td>0</td><td>69</td><td>17</td><td>50-60</td><td>155-165</td></tr><tr><td>L</td><td>53</td><td>0</td><td>71</td><td>18</td><td>60-70</td><td>160-170</td></tr><tr><td>XL</td><td>54</td><td>0</td><td>73</td><td>19</td><td>70-80</td><td>165-175</td></tr><tr><td>2XL</td><td>55</td><td>0</td><td>74</td><td>20</td><td>80-90</td><td>170-180</td></tr><tr><td>3XL</td><td>57</td><td>0</td><td>76</td><td>21</td><td>90-95</td><td>175-185</td></tr></tbody></table>
+      </div>
+
+      <button class="sizechart-toggle" data-panel="reco-9">View size recommendation ▾</button>
+      <div class="sizechart-panel" id="reco-9">
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <input type="text" class="reco-weight" data-idx="9" placeholder="Weight (kg)" style="flex:1;font-size:12px;padding:6px;border:1px solid var(--line);border-radius:2px;">
+          <input type="text" class="reco-height" data-idx="9" placeholder="Height (cm)" style="flex:1;font-size:12px;padding:6px;border:1px solid var(--line);border-radius:2px;">
+        </div>
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <input type="text" class="reco-bodycm" data-idx="9" placeholder="Chest cm (optional, precise)" style="flex:1;font-size:12px;padding:6px;border:1px solid var(--line);border-radius:2px;">
+          <select class="reco-fitpref" data-idx="9" style="font-size:12px;padding:6px;border:1px solid var(--line);border-radius:2px;">
+            <option value="slim">Slim</option>
+            <option value="regular" selected="">Regular</option>
+            <option value="relaxed">Relaxed</option>
+          </select>
+        </div>
+        <button class="btn btn-primary reco-find" data-idx="9" style="width:100%;margin-top:6px;font-size:12px;padding:7px;">Find Size</button>
+        <div class="reco-result" id="recoResult-9" style="display:none;font-size:12px;margin-top:8px;padding:8px;background:#efe8d8;border-left:3px solid var(--rust);line-height:1.4;"></div>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- SIZE GUIDE VIEW -->
+  <section id="sizing" class="view">
+    <h1 class="section-title">Size Guide</h1>
+    <div class="section-sub">// each code has its own size range — pick a product to see its exact chart</div>
+
+    <div class="measure-note">
+      <b>Live-selling tip:</b> weight + height gives a good estimate. If you (or the customer) know their actual chest/waist measurement, enter it too — that's compared directly against this product's real garment measurements for a much more accurate call.
+    </div>
+
+    <div class="toolbar">
+      <select id="sizeGuideProduct"><option value="0">E90 — Office Shirt (shirt)</option><option value="1">E214 — Linen (shirt)</option><option value="2">E186 — KKV (shirt)</option><option value="3">E187 — Roundneck (shirt)</option><option value="4">E192 — Short-sleeved striped (shirt)</option><option value="5">E193 — Striped T-shirt (shirt)</option><option value="6">E194 — Crew-neck T-shirt (shirt)</option><option value="7">E195 — Short-sleeved striped (shirt)</option><option value="8">E196 — Long-sleeved linen (shirt)</option><option value="9">E197 — Ice (shirt)</option></select>
+      <input type="text" id="finderWeight" placeholder="Weight (kg)" style="max-width:130px;">
+      <input type="text" id="finderHeight" placeholder="Height (cm)" style="max-width:130px;">
+    </div>
+    <div class="toolbar">
+      <input type="text" id="finderBodyCm" placeholder="Chest/Waist cm (optional, more accurate)" style="max-width:260px;">
+      <select id="finderFitPref">
+        <option value="slim">Slim fit</option>
+        <option value="regular" selected="">Regular fit</option>
+        <option value="relaxed">Relaxed fit</option>
+      </select>
+      <button class="btn btn-primary" id="findSizeBtn">Find Size</button>
+    </div>
+    <div id="finderResult" style="display:none;" class="measure-note"></div>
+
+    <table class="big" id="sizeGuideTable"><thead id="sizeGuideHead"><tr><th>Size</th><th>Chest cm</th><th>Shoulder cm</th><th>Length cm</th><th>Sleeve cm</th><th>Weight kg</th><th>Height cm</th></tr></thead><tbody id="sizeTable"><tr><td>M</td><td>104</td><td>46</td><td>68</td><td>60</td><td>55-65</td><td>160-170</td></tr><tr><td>L</td><td>110</td><td>48</td><td>70</td><td>61</td><td>65-75</td><td>165-175</td></tr><tr><td>XL</td><td>116</td><td>50</td><td>72</td><td>62</td><td>75-85</td><td>170-180</td></tr><tr><td>2XL</td><td>122</td><td>52</td><td>74</td><td>63</td><td>85-98</td><td>175-185</td></tr><tr><td>3XL</td><td>128</td><td>54</td><td>76</td><td>64</td><td>98-112</td><td>178-188</td></tr><tr><td>4XL</td><td>134</td><td>56</td><td>78</td><td>65</td><td>112-125</td><td>180-190</td></tr></tbody></table>
+  </section>
+
+  <!-- FABRIC VIEW -->
+  <section id="fabric" class="view">
+    <h1 class="section-title">Fabric &amp; Care</h1>
+    <div class="section-sub">// per product code — quick answers for customer questions</div>
+    <div class="fabric-grid" id="fabricGrid">
+    <div class="fcard">
+      <b>សាច់ឬក្សី</b>
+      <span class="fcode">E214 — Linen</span>
+      <p></p>
+      <div class="care"></div>
+    </div>
+  </div>
+  </section>
+
+</main>
+
+<div class="lightbox" id="lightbox"><img id="lightboxImg" src="" alt=""></div>
+
+<!-- ADD PRODUCT MODAL -->
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal">
+    <h2 id="modalTitle">Add New Product</h2>
+    <div class="sub" id="modalSub">// fill in what you know — everything can be edited later</div>
+
+    <div class="type-toggle">
+      <label><input type="radio" name="ptype" value="shirt" checked=""><span>👕 Shirt (អាវ)</span></label>
+      <label><input type="radio" name="ptype" value="pants"><span>👖 Pants (ខោ)</span></label>
+    </div>
+
+    <div class="field-row">
+      <div class="field"><label>Product code *</label><input type="text" id="f_code" placeholder="e.g. E210"></div>
+      <div class="field"><label>Price (USD)</label><input type="text" id="f_price" placeholder="e.g. 11.5"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Name (English) *</label><input type="text" id="f_name" placeholder="e.g. Cargo Shirt"></div>
+      <div class="field"><label>Name (Khmer)</label><input type="text" id="f_namekh" placeholder="ឈ្មោះខ្មែរ"></div>
+    </div>
+    <div class="field">
+      <label>Search keywords</label>
+      <input type="text" id="f_keywords" placeholder="e.g. kbk polo office formal">
+      <div class="field-hint">Informal terms staff might search — abbreviations, style names, etc.</div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Photo URL</label><input type="text" id="f_image" placeholder="images/e210.jpg or hosted link">
+        <div class="field-hint">Paste anything ImgBB/Drive gives you — a plain link, full HTML embed code, BBCode, or Markdown — it auto-extracts the real image link when you click away.</div>
+      </div>
+      <div class="field"><label>Album link (full photo set)</label><input type="text" id="f_album" placeholder="Google Drive folder link"></div>
+    </div>
+    <div class="field">
+      <label>Colors — tap to select</label>
+      <div class="color-check-row" id="colorCheckRow"><label class="color-chip"><input type="checkbox" class="color-check" value="0"><span class="chip-dot" style="background:#1a1a1a"></span><span>ខ្មៅ (Black)</span></label><label class="color-chip"><input type="checkbox" class="color-check" value="1"><span class="chip-dot" style="background:#8a8a86"></span><span>ប្រផេះ (Grey)</span></label><label class="color-chip"><input type="checkbox" class="color-check" value="2"><span class="chip-dot" style="background:#1c2b3a"></span><span>ប៊ិច (Bic Blue)</span></label><label class="color-chip"><input type="checkbox" class="color-check" value="3"><span class="chip-dot" style="background:#dab08c"></span><span>សាច់ (Nude)</span></label><label class="color-chip"><input type="checkbox" class="color-check" value="4"><span class="chip-dot" style="background:#4a5c3a"></span><span>បៃតង (Green)</span></label><label class="color-chip"><input type="checkbox" class="color-check" value="5"><span class="chip-dot" style="background:#6fa3c7"></span><span>មេឃ (Sky Blue)</span></label><label class="color-chip"><input type="checkbox" class="color-check" value="6"><span class="chip-dot" style="background:#7d8570"></span><span>ស្លែ ((confirm))</span></label><label class="color-chip"><input type="checkbox" class="color-check" value="7"><span class="chip-dot" style="background:#c97b8a"></span><span>ឈូក (Pink)</span></label><label class="color-chip"><input type="checkbox" class="color-check" value="8"><span class="chip-dot" style="background:#4b3621"></span><span>កាហ្វេ (Coffee)</span></label><label class="color-chip"><input type="checkbox" class="color-check" value="9"><span class="chip-dot" style="background:#8b6b4a"></span><span>ដី (Earth)</span></label><label class="color-chip"><input type="checkbox" class="color-check" value="10"><span class="chip-dot" style="background:#2f4f7a"></span><span>ខៀវ (Blue)</span></label><label class="color-chip"><input type="checkbox" class="color-check" value="11"><span class="chip-dot" style="background:#7a2a2a"></span><span>ក្រហម (Red)</span></label><label class="color-chip"><input type="checkbox" class="color-check" value="12"><span class="chip-dot" style="background:#c9c9c4"></span><span>ពពក (Cloud)</span></label><label class="color-chip"><input type="checkbox" class="color-check" value="13"><span class="chip-dot" style="background:#c9a536"></span><span>លឿង (Yellow)</span></label><label class="color-chip"><input type="checkbox" class="color-check" value="14"><span class="chip-dot" style="background:#6b1f1f"></span><span>ឈាមជ្រូក (Ox-blood)</span></label><label class="color-chip"><input type="checkbox" class="color-check" value="15"><span class="chip-dot" style="background:#b8b8b8"></span><span>ប្រាក់ (Silver)</span></label><label class="color-chip"><input type="checkbox" class="color-check" value="16"><span class="chip-dot" style="background:#a89f8a"></span><span>សរ ((confirm))</span></label><label class="color-chip"><input type="checkbox" class="color-check" value="17"><span class="chip-dot" style="background:#f2ede0"></span><span>ស (White)</span></label><label class="color-chip"><input type="checkbox" class="color-check" value="18"><span class="chip-dot" style="background:#22304f"></span><span>ខៀវចាស់ (Navy)</span></label><label class="color-chip"><input type="checkbox" class="color-check" value="19"><span class="chip-dot" style="background:#5e2330"></span><span>ក្រហមចាស់ (Maroon)</span></label><label class="color-chip"><input type="checkbox" class="color-check" value="20"><span class="chip-dot" style="background:#5c6647"></span><span>បៃតងអូលីវ (Olive)</span></label><label class="color-chip"><input type="checkbox" class="color-check" value="21"><span class="chip-dot" style="background:#5a4632"></span><span>ត្នោត (Brown)</span></label><label class="color-chip"><input type="checkbox" class="color-check" value="22"><span class="chip-dot" style="background:#d8c9a8"></span><span>ត្នោតខ្ចី (Beige)</span></label><label class="color-chip"><input type="checkbox" class="color-check" value="23"><span class="chip-dot" style="background:#b9ad86"></span><span>ខាគី (Khaki)</span></label><label class="color-chip"><input type="checkbox" class="color-check" value="24"><span class="chip-dot" style="background:#5b3a6e"></span><span>ស្វាយ (Purple)</span></label><label class="color-chip"><input type="checkbox" class="color-check" value="25"><span class="chip-dot" style="background:#c2703d"></span><span>ទឹកក្រូច (Orange)</span></label></div>
+      <div class="field-hint">Khmer name is what staff search by — English is just for reference. Missing a color? Use "🎨 Manage Colors" in the toolbar to add it permanently.</div>
+    </div>
+    <div class="field">
+      <label>Other color (not in the list above)</label>
+      <input type="text" id="f_colors_custom" placeholder="e.g. ក្រហមស្វាយ, or Teal/ខៀវបៃតង">
+      <div class="field-hint">Optional — same format as before, Khmer-only or English/Khmer, comma-separated for more than one.</div>
+    </div>
+
+    <div class="field">
+      <label>Available sizes — check all that apply for this code</label>
+      <div class="size-check-row" id="sizeCheckRow"><label><input type="checkbox" value="S" class="size-check"> S</label><label><input type="checkbox" value="M" class="size-check"> M</label><label><input type="checkbox" value="L" class="size-check"> L</label><label><input type="checkbox" value="XL" class="size-check"> XL</label><label><input type="checkbox" value="2XL" class="size-check"> 2XL</label><label><input type="checkbox" value="3XL" class="size-check"> 3XL</label><label><input type="checkbox" value="4XL" class="size-check"> 4XL</label></div>
+      <div id="sizeMeasureBlocks"><div class="size-measure-block" id="sm-M">
+    <div class="sm-title">M</div>
+    <div class="sm-inputs">
+      <div><label>Chest cm</label><input type="text" class="m-chestcm" value="104"></div>
+      <div><label>Chest in</label><input type="text" class="m-chestin" value="41"></div>
+      <div><label>Length cm</label><input type="text" class="m-lengthcm" value="68"></div>
+      <div><label>Shoulder cm</label><input type="text" class="m-shouldercm" value="46"></div>
+      <div><label>Sleeve cm</label><input type="text" class="m-sleevecm" value="60"></div>
+      <div><label>Weight range kg</label><input type="text" class="m-weightkg" value="55-65"></div>
+      <div><label>Height range cm</label><input type="text" class="m-heightcm" value="160-170"></div>
+    </div></div><div class="size-measure-block" id="sm-L">
+    <div class="sm-title">L</div>
+    <div class="sm-inputs">
+      <div><label>Chest cm</label><input type="text" class="m-chestcm" value="110"></div>
+      <div><label>Chest in</label><input type="text" class="m-chestin" value="43"></div>
+      <div><label>Length cm</label><input type="text" class="m-lengthcm" value="70"></div>
+      <div><label>Shoulder cm</label><input type="text" class="m-shouldercm" value="48"></div>
+      <div><label>Sleeve cm</label><input type="text" class="m-sleevecm" value="61"></div>
+      <div><label>Weight range kg</label><input type="text" class="m-weightkg" value="65-75"></div>
+      <div><label>Height range cm</label><input type="text" class="m-heightcm" value="165-175"></div>
+    </div></div><div class="size-measure-block" id="sm-XL">
+    <div class="sm-title">XL</div>
+    <div class="sm-inputs">
+      <div><label>Chest cm</label><input type="text" class="m-chestcm" value="116"></div>
+      <div><label>Chest in</label><input type="text" class="m-chestin" value="46"></div>
+      <div><label>Length cm</label><input type="text" class="m-lengthcm" value="72"></div>
+      <div><label>Shoulder cm</label><input type="text" class="m-shouldercm" value="50"></div>
+      <div><label>Sleeve cm</label><input type="text" class="m-sleevecm" value="62"></div>
+      <div><label>Weight range kg</label><input type="text" class="m-weightkg" value="75-85"></div>
+      <div><label>Height range cm</label><input type="text" class="m-heightcm" value="170-180"></div>
+    </div></div><div class="size-measure-block" id="sm-2XL">
+    <div class="sm-title">2XL</div>
+    <div class="sm-inputs">
+      <div><label>Chest cm</label><input type="text" class="m-chestcm" value="122"></div>
+      <div><label>Chest in</label><input type="text" class="m-chestin" value="48"></div>
+      <div><label>Length cm</label><input type="text" class="m-lengthcm" value="74"></div>
+      <div><label>Shoulder cm</label><input type="text" class="m-shouldercm" value="52"></div>
+      <div><label>Sleeve cm</label><input type="text" class="m-sleevecm" value="63"></div>
+      <div><label>Weight range kg</label><input type="text" class="m-weightkg" value="85-98"></div>
+      <div><label>Height range cm</label><input type="text" class="m-heightcm" value="175-185"></div>
+    </div></div><div class="size-measure-block" id="sm-3XL">
+    <div class="sm-title">3XL</div>
+    <div class="sm-inputs">
+      <div><label>Chest cm</label><input type="text" class="m-chestcm" value="128"></div>
+      <div><label>Chest in</label><input type="text" class="m-chestin" value="50"></div>
+      <div><label>Length cm</label><input type="text" class="m-lengthcm" value="76"></div>
+      <div><label>Shoulder cm</label><input type="text" class="m-shouldercm" value="54"></div>
+      <div><label>Sleeve cm</label><input type="text" class="m-sleevecm" value="64"></div>
+      <div><label>Weight range kg</label><input type="text" class="m-weightkg" value="98-112"></div>
+      <div><label>Height range cm</label><input type="text" class="m-heightcm" value="178-188"></div>
+    </div></div></div>
+    </div>
+
+    <div class="field-row">
+      <div class="field"><label>Fabric title</label><input type="text" id="f_fabrictitle" placeholder="e.g. Cotton Twill"></div>
+    </div>
+    <div class="field"><label>Fabric description</label><textarea id="f_fabricdesc" placeholder="Feel, weight, weave..."></textarea></div>
+    <div class="field"><label>Care instructions</label><textarea id="f_fabriccare" placeholder="Wash / dry / iron notes..."></textarea></div>
+
+    <div class="form-error" id="formError"></div>
+
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="cancelAdd">Cancel</button>
+      <button class="btn btn-primary" id="submitAdd">Add Product</button>
+    </div>
+  </div>
+</div>
+
+<!-- MANAGE COLORS MODAL -->
+<div class="modal-backdrop" id="colorModalBackdrop">
+  <div class="modal">
+    <h2>Manage Colors</h2>
+    <div class="sub">// edit, rename, recolor, add, or remove entries in the color picker</div>
+    <div id="colorRows"></div>
+    <button class="btn btn-ghost" id="addColorRow" style="width:100%;margin-top:6px;">+ Add Color</button>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="cancelColorManage">Cancel</button>
+      <button class="btn btn-primary" id="saveColorManage">Save Palette</button>
+    </div>
+  </div>
+</div>
+
+<div style="max-width:1150px;margin:0 auto;padding:0 20px;">
+  <div class="edit-hint">
+    Adding photos: create a folder named "images" next to this file, drop photos in, then set the product's Photo URL to "images/yourfile.jpg" (or paste any ImgBB/Drive link or embed code — it auto-extracts). Click any photo to zoom.<br><br>
+    Saving your changes: this file has no server, so new products live only in this open tab until you click <b>"⬇ Save Updated File"</b> — that downloads a new .html with everything included, named with the version number. Replace the old file with it, or send it to teammates so everyone has the same catalog.<br><br>
+    Getting a new version from me without losing your data: click <b>"📥 Import from Old File"</b> and select your current working file (the one with your real products) — it pulls in all your codes, photos, colors, and prices, merged with whatever new features this version adds. Then Save to lock it in.<br><br>
+    <b>Version <span id="versionTagFooter">v2.8</span> — what's changed:</b><br>
+    <span id="changelogList">• v2.8 — "📥 Import from Old File" button: select any older version of your catalog file and it pulls in all your real products (codes, photos, colors, prices) into this newer version, so updates never wipe your data again.<br>• v2.7 — More accurate size finder, Uniqlo MySize-style: enter an actual chest/waist measurement (optional) and it's compared directly against this product's real garment measurements, with a Slim/Regular/Relaxed fit preference and an ease/room number per size (e.g. "+8cm at chest"). Falls back to the weight/height bracket when no measurement is given.<br>• v2.6 — Color palette rebuilt from your actual inventory sheets (ខ្មៅ, ប្រផេះ, ប៊ិច, សាច់, បៃតង, មេឃ, ឈូក, កាហ្វេ, ដី, ខៀវ, ក្រហម, ពពក, លឿង, ឈាមជ្រូក, ប្រាក់, and more). New "🎨 Manage Colors" button lets you add, rename, recolor, or remove any palette entry — changes persist through Save/Export.<br>• v2.5 — Colors are now tap-to-select from a fixed palette (no typos, consistent swatches). Khmer name is what search matches on; English is just a label. Custom color field still available for anything not in the list.<br>• v2.4 — Khmer-only colors now map to accurate swatch colors (no English name required). Common Khmer color terms recognized directly.<br>• v2.3 — Smart photo URL: paste ImgBB/Drive embed code, BBCode, or Markdown, it auto-extracts the link. Clearer edit/delete buttons.<br>• v2.2 — Drive link auto-convert with fallback chain if a photo format fails to load.<br>• v2.1 — Edit button on every product (opens pre-filled form instead of re-adding).<br>• v2.0 — Shirt vs Pants sizing (letter sizes vs waist numbers), joint height+weight bracket matching, Khmer color names, price, keywords, album link.<br>• v1.2 — Inline size recommendation finder on each card; weight/height columns.<br>• v1.1 — Per-product size charts, add-product form, keyword search.<br>• v1.0 — Initial catalog: products, size guide, fabric info, photos.</span>
+  </div>
+</div>
+
+<script type="application/json" id="product-data">{
+  "products": [
+    {
+      "code": "E90",
+      "type": "shirt",
+      "name": "Office Shirt",
+      "nameKh": "អាវសាច់ទឹកកក",
+      "keywords": "sachterkkork arv daiveng",
+      "price": 7.6,
+      "colors": [
+        {
+          "name": "Black",
+          "nameKh": "ខ្មៅ",
+          "hex": "#1a1a1a"
+        },
+        {
+          "name": "Grey",
+          "nameKh": "ប្រផេះ",
+          "hex": "#8a8a86"
+        },
+        {
+          "name": "Bic Blue",
+          "nameKh": "ប៊ិច",
+          "hex": "#1c2b3a"
+        },
+        {
+          "name": "White",
+          "nameKh": "ស",
+          "hex": "#f2ede0"
+        },
+        {
+          "name": "",
+          "nameKh": "ប្រាក់",
+          "hex": "hsl(259,35%,45%)"
+        }
+      ],
+      "sizeChart": [
+        {
+          "size": "M",
+          "chestCm": 104,
+          "chestIn": 41,
+          "lengthCm": 68,
+          "shoulderCm": 46,
+          "sleeveCm": 60,
+          "weightKg": "55-65",
+          "heightCm": "160-170"
+        },
+        {
+          "size": "L",
+          "chestCm": 110,
+          "chestIn": 43,
+          "lengthCm": 70,
+          "shoulderCm": 48,
+          "sleeveCm": 61,
+          "weightKg": "65-75",
+          "heightCm": "165-175"
+        },
+        {
+          "size": "XL",
+          "chestCm": 116,
+          "chestIn": 46,
+          "lengthCm": 72,
+          "shoulderCm": 50,
+          "sleeveCm": 62,
+          "weightKg": "75-85",
+          "heightCm": "170-180"
+        },
+        {
+          "size": "2XL",
+          "chestCm": 122,
+          "chestIn": 48,
+          "lengthCm": 74,
+          "shoulderCm": 52,
+          "sleeveCm": 63,
+          "weightKg": "85-98",
+          "heightCm": "175-185"
+        },
+        {
+          "size": "3XL",
+          "chestCm": 128,
+          "chestIn": 50,
+          "lengthCm": 76,
+          "shoulderCm": 54,
+          "sleeveCm": 64,
+          "weightKg": "98-112",
+          "heightCm": "178-188"
+        },
+        {
+          "size": "4XL",
+          "chestCm": 134,
+          "chestIn": 52.5,
+          "lengthCm": 78,
+          "shoulderCm": 56,
+          "sleeveCm": 65,
+          "weightKg": "112-125",
+          "heightCm": "180-190"
+        }
+      ],
+      "image": "https://i.ibb.co/RGH1JSPQ/photo-2026-07-04-00-52-45.jpg",
+      "albumLink": "",
+      "fabricTitle": "",
+      "fabricDesc": "",
+      "fabricCare": ""
+    },
+    {
+      "code": "E214",
+      "type": "shirt",
+      "name": "Linen",
+      "nameKh": "លីនីន",
+      "keywords": "អាវដៃខ្លីកវី",
+      "price": 8.8,
+      "colors": [
+        {
+          "name": "Black",
+          "nameKh": "ខ្មៅ",
+          "hex": "#1a1a1a"
+        },
+        {
+          "name": "Grey",
+          "nameKh": "ប្រផេះ",
+          "hex": "#8a8a86"
+        },
+        {
+          "name": "Nude",
+          "nameKh": "សាច់",
+          "hex": "#dab08c"
+        },
+        {
+          "name": "Coffee",
+          "nameKh": "កាហ្វេ",
+          "hex": "#4b3621"
+        },
+        {
+          "name": "White",
+          "nameKh": "ស",
+          "hex": "#f2ede0"
+        }
+      ],
+      "sizeChart": [
+        {
+          "size": "S",
+          "chestCm": 98,
+          "chestIn": 38.5,
+          "lengthCm": 64,
+          "shoulderCm": 44,
+          "sleeveCm": 58,
+          "weightKg": "45-55",
+          "heightCm": "150-160"
+        },
+        {
+          "size": "M",
+          "chestCm": 104,
+          "chestIn": 41,
+          "lengthCm": 68,
+          "shoulderCm": 46,
+          "sleeveCm": 60,
+          "weightKg": "55-65",
+          "heightCm": "160-170"
+        },
+        {
+          "size": "L",
+          "chestCm": 110,
+          "chestIn": 43,
+          "lengthCm": 70,
+          "shoulderCm": 48,
+          "sleeveCm": 61,
+          "weightKg": "65-75",
+          "heightCm": "165-175"
+        },
+        {
+          "size": "XL",
+          "chestCm": 116,
+          "chestIn": 46,
+          "lengthCm": 72,
+          "shoulderCm": 50,
+          "sleeveCm": 62,
+          "weightKg": "75-85",
+          "heightCm": "170-180"
+        }
+      ],
+      "image": "https://i.ibb.co/DHD4qJ7X/photo-2026-07-04-11-27-59.jpg",
+      "albumLink": "",
+      "fabricTitle": "សាច់ឬក្សី",
+      "fabricDesc": "",
+      "fabricCare": ""
+    },
+    {
+      "code": "E186",
+      "type": "shirt",
+      "name": "KKV",
+      "nameKh": "សាច់កាគី",
+      "keywords": "KKV",
+      "price": 9.6,
+      "colors": [
+        {
+          "name": "Black",
+          "nameKh": "ខ្មៅ",
+          "hex": "#1a1a1a"
+        },
+        {
+          "name": "Green",
+          "nameKh": "បៃតង",
+          "hex": "#4a5c3a"
+        },
+        {
+          "name": "Coffee",
+          "nameKh": "កាហ្វេ",
+          "hex": "#4b3621"
+        },
+        {
+          "name": "Earth",
+          "nameKh": "ដី",
+          "hex": "#8b6b4a"
+        },
+        {
+          "name": "White",
+          "nameKh": "ស",
+          "hex": "#f2ede0"
+        }
+      ],
+      "sizeChart": [
+        {
+          "size": "S",
+          "chestCm": 45,
+          "chestIn": 0,
+          "lengthCm": 66,
+          "shoulderCm": 0,
+          "sleeveCm": 45,
+          "weightKg": "50-60",
+          "heightCm": "1.60 – 1.70"
+        },
+        {
+          "size": "M",
+          "chestCm": 46,
+          "chestIn": 0,
+          "lengthCm": 68,
+          "shoulderCm": 0,
+          "sleeveCm": 46,
+          "weightKg": "60 - 70",
+          "heightCm": "1.70 –1.75"
+        },
+        {
+          "size": "L",
+          "chestCm": 47,
+          "chestIn": 0,
+          "lengthCm": 70,
+          "shoulderCm": 0,
+          "sleeveCm": 47,
+          "weightKg": "70 - 80",
+          "heightCm": "1.75 –1.80"
+        },
+        {
+          "size": "XL",
+          "chestCm": 48,
+          "chestIn": 0,
+          "lengthCm": 71,
+          "shoulderCm": 0,
+          "sleeveCm": 48,
+          "weightKg": "80 - 85",
+          "heightCm": "1.80 – 1.85"
+        },
+        {
+          "size": "2XL",
+          "chestCm": 49,
+          "chestIn": 0,
+          "lengthCm": 76,
+          "shoulderCm": 0,
+          "sleeveCm": 49,
+          "weightKg": "85 - 90",
+          "heightCm": "1.85 –1.87"
+        }
+      ],
+      "image": "https://i.ibb.co/PszhPtGV/photo-2026-07-04-13-12-41.jpg",
+      "albumLink": "",
+      "fabricTitle": "",
+      "fabricDesc": "",
+      "fabricCare": ""
+    },
+    {
+      "code": "E187",
+      "type": "shirt",
+      "name": "Roundneck",
+      "nameKh": "អាវយឺតកមូលលេវ",
+      "keywords": "KML",
+      "price": 6.6,
+      "colors": [
+        {
+          "name": "Black",
+          "nameKh": "ខ្មៅ",
+          "hex": "#1a1a1a"
+        },
+        {
+          "name": "Grey",
+          "nameKh": "ប្រផេះ",
+          "hex": "#8a8a86"
+        },
+        {
+          "name": "Coffee",
+          "nameKh": "កាហ្វេ",
+          "hex": "#4b3621"
+        },
+        {
+          "name": "White",
+          "nameKh": "ស",
+          "hex": "#f2ede0"
+        }
+      ],
+      "sizeChart": [
+        {
+          "size": "S",
+          "chestCm": 53,
+          "chestIn": 0,
+          "lengthCm": 66,
+          "shoulderCm": 0,
+          "sleeveCm": 0,
+          "weightKg": "50 - 60",
+          "heightCm": "1.60 – 1.65"
+        },
+        {
+          "size": "M",
+          "chestCm": 54,
+          "chestIn": 0,
+          "lengthCm": 68,
+          "shoulderCm": 0,
+          "sleeveCm": 0,
+          "weightKg": "60 - 70",
+          "heightCm": "1.65–1.70"
+        },
+        {
+          "size": "L",
+          "chestCm": 56,
+          "chestIn": 0,
+          "lengthCm": 70,
+          "shoulderCm": 0,
+          "sleeveCm": 0,
+          "weightKg": "70 - 80",
+          "heightCm": "1.70 – 1.75"
+        },
+        {
+          "size": "XL",
+          "chestCm": 58,
+          "chestIn": 0,
+          "lengthCm": 73,
+          "shoulderCm": 0,
+          "sleeveCm": 62,
+          "weightKg": "80 - 90",
+          "heightCm": "170-185"
+        }
+      ],
+      "image": "https://i.ibb.co/gZ4kKpTy/photo-2026-07-04-14-41-37.jpg",
+      "albumLink": "",
+      "fabricTitle": "",
+      "fabricDesc": "",
+      "fabricCare": ""
+    },
+    {
+      "code": "E192",
+      "type": "shirt",
+      "name": "Short-sleeved striped",
+      "nameKh": "អាវដៃខ្លីកបើកមានឆ្នូត",
+      "keywords": "KBC",
+      "price": 8.8,
+      "colors": [
+        {
+          "name": "Black",
+          "nameKh": "ខ្មៅ",
+          "hex": "#1a1a1a"
+        },
+        {
+          "name": "Grey",
+          "nameKh": "ប្រផេះ",
+          "hex": "#8a8a86"
+        },
+        {
+          "name": "Bic Blue",
+          "nameKh": "ប៊ិច",
+          "hex": "#1c2b3a"
+        },
+        {
+          "name": "Sky Blue",
+          "nameKh": "មេឃ",
+          "hex": "#6fa3c7"
+        },
+        {
+          "name": "White",
+          "nameKh": "ស",
+          "hex": "#f2ede0"
+        }
+      ],
+      "sizeChart": [
+        {
+          "size": "S",
+          "chestCm": 51,
+          "chestIn": 0,
+          "lengthCm": 69,
+          "shoulderCm": 0,
+          "sleeveCm": 0,
+          "weightKg": "50-60",
+          "heightCm": "160-170"
+        },
+        {
+          "size": "M",
+          "chestCm": 53,
+          "chestIn": 0,
+          "lengthCm": 72,
+          "shoulderCm": 0,
+          "sleeveCm": 0,
+          "weightKg": "60-70",
+          "heightCm": "160-175"
+        },
+        {
+          "size": "L",
+          "chestCm": 54,
+          "chestIn": 0,
+          "lengthCm": 72,
+          "shoulderCm": 0,
+          "sleeveCm": 0,
+          "weightKg": "70-80",
+          "heightCm": "165-175"
+        },
+        {
+          "size": "XL",
+          "chestCm": 57,
+          "chestIn": 0,
+          "lengthCm": 75,
+          "shoulderCm": 0,
+          "sleeveCm": 0,
+          "weightKg": "80-85",
+          "heightCm": "170-180"
+        },
+        {
+          "size": "2XL",
+          "chestCm": 58,
+          "chestIn": 0,
+          "lengthCm": 76,
+          "shoulderCm": 0,
+          "sleeveCm": 0,
+          "weightKg": "85-90",
+          "heightCm": "175-185"
+        }
+      ],
+      "image": "https://i.ibb.co/84s9bWpt/photo-2026-07-04-15-42-46.jpg",
+      "albumLink": "https://m.me/vhmen.khofficial",
+      "fabricTitle": "",
+      "fabricDesc": "",
+      "fabricCare": ""
+    },
+    {
+      "code": "E193",
+      "type": "shirt",
+      "name": "Striped T-shirt",
+      "nameKh": "អាវយឹតដៃបង្កង់",
+      "keywords": "KMK",
+      "price": 6.4,
+      "colors": [
+        {
+          "name": "Black",
+          "nameKh": "ខ្មៅ",
+          "hex": "#1a1a1a"
+        },
+        {
+          "name": "Bic Blue",
+          "nameKh": "ប៊ិច",
+          "hex": "#1c2b3a"
+        },
+        {
+          "name": "Nude",
+          "nameKh": "សាច់",
+          "hex": "#dab08c"
+        },
+        {
+          "name": "Coffee",
+          "nameKh": "កាហ្វេ",
+          "hex": "#4b3621"
+        },
+        {
+          "name": "Earth",
+          "nameKh": "ដី",
+          "hex": "#8b6b4a"
+        }
+      ],
+      "sizeChart": [
+        {
+          "size": "S",
+          "chestCm": 50,
+          "chestIn": 0,
+          "lengthCm": 66,
+          "shoulderCm": 0,
+          "sleeveCm": 0,
+          "weightKg": "50-60",
+          "heightCm": "160-170"
+        },
+        {
+          "size": "M",
+          "chestCm": 51,
+          "chestIn": 0,
+          "lengthCm": 67,
+          "shoulderCm": 0,
+          "sleeveCm": 0,
+          "weightKg": "60-70",
+          "heightCm": "170-175"
+        },
+        {
+          "size": "L",
+          "chestCm": 53,
+          "chestIn": 0,
+          "lengthCm": 71,
+          "shoulderCm": 0,
+          "sleeveCm": 0,
+          "weightKg": "70-80",
+          "heightCm": "175-180"
+        },
+        {
+          "size": "XL",
+          "chestCm": 56,
+          "chestIn": 0,
+          "lengthCm": 74,
+          "shoulderCm": 0,
+          "sleeveCm": 0,
+          "weightKg": "75-85",
+          "heightCm": "180-185"
+        },
+        {
+          "size": "2XL",
+          "chestCm": 58,
+          "chestIn": 0,
+          "lengthCm": 75,
+          "shoulderCm": 0,
+          "sleeveCm": 0,
+          "weightKg": "85-90",
+          "heightCm": "185-190"
+        }
+      ],
+      "image": "https://i.ibb.co/RGNCtF0J/photo-2026-07-04-16-07-10.jpg",
+      "albumLink": "https://m.me/vhmen.khofficial",
+      "fabricTitle": "",
+      "fabricDesc": "",
+      "fabricCare": ""
+    },
+    {
+      "code": "E194",
+      "type": "shirt",
+      "name": "Crew-neck T-shirt",
+      "nameKh": "អាវយឺតកមូលដៃខ្លី​ម៉ូតបង្កង់POLO",
+      "keywords": "KMK",
+      "price": 6.4,
+      "colors": [
+        {
+          "name": "Black",
+          "nameKh": "ខ្មៅ",
+          "hex": "#1a1a1a"
+        },
+        {
+          "name": "Grey",
+          "nameKh": "ប្រផេះ",
+          "hex": "#8a8a86"
+        },
+        {
+          "name": "Bic Blue",
+          "nameKh": "ប៊ិច",
+          "hex": "#1c2b3a"
+        },
+        {
+          "name": "Nude",
+          "nameKh": "សាច់",
+          "hex": "#dab08c"
+        },
+        {
+          "name": "Yellow",
+          "nameKh": "លឿង",
+          "hex": "#c9a536"
+        },
+        {
+          "name": "Silver",
+          "nameKh": "ប្រាក់",
+          "hex": "#b8b8b8"
+        },
+        {
+          "name": "White",
+          "nameKh": "ស",
+          "hex": "#f2ede0"
+        }
+      ],
+      "sizeChart": [
+        {
+          "size": "S",
+          "chestCm": 55,
+          "chestIn": 0,
+          "lengthCm": 67,
+          "shoulderCm": 0,
+          "sleeveCm": 0,
+          "weightKg": "50-65",
+          "heightCm": "160-170"
+        },
+        {
+          "size": "M",
+          "chestCm": 56,
+          "chestIn": 0,
+          "lengthCm": 68,
+          "shoulderCm": 0,
+          "sleeveCm": 0,
+          "weightKg": "65-70",
+          "heightCm": "170-175"
+        },
+        {
+          "size": "L",
+          "chestCm": 57,
+          "chestIn": 0,
+          "lengthCm": 73,
+          "shoulderCm": 0,
+          "sleeveCm": 0,
+          "weightKg": "75-80",
+          "heightCm": "175-180"
+        },
+        {
+          "size": "XL",
+          "chestCm": 58,
+          "chestIn": 0,
+          "lengthCm": 74,
+          "shoulderCm": 0,
+          "sleeveCm": 0,
+          "weightKg": "85-90",
+          "heightCm": "180-185"
+        },
+        {
+          "size": "2XL",
+          "chestCm": 59,
+          "chestIn": 0,
+          "lengthCm": 75,
+          "shoulderCm": 0,
+          "sleeveCm": 0,
+          "weightKg": "90-95",
+          "heightCm": "185-190"
+        }
+      ],
+      "image": "https://i.ibb.co/NgMfVy30/photo-2026-07-04-16-15-57.jpg",
+      "albumLink": "https://m.me/vhmen.khofficial",
+      "fabricTitle": "",
+      "fabricDesc": "",
+      "fabricCare": ""
+    },
+    {
+      "code": "E195",
+      "type": "shirt",
+      "name": "Short-sleeved striped",
+      "nameKh": "អាវកបើកដៃខ្លី​ឆ្នូត",
+      "keywords": "KBK",
+      "price": 8.8,
+      "colors": [
+        {
+          "name": "Black",
+          "nameKh": "ខ្មៅ",
+          "hex": "#1a1a1a"
+        },
+        {
+          "name": "Grey",
+          "nameKh": "ប្រផេះ",
+          "hex": "#8a8a86"
+        },
+        {
+          "name": "Bic Blue",
+          "nameKh": "ប៊ិច",
+          "hex": "#1c2b3a"
+        },
+        {
+          "name": "Sky Blue",
+          "nameKh": "មេឃ",
+          "hex": "#6fa3c7"
+        },
+        {
+          "name": "White",
+          "nameKh": "ស",
+          "hex": "#f2ede0"
+        }
+      ],
+      "sizeChart": [
+        {
+          "size": "S",
+          "chestCm": 48,
+          "chestIn": 0,
+          "lengthCm": 67,
+          "shoulderCm": 0,
+          "sleeveCm": 0,
+          "weightKg": "50-60",
+          "heightCm": "155-165"
+        },
+        {
+          "size": "M",
+          "chestCm": 49,
+          "chestIn": 0,
+          "lengthCm": 69,
+          "shoulderCm": 0,
+          "sleeveCm": 0,
+          "weightKg": "60-70",
+          "heightCm": "165-170"
+        },
+        {
+          "size": "L",
+          "chestCm": 52,
+          "chestIn": 0,
+          "lengthCm": 72,
+          "shoulderCm": 0,
+          "sleeveCm": 0,
+          "weightKg": "70-80",
+          "heightCm": "170-175"
+        },
+        {
+          "size": "XL",
+          "chestCm": 54,
+          "chestIn": 0,
+          "lengthCm": 73,
+          "shoulderCm": 0,
+          "sleeveCm": 0,
+          "weightKg": "80-85",
+          "heightCm": "175-180"
+        }
+      ],
+      "image": "https://i.ibb.co/84s9bWpt/photo-2026-07-04-15-42-46.jpg",
+      "albumLink": "https://m.me/vhmen.khofficial",
+      "fabricTitle": "",
+      "fabricDesc": "",
+      "fabricCare": ""
+    },
+    {
+      "code": "E196",
+      "type": "shirt",
+      "name": "Long-sleeved linen",
+      "nameKh": "អាវលីនីនដៃវែង",
+      "keywords": "LNV",
+      "price": 8.8,
+      "colors": [
+        {
+          "name": "Black",
+          "nameKh": "ខ្មៅ",
+          "hex": "#1a1a1a"
+        },
+        {
+          "name": "Grey",
+          "nameKh": "ប្រផេះ",
+          "hex": "#8a8a86"
+        },
+        {
+          "name": "Nude",
+          "nameKh": "សាច់",
+          "hex": "#dab08c"
+        },
+        {
+          "name": "Green",
+          "nameKh": "បៃតង",
+          "hex": "#4a5c3a"
+        },
+        {
+          "name": "White",
+          "nameKh": "ស",
+          "hex": "#f2ede0"
+        }
+      ],
+      "sizeChart": [
+        {
+          "size": "M",
+          "chestCm": 50,
+          "chestIn": 0,
+          "lengthCm": 68,
+          "shoulderCm": 0,
+          "sleeveCm": 50,
+          "weightKg": "50-60",
+          "heightCm": "160-170"
+        },
+        {
+          "size": "L",
+          "chestCm": 52,
+          "chestIn": 0,
+          "lengthCm": 69,
+          "shoulderCm": 0,
+          "sleeveCm": 51,
+          "weightKg": "60-68",
+          "heightCm": "170-175"
+        },
+        {
+          "size": "XL",
+          "chestCm": 55,
+          "chestIn": 0,
+          "lengthCm": 71,
+          "shoulderCm": 0,
+          "sleeveCm": 55,
+          "weightKg": "68-78",
+          "heightCm": "170-180"
+        },
+        {
+          "size": "2XL",
+          "chestCm": 53,
+          "chestIn": 0,
+          "lengthCm": 73,
+          "shoulderCm": 0,
+          "sleeveCm": 56,
+          "weightKg": "78-85",
+          "heightCm": "175-185"
+        }
+      ],
+      "image": "https://i.ibb.co/5xf5BqBT/photo-2026-07-04-17-40-15.jpg",
+      "albumLink": "https://m.me/vhmen.khofficial",
+      "fabricTitle": "",
+      "fabricDesc": "",
+      "fabricCare": ""
+    },
+    {
+      "code": "E197",
+      "type": "shirt",
+      "name": "Ice",
+      "nameKh": "អាវកបើកសាច់ទឹកកកម៉ូតឆ្នូត",
+      "keywords": "Ice",
+      "price": 6.2,
+      "colors": [
+        {
+          "name": "Black",
+          "nameKh": "ខ្មៅ",
+          "hex": "#1a1a1a"
+        },
+        {
+          "name": "Red",
+          "nameKh": "ក្រហម",
+          "hex": "#7a2a2a"
+        },
+        {
+          "name": "Silver",
+          "nameKh": "ប្រាក់",
+          "hex": "#b8b8b8"
+        },
+        {
+          "name": "White",
+          "nameKh": "ស",
+          "hex": "#f2ede0"
+        }
+      ],
+      "sizeChart": [
+        {
+          "size": "M",
+          "chestCm": 49,
+          "chestIn": 0,
+          "lengthCm": 69,
+          "shoulderCm": 0,
+          "sleeveCm": 17,
+          "weightKg": "50-60",
+          "heightCm": "155-165"
+        },
+        {
+          "size": "L",
+          "chestCm": 53,
+          "chestIn": 0,
+          "lengthCm": 71,
+          "shoulderCm": 0,
+          "sleeveCm": 18,
+          "weightKg": "60-70",
+          "heightCm": "160-170"
+        },
+        {
+          "size": "XL",
+          "chestCm": 54,
+          "chestIn": 0,
+          "lengthCm": 73,
+          "shoulderCm": 0,
+          "sleeveCm": 19,
+          "weightKg": "70-80",
+          "heightCm": "165-175"
+        },
+        {
+          "size": "2XL",
+          "chestCm": 55,
+          "chestIn": 0,
+          "lengthCm": 74,
+          "shoulderCm": 0,
+          "sleeveCm": 20,
+          "weightKg": "80-90",
+          "heightCm": "170-180"
+        },
+        {
+          "size": "3XL",
+          "chestCm": 57,
+          "chestIn": 0,
+          "lengthCm": 76,
+          "shoulderCm": 0,
+          "sleeveCm": 21,
+          "weightKg": "90-95",
+          "heightCm": "175-185"
+        }
+      ],
+      "image": "https://i.ibb.co/rGwWnzS5/photo-2026-07-04-18-17-26.jpg",
+      "albumLink": "https://m.me/vhmen.khofficial",
+      "fabricTitle": "",
+      "fabricDesc": "",
+      "fabricCare": ""
+    }
+  ],
+  "colorPalette": [
+    {
+      "name": "Black",
+      "nameKh": "ខ្មៅ",
+      "hex": "#1a1a1a"
+    },
+    {
+      "name": "Grey",
+      "nameKh": "ប្រផេះ",
+      "hex": "#8a8a86"
+    },
+    {
+      "name": "Bic Blue",
+      "nameKh": "ប៊ិច",
+      "hex": "#1c2b3a"
+    },
+    {
+      "name": "Nude",
+      "nameKh": "សាច់",
+      "hex": "#dab08c"
+    },
+    {
+      "name": "Green",
+      "nameKh": "បៃតង",
+      "hex": "#4a5c3a"
+    },
+    {
+      "name": "Sky Blue",
+      "nameKh": "មេឃ",
+      "hex": "#6fa3c7"
+    },
+    {
+      "name": "(confirm)",
+      "nameKh": "ស្លែ",
+      "hex": "#7d8570"
+    },
+    {
+      "name": "Pink",
+      "nameKh": "ឈូក",
+      "hex": "#c97b8a"
+    },
+    {
+      "name": "Coffee",
+      "nameKh": "កាហ្វេ",
+      "hex": "#4b3621"
+    },
+    {
+      "name": "Earth",
+      "nameKh": "ដី",
+      "hex": "#8b6b4a"
+    },
+    {
+      "name": "Blue",
+      "nameKh": "ខៀវ",
+      "hex": "#2f4f7a"
+    },
+    {
+      "name": "Red",
+      "nameKh": "ក្រហម",
+      "hex": "#7a2a2a"
+    },
+    {
+      "name": "Cloud",
+      "nameKh": "ពពក",
+      "hex": "#c9c9c4"
+    },
+    {
+      "name": "Yellow",
+      "nameKh": "លឿង",
+      "hex": "#c9a536"
+    },
+    {
+      "name": "Ox-blood",
+      "nameKh": "ឈាមជ្រូក",
+      "hex": "#6b1f1f"
+    },
+    {
+      "name": "Silver",
+      "nameKh": "ប្រាក់",
+      "hex": "#b8b8b8"
+    },
+    {
+      "name": "(confirm)",
+      "nameKh": "សរ",
+      "hex": "#a89f8a"
+    },
+    {
+      "name": "White",
+      "nameKh": "ស",
+      "hex": "#f2ede0"
+    },
+    {
+      "name": "Navy",
+      "nameKh": "ខៀវចាស់",
+      "hex": "#22304f"
+    },
+    {
+      "name": "Maroon",
+      "nameKh": "ក្រហមចាស់",
+      "hex": "#5e2330"
+    },
+    {
+      "name": "Olive",
+      "nameKh": "បៃតងអូលីវ",
+      "hex": "#5c6647"
+    },
+    {
+      "name": "Brown",
+      "nameKh": "ត្នោត",
+      "hex": "#5a4632"
+    },
+    {
+      "name": "Beige",
+      "nameKh": "ត្នោតខ្ចី",
+      "hex": "#d8c9a8"
+    },
+    {
+      "name": "Khaki",
+      "nameKh": "ខាគី",
+      "hex": "#b9ad86"
+    },
+    {
+      "name": "Purple",
+      "nameKh": "ស្វាយ",
+      "hex": "#5b3a6e"
+    },
+    {
+      "name": "Orange",
+      "nameKh": "ទឹកក្រូច",
+      "hex": "#c2703d"
+    }
+  ]
+}</script>
+
+<script>
+/* ============ REMOTE STORAGE (Firebase Firestore backend) ============ */
+/* This uses Firebase, a Google product built specifically for websites to
+   read/write shared data directly from the browser using standard,
+   fully-supported web requests — unlike the previous Google Sheets version,
+   this doesn't rely on workarounds that browsers' privacy protections can
+   block. See the setup guide for how to get your own config values below. */
+const firebaseConfig = {
+  apiKey: "AIzaSyDDQp5_gvuRdX0flKQ3gm3zXJM_SXWUJSE",
+  authDomain: "vhm-catalog.firebaseapp.com",
+  projectId: "vhm-catalog",
+  storageBucket: "vhm-catalog.firebasestorage.app",
+  messagingSenderId: "892196724857",
+  appId: "1:892196724857:web:8ed3f5f056284b63aa34a8"
+};
+
+let __catalogDb = null;
+function catalogFirestore_(){
+  if (firebaseConfig.apiKey.startsWith('PASTE_')) throw new Error('Firebase not configured yet');
+  if (!__catalogDb) {
+    firebase.initializeApp(firebaseConfig);
+    __catalogDb = firebase.firestore();
+  }
+  return __catalogDb;
+}
+
+if (!window.storage) {
+  window.storage = {
+    async get(key){
+      const db = catalogFirestore_();
+      const doc = await db.collection('kv').doc(key).get();
+      if (!doc.exists) return null;
+      const data = doc.data();
+      if (data.value === null || data.value === undefined) return null;
+      return { key, value: data.value, shared: true };
+    },
+    async set(key, value){
+      const db = catalogFirestore_();
+      await db.collection('kv').doc(key).set({
+        value: value,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      return { key, value, shared:true };
+    },
+    async delete(key){
+      const db = catalogFirestore_();
+      await db.collection('kv').doc(key).delete();
+      return { key, deleted:true, shared:true };
+    },
+    async list(prefix){
+      const db = catalogFirestore_();
+      const snapshot = await db.collection('kv').get();
+      const keys = [];
+      snapshot.forEach(doc => { if(doc.id.indexOf(prefix||'') === 0) keys.push(doc.id); });
+      return { keys, prefix, shared:true };
+    }
+  };
+}
+
+async function checkCatalogStorageConnection(){
+  const dot = document.getElementById('catalogConnDot');
+  const text = document.getElementById('catalogConnText');
+  const pill = document.getElementById('catalogConnStatus');
+  if(!dot || !text || !pill) return;
+  try{
+    await window.storage.list('__connection_check__');
+    dot.style.background = '#7ED0A0';
+    pill.style.background = '#1a1a1a';
+    text.style.color = '#ddd';
+    text.textContent = 'Cloud storage connected — changes save for everyone';
+  }catch(e){
+    dot.style.background = '#c0392b';
+    pill.style.background = '#3a1f1f';
+    text.style.color = '#f5b7b1';
+    text.textContent = 'NOT connected — changes only save in this tab (' + (e && e.message ? e.message : 'unknown error') + ')';
+  }
+}
+
+const CATALOG_EDIT_PASSCODE = "vhmcatalog2026"; // change this to whatever you like
+
+function openEditLock(){
+  if(document.body.classList.contains('edit-unlocked')){
+    if(confirm('Lock editing again and go back to browse-only?')){
+      document.body.classList.remove('edit-unlocked');
+      document.getElementById('editLockBtn').textContent = '🔒 Browse Only';
+    }
+    return;
+  }
+  document.getElementById('editLockScreen').style.display = 'flex';
+  document.getElementById('editPinInput').value = '';
+  document.getElementById('editPinInput').focus();
+}
+function closeEditLock(){
+  document.getElementById('editLockScreen').style.display = 'none';
+}
+function tryUnlockEdit(){
+  const val = document.getElementById('editPinInput').value;
+  if(val === CATALOG_EDIT_PASSCODE){
+    document.body.classList.add('edit-unlocked');
+    document.getElementById('editLockBtn').textContent = '🔓 Edit Mode';
+    closeEditLock();
+  } else {
+    alert('Wrong passcode.');
+  }
+}
+document.addEventListener('keydown', (e) => {
+  if(e.key === 'Enter' && document.getElementById('editLockScreen').style.display === 'flex'){
+    tryUnlockEdit();
+  }
+});
+
+// ---------- Size systems ----------
+const SHIRT_SIZES = ["S","M","L","XL","2XL","3XL","4XL"];
+const PANTS_SIZES = ["28","29","30","31","32","34","36"];
+
+const MASTER_MEASURE_SHIRT = {
+  "S":   {chestCm:98,  chestIn:38.5, lengthCm:64, shoulderCm:44, sleeveCm:58, weightKg:"45-55", heightCm:"150-160"},
+  "M":   {chestCm:104, chestIn:41,   lengthCm:68, shoulderCm:46, sleeveCm:60, weightKg:"55-65", heightCm:"160-170"},
+  "L":   {chestCm:110, chestIn:43,   lengthCm:70, shoulderCm:48, sleeveCm:61, weightKg:"65-75", heightCm:"165-175"},
+  "XL":  {chestCm:116, chestIn:46,   lengthCm:72, shoulderCm:50, sleeveCm:62, weightKg:"75-85", heightCm:"170-180"},
+  "2XL": {chestCm:122, chestIn:48,   lengthCm:74, shoulderCm:52, sleeveCm:63, weightKg:"85-98", heightCm:"175-185"},
+  "3XL": {chestCm:128, chestIn:50,   lengthCm:76, shoulderCm:54, sleeveCm:64, weightKg:"98-112", heightCm:"178-188"},
+  "4XL": {chestCm:134, chestIn:52.5, lengthCm:78, shoulderCm:56, sleeveCm:65, weightKg:"112-125", heightCm:"180-190"}
+};
+const MASTER_MEASURE_PANTS = {
+  "28": {outerCm:96,  innerCm:70, legOpeningCm:17, riseCm:26, hemCm:20, weightKg:"50-55", heightCm:"160-165"},
+  "29": {outerCm:99,  innerCm:73, legOpeningCm:18, riseCm:27, hemCm:20, weightKg:"55-60", heightCm:"165-170"},
+  "30": {outerCm:101, innerCm:74, legOpeningCm:18, riseCm:27, hemCm:20, weightKg:"58-63", heightCm:"167-172"},
+  "31": {outerCm:102, innerCm:75, legOpeningCm:18, riseCm:28, hemCm:21, weightKg:"63-68", heightCm:"170-175"},
+  "32": {outerCm:104, innerCm:76, legOpeningCm:19, riseCm:28, hemCm:21, weightKg:"69-74", heightCm:"175-180"},
+  "34": {outerCm:108, innerCm:77, legOpeningCm:19, riseCm:29, hemCm:21, weightKg:"75-80", heightCm:"180-185"},
+  "36": {outerCm:112, innerCm:78, legOpeningCm:20, riseCm:30, hemCm:22, weightKg:"81-88", heightCm:"185-190"}
+};
+
+const COLOR_MAP = {
+  "black":"#1a1a1a","navy":"#22304f","olive":"#5c6647","beige":"#d8c9a8","grey":"#8a8a86",
+  "gray":"#8a8a86","maroon":"#5e2330","white":"#f2ede0","cream":"#f2ede0","white/cream":"#f2ede0",
+  "blue":"#2f4f7a","green":"#4a5c3a","red":"#7a2a2a","brown":"#5a4632","khaki":"#b9ad86","charcoal":"#333333"
+};
+const KHMER_COLOR_MAP = {
+  "ខ្មៅ":"#1a1a1a", "ស":"#f2ede0", "សដូនលា":"#f2ede0",
+  "ខៀវ":"#2f4f7a", "ខៀវចាស់":"#22304f", "ខៀវខ្ចី":"#4a6a9e",
+  "ក្រហម":"#7a2a2a", "ក្រហមចាស់":"#5e2330",
+  "បៃតង":"#4a5c3a", "បៃតងអូលីវ":"#5c6647", "បៃតងខ្ចី":"#6d8a52",
+  "លឿង":"#c9a536", "ត្នោត":"#5a4632", "ត្នោតខ្ចី":"#d8c9a8",
+  "ប្រផេះ":"#8a8a86", "ខាគី":"#b9ad86", "ស្វាយ":"#5b3a6e",
+  "ផ្កាឈូក":"#c97b8a", "ទឹកក្រូច":"#c2703d"
+};
+function isKhmerText(str){ return /[\u1780-\u17FF]/.test(str); }
+function colorToHex(text){
+  const raw = text.trim();
+  const key = raw.toLowerCase();
+  if(COLOR_MAP[key]) return COLOR_MAP[key];
+  if(KHMER_COLOR_MAP[raw]) return KHMER_COLOR_MAP[raw];
+  let hash=0;
+  for(let i=0;i<key.length;i++) hash = key.charCodeAt(i) + ((hash<<5)-hash);
+  const hue = Math.abs(hash)%360;
+  return `hsl(${hue},35%,45%)`;
+}
+
+// Curated palette for the tap-to-select picker — Khmer name shown first (what staff search by)
+// Default palette — built from actual color-word frequency in your inventory sheets
+// (most-used first). "សរ" and "ស្លែ" appeared often but I couldn't confirm the exact
+// shade from the sheet alone — edit them via "Manage Colors" once confirmed.
+const DEFAULT_COLOR_PALETTE = [
+  {name:"Black", nameKh:"ខ្មៅ", hex:"#1a1a1a"},
+  {name:"Grey", nameKh:"ប្រផេះ", hex:"#8a8a86"},
+  {name:"Bic Blue", nameKh:"ប៊ិច", hex:"#1c2b3a"},
+  {name:"Nude", nameKh:"សាច់", hex:"#dab08c"},
+  {name:"Green", nameKh:"បៃតង", hex:"#4a5c3a"},
+  {name:"Sky Blue", nameKh:"មេឃ", hex:"#6fa3c7"},
+  {name:"(confirm)", nameKh:"ស្លែ", hex:"#7d8570"},
+  {name:"Pink", nameKh:"ឈូក", hex:"#c97b8a"},
+  {name:"Coffee", nameKh:"កាហ្វេ", hex:"#4b3621"},
+  {name:"Earth", nameKh:"ដី", hex:"#8b6b4a"},
+  {name:"Blue", nameKh:"ខៀវ", hex:"#2f4f7a"},
+  {name:"Red", nameKh:"ក្រហម", hex:"#7a2a2a"},
+  {name:"Cloud", nameKh:"ពពក", hex:"#c9c9c4"},
+  {name:"Yellow", nameKh:"លឿង", hex:"#c9a536"},
+  {name:"Ox-blood", nameKh:"ឈាមជ្រូក", hex:"#6b1f1f"},
+  {name:"Silver", nameKh:"ប្រាក់", hex:"#b8b8b8"},
+  {name:"(confirm)", nameKh:"សរ", hex:"#a89f8a"},
+  {name:"White", nameKh:"ស", hex:"#f2ede0"},
+  {name:"Navy", nameKh:"ខៀវចាស់", hex:"#22304f"},
+  {name:"Maroon", nameKh:"ក្រហមចាស់", hex:"#5e2330"},
+  {name:"Olive", nameKh:"បៃតងអូលីវ", hex:"#5c6647"},
+  {name:"Brown", nameKh:"ត្នោត", hex:"#5a4632"},
+  {name:"Beige", nameKh:"ត្នោតខ្ចី", hex:"#d8c9a8"},
+  {name:"Khaki", nameKh:"ខាគី", hex:"#b9ad86"},
+  {name:"Purple", nameKh:"ស្វាយ", hex:"#5b3a6e"},
+  {name:"Orange", nameKh:"ទឹកក្រូច", hex:"#c2703d"}
+];
+let COLOR_PALETTE = [...DEFAULT_COLOR_PALETTE];
+
+function colorsMatch(c, master){
+  if(c.hex && master.hex && c.hex.toLowerCase()===master.hex.toLowerCase()) return true;
+  if(c.nameKh && master.nameKh && c.nameKh===master.nameKh) return true;
+  if(c.name && master.name && c.name.toLowerCase()===master.name.toLowerCase()) return true;
+  return false;
+}
+function parseColorsText(text){
+  if(!text) return [];
+  return text.split(',').map(c=>c.trim()).filter(Boolean).map(entry=>{
+    let en='', kh='';
+    if(entry.includes('/')){
+      [en, kh] = entry.split('/').map(x=>x?x.trim():'');
+    } else if(isKhmerText(entry)){
+      kh = entry;
+    } else {
+      en = entry;
+    }
+    return {name:en, nameKh:kh, hex:colorToHex(kh || en)};
+  });
+}
+function buildColorPicker(prefillColors){
+  const row = document.getElementById('colorCheckRow');
+  row.innerHTML = COLOR_PALETTE.map((m,i)=>{
+    const checked = prefillColors && prefillColors.some(c=>colorsMatch(c,m)) ? 'checked' : '';
+    const label = m.nameKh ? `${m.nameKh}${m.name ? ' ('+m.name+')' : ''}` : m.name;
+    return `<label class="color-chip"><input type="checkbox" class="color-check" value="${i}" ${checked}><span class="chip-dot" style="background:${m.hex}"></span><span>${label}</span></label>`;
+  }).join('');
+  const customField = document.getElementById('f_colors_custom');
+  if(prefillColors){
+    const leftover = prefillColors.filter(c=>!COLOR_PALETTE.some(m=>colorsMatch(c,m)));
+    customField.value = leftover.map(c=>{
+      if(c.name && c.nameKh) return `${c.name}/${c.nameKh}`;
+      return c.nameKh || c.name;
+    }).join(', ');
+  } else {
+    customField.value = '';
+  }
+}
+
+function parseRange(str){
+  if(!str) return null;
+  const parts = String(str).split('-').map(s=>parseFloat(s.trim()));
+  if(parts.length!==2 || isNaN(parts[0]) || isNaN(parts[1])) return null;
+  return parts;
+}
+function inRange(rangeStr, value){
+  const r = parseRange(rangeStr);
+  if(!r || isNaN(value)) return false;
+  return value>=r[0] && value<=r[1];
+}
+function rangeDistance(rangeStr, value){
+  const r = parseRange(rangeStr);
+  if(!r || isNaN(value)) return null;
+  const [min,max] = r;
+  if(value<min) return min-value;
+  if(value>max) return value-max;
+  return 0;
+}
+// Joint height+weight bracket match (mirrors the paired-bracket approach)
+// Ease targets in cm for how much room the garment should have over the body measurement,
+// at the chest (shirts) or waist (pants). Adjust these if your real garments run different.
+const FIT_EASE_TARGETS = { slim: 4, regular: 8, relaxed: 13 };
+
+function fitLabelForEase(ease){
+  if(ease < 0) return "Too small";
+  if(ease < 3) return "Snug";
+  if(ease < 7) return "Fitted";
+  if(ease < 11) return "Regular";
+  if(ease < 16) return "Relaxed";
+  return "Oversized";
+}
+
+// Most accurate: compare the customer's actual chest/waist measurement against each
+// size's real garment measurement (like Uniqlo's "expected fit" comparison).
+function recommendSizeByMeasurement(product, bodyCm, fitPref){
+  if(!product || !product.sizeChart || !product.sizeChart.length) return null;
+  const body = parseFloat(bodyCm);
+  if(isNaN(body)) return null;
+  const key = product.type === 'pants' ? 'outerCm' : 'chestCm';
+  const target = FIT_EASE_TARGETS[fitPref] ?? FIT_EASE_TARGETS.regular;
+
+  const scored = product.sizeChart.map(s=>{
+    const garment = parseFloat(s[key]);
+    const ease = garment - body;
+    return { size:s.size, ease, garment, distFromTarget: Math.abs(ease - target) };
+  });
+
+  const wearable = scored.filter(s=>s.ease >= 0);
+  const pool = wearable.length ? wearable : scored; // if nothing fits, fall back to closest overall
+  pool.sort((a,b)=>a.distFromTarget - b.distFromTarget);
+  const best = pool[0];
+  const close = pool.slice(1,3);
+  return {
+    best: { size:best.size, ease:best.ease, label:fitLabelForEase(best.ease), exact:true },
+    close: close.map(c=>({ size:c.size, ease:c.ease, label:fitLabelForEase(c.ease) })),
+    tooSmallForAll: wearable.length===0,
+    source: 'measurement'
+  };
+}
+
+function recommendSize(product, weight, height){
+  if(!product || !product.sizeChart || !product.sizeChart.length) return null;
+  const w = parseFloat(weight), h = parseFloat(height);
+  const hasW = !isNaN(w), hasH = !isNaN(h);
+  if(!hasW && !hasH) return null;
+
+  // 1. exact joint match: both weight AND height fall inside the size's bracket
+  const exact = product.sizeChart.filter(s=>{
+    const wOk = !hasW || inRange(s.weightKg, w);
+    const hOk = !hasH || inRange(s.heightCm, h);
+    return wOk && hOk;
+  });
+  if(exact.length===1){
+    return {best:{size:exact[0].size, exact:true}, close:[], source:'bracket'};
+  }
+  if(exact.length>1){
+    return {best:{size:exact[0].size, exact:true}, close:exact.slice(1).map(s=>({size:s.size})), source:'bracket'};
+  }
+
+  // 2. fallback: closest bracket by combined distance
+  const scored = product.sizeChart.map(s=>{
+    const dw = hasW ? rangeDistance(s.weightKg, w) : 0;
+    const dh = hasH ? rangeDistance(s.heightCm, h) : 0;
+    return {size:s.size, score:(dw||0)+(dh||0)};
+  });
+  scored.sort((a,b)=>a.score-b.score);
+  const best = scored[0];
+  const close = scored.filter(s=>s.score<=best.score+3 && s.size!==best.size);
+  return {best, close, source:'bracket'};
+}
+
+function imgErrorHandler(img){
+  let list = [];
+  try{ list = JSON.parse(img.dataset.fallbacks || '[]'); }catch(e){}
+  let idx = parseInt(img.dataset.fallbackIdx || '0', 10) + 1;
+  if(idx < list.length){
+    img.dataset.fallbackIdx = idx;
+    img.src = list[idx];
+  } else {
+    img.parentElement.innerHTML = `<div class="pimg-placeholder">Photo not found — link may not be publicly shared</div>`;
+  }
+}
+
+// ---------- Version ----------
+const CATALOG_VERSION = "v2.8";
+const CHANGELOG = [
+  "v2.8 — \"📥 Import from Old File\" button: select any older version of your catalog file and it pulls in all your real products (codes, photos, colors, prices) into this newer version, so updates never wipe your data again.",
+  "v2.7 — More accurate size finder, Uniqlo MySize-style: enter an actual chest/waist measurement (optional) and it's compared directly against this product's real garment measurements, with a Slim/Regular/Relaxed fit preference and an ease/room number per size (e.g. \"+8cm at chest\"). Falls back to the weight/height bracket when no measurement is given.",
+  "v2.6 — Color palette rebuilt from your actual inventory sheets (ខ្មៅ, ប្រផេះ, ប៊ិច, សាច់, បៃតង, មេឃ, ឈូក, កាហ្វេ, ដី, ខៀវ, ក្រហម, ពពក, លឿង, ឈាមជ្រូក, ប្រាក់, and more). New \"🎨 Manage Colors\" button lets you add, rename, recolor, or remove any palette entry — changes persist through Save/Export.",
+  "v2.5 — Colors are now tap-to-select from a fixed palette (no typos, consistent swatches). Khmer name is what search matches on; English is just a label. Custom color field still available for anything not in the list.",
+  "v2.4 — Khmer-only colors now map to accurate swatch colors (no English name required). Common Khmer color terms recognized directly.",
+  "v2.3 — Smart photo URL: paste ImgBB/Drive embed code, BBCode, or Markdown, it auto-extracts the link. Clearer edit/delete buttons.",
+  "v2.2 — Drive link auto-convert with fallback chain if a photo format fails to load.",
+  "v2.1 — Edit button on every product (opens pre-filled form instead of re-adding).",
+  "v2.0 — Shirt vs Pants sizing (letter sizes vs waist numbers), joint height+weight bracket matching, Khmer color names, price, keywords, album link.",
+  "v1.2 — Inline size recommendation finder on each card; weight/height columns.",
+  "v1.1 — Per-product size charts, add-product form, keyword search.",
+  "v1.0 — Initial catalog: products, size guide, fabric info, photos."
+];
+document.getElementById('versionTag').textContent = CATALOG_VERSION;
+document.getElementById('versionTagFooter').textContent = CATALOG_VERSION;
+document.getElementById('changelogList').innerHTML = CHANGELOG.map(c=>`• ${c}`).join('<br>');
+
+// ---------- Load embedded data ----------
+let PRODUCTS = [];
+try{
+  const raw = JSON.parse(document.getElementById('product-data').textContent);
+  PRODUCTS = raw.products || [];
+  if(Array.isArray(raw.colorPalette) && raw.colorPalette.length){ COLOR_PALETTE = raw.colorPalette; }
+}catch(e){ console.error('Could not parse embedded product data', e); }
+
+async function tryLoadFromStorage(){
+  let cloudProducts = null, cloudPalette = null;
+  try{
+    const result = await window.storage.get('vhm-catalog-products', true);
+    if(result && result.value){
+      const parsed = JSON.parse(result.value);
+      if(Array.isArray(parsed)) cloudProducts = parsed;
+    }
+  }catch(e){}
+  try{
+    const paletteResult = await window.storage.get('vhm-catalog-palette', true);
+    if(paletteResult && paletteResult.value){
+      const parsed = JSON.parse(paletteResult.value);
+      if(Array.isArray(parsed)) cloudPalette = parsed;
+    }
+  }catch(e){}
+
+  if(cloudProducts && cloudProducts.length){
+    PRODUCTS = cloudProducts;
+  } else if(PRODUCTS.length){
+    // Cloud has nothing yet but this file has real embedded products —
+    // push them up now so the cloud copy starts seeded with your real data.
+    trySaveToStorage();
+  }
+  if(cloudPalette && cloudPalette.length){
+    COLOR_PALETTE = cloudPalette;
+  } else if(COLOR_PALETTE.length){
+    trySavePaletteToStorage();
+  }
+  renderAll();
+}
+async function trySaveToStorage(){
+  try{
+    await window.storage.set('vhm-catalog-products', JSON.stringify(PRODUCTS), true);
+    checkCatalogStorageConnection();
+  }
+  catch(e){
+    const dot = document.getElementById('catalogConnDot');
+    const text = document.getElementById('catalogConnText');
+    const pill = document.getElementById('catalogConnStatus');
+    if(dot && text && pill){
+      dot.style.background = '#c0392b';
+      pill.style.background = '#3a1f1f';
+      text.style.color = '#f5b7b1';
+      text.textContent = 'Save failed — this change only exists in this tab (' + (e && e.message ? e.message : 'unknown error') + ')';
+    }
+  }
+}
+async function trySavePaletteToStorage(){
+  try{ await window.storage.set('vhm-catalog-palette', JSON.stringify(COLOR_PALETTE), true); }
+  catch(e){}
+}
+
+// ---------- Helpers ----------
+function productSearchText(p){
+  return [
+    p.code, p.name, p.nameKh, p.note, p.keywords, p.type,
+    ...(p.colors||[]).map(c=>c.name), ...(p.colors||[]).map(c=>c.nameKh),
+    p.fabricTitle, p.fabricDesc, p.fabricCare
+  ].filter(Boolean).join(' ').toLowerCase();
+}
+function sizeChartHeadRow(type){
+  return type==='pants'
+    ? '<tr><th>Size</th><th>Outer cm</th><th>Inner cm</th><th>Leg open cm</th><th>Rise cm</th><th>Hem cm</th><th>Weight kg</th><th>Height cm</th></tr>'
+    : '<tr><th>Size</th><th>Chest cm</th><th>Shoulder cm</th><th>Length cm</th><th>Sleeve cm</th><th>Weight kg</th><th>Height cm</th></tr>';
+}
+function sizeChartRow(type, s){
+  if(type==='pants'){
+    return `<tr><td>${s.size}</td><td>${s.outerCm}</td><td>${s.innerCm}</td><td>${s.legOpeningCm}</td><td>${s.riseCm}</td><td>${s.hemCm}</td><td>${s.weightKg||'—'}</td><td>${s.heightCm||'—'}</td></tr>`;
+  }
+  return `<tr><td>${s.size}</td><td>${s.chestCm}</td><td>${s.shoulderCm}</td><td>${s.lengthCm}</td><td>${s.sleeveCm||'—'}</td><td>${s.weightKg||'—'}</td><td>${s.heightCm||'—'}</td></tr>`;
+}
+
+function initFilters(){
+  const colorSel = document.getElementById('filterColor');
+  const sizeSel = document.getElementById('filterSize');
+  colorSel.innerHTML = '<option value="">All colors</option>';
+  sizeSel.innerHTML = '<option value="">All sizes</option>';
+  const colors = new Set(), sizes = new Set();
+  PRODUCTS.forEach(p=>{
+    (p.colors||[]).forEach(c=>colors.add(c.name));
+    (p.sizeChart||[]).forEach(s=>sizes.add(s.size));
+  });
+  [...colors].sort().forEach(c=>{ const o=document.createElement('option'); o.value=c; o.textContent=c; colorSel.appendChild(o); });
+  const orderedSizes = [...SHIRT_SIZES, ...PANTS_SIZES].filter(s=>sizes.has(s));
+  orderedSizes.forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=s; sizeSel.appendChild(o); });
+}
+
+function renderGrid(){
+  const q = document.getElementById('search').value.toLowerCase().trim();
+  const typeF = document.getElementById('filterType').value;
+  const colorF = document.getElementById('filterColor').value;
+  const sizeF = document.getElementById('filterSize').value;
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+
+  const filtered = PRODUCTS.filter(p=>{
+    const matchesQ = !q || productSearchText(p).includes(q);
+    const matchesType = !typeF || p.type===typeF;
+    const matchesColor = !colorF || (p.colors||[]).some(c=>c.name===colorF);
+    const matchesSize = !sizeF || (p.sizeChart||[]).some(s=>s.size===sizeF);
+    return matchesQ && matchesType && matchesColor && matchesSize;
+  });
+
+  document.getElementById('catalogSub').textContent =
+    `// showing ${filtered.length} of ${PRODUCTS.length} products — searchable by code, name, keyword, color or fabric`;
+
+  if(filtered.length===0){
+    grid.innerHTML = '<div style="grid-column:1/-1;padding:30px;text-align:center;color:#8a8375;font-family:Space Mono,monospace;font-size:13px;">No products match — try clearing filters.</div>';
+    return;
+  }
+
+  const visibleCount = Math.min(gridPage * GRID_PAGE_SIZE, filtered.length);
+  const toRender = filtered.slice(0, visibleCount);
+
+  toRender.forEach(p=>{
+    const realIdx = PRODUCTS.indexOf(p);
+    const card = document.createElement('div');
+    card.className = 'pcard';
+
+    const imgCandidates = p.image ? driveCandidates(p.image) : [];
+    const imgBlock = p.image
+      ? `<div class="pimg-wrap" data-full="${imgCandidates[0]}">
+           <img src="${imgCandidates[0]}" alt="${p.name}" loading="lazy" decoding="async"
+                data-fallbacks='${JSON.stringify(imgCandidates).replace(/'/g,"&#39;")}' data-fallback-idx="0"
+                onerror="imgErrorHandler(this)">
+         </div>`
+      : `<div class="pimg-wrap"><div class="pimg-placeholder">No photo set</div></div>`;
+
+    const chartRows = (p.sizeChart||[]).map(s=>sizeChartRow(p.type, s)).join('');
+    const colorText = (p.colors||[]).map(c=>{
+      if(c.name && c.nameKh) return `${c.name} (${c.nameKh})`;
+      return c.nameKh || c.name;
+    }).join(', ');
+
+    const fabricNote = (p.fabricTitle || p.fabricDesc) ? `
+      <div class="fabric-note"><b>${p.fabricTitle||'Fabric'}</b>${p.fabricDesc||''}</div>
+    ` : '';
+
+    const albumBlock = p.albumLink ? `<a class="album-link" href="${p.albumLink}" target="_blank" rel="noopener">📸 Open Album</a>` : '';
+
+    card.innerHTML = `
+      <button class="pdelete" data-idx="${realIdx}" title="Delete product">×</button>
+      <button class="pedit" data-idx="${realIdx}" title="Edit product">✎</button>
+      ${imgBlock}
+      <div class="ptop-row">
+        <div>
+          <span class="pcode">${p.code}</span>
+          <div class="ptype">${p.type==='pants' ? 'Pants · ខោ' : 'Shirt · អាវ'}</div>
+        </div>
+        ${p.price ? `<span class="pprice">$${Number(p.price).toFixed(2)}</span>` : ''}
+      </div>
+      <div class="pname">${p.name}</div>
+      <div class="pname-kh">${p.nameKh || ''}</div>
+      <div class="swatches">${(p.colors||[]).map(c=>`<span class="swatch" title="${[c.name,c.nameKh].filter(Boolean).join(' / ')}" style="background:${c.hex}"></span>`).join('')}</div>
+      <div class="sizes">${(p.sizeChart||[]).map(s=>`<span>${s.size}</span>`).join('')}</div>
+      <div class="prow"><span>Colors</span><span>${colorText}</span></div>
+      ${p.note ? `<div class="prow"><span>Note</span><span>${p.note}</span></div>` : ''}
+      ${fabricNote}
+      ${albumBlock}
+      <button class="sizechart-toggle" data-panel="chart-${realIdx}">View size chart ▾</button>
+      <div class="sizechart-panel" id="chart-${realIdx}">
+        <table><thead>${sizeChartHeadRow(p.type)}</thead><tbody>${chartRows || '<tr><td colspan="8">No sizes added yet</td></tr>'}</tbody></table>
+      </div>
+
+      <button class="sizechart-toggle" data-panel="reco-${realIdx}">View size recommendation ▾</button>
+      <div class="sizechart-panel" id="reco-${realIdx}">
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <input type="text" class="reco-weight" data-idx="${realIdx}" placeholder="Weight (kg)" style="flex:1;font-size:12px;padding:6px;border:1px solid var(--line);border-radius:2px;">
+          <input type="text" class="reco-height" data-idx="${realIdx}" placeholder="Height (cm)" style="flex:1;font-size:12px;padding:6px;border:1px solid var(--line);border-radius:2px;">
+        </div>
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <input type="text" class="reco-bodycm" data-idx="${realIdx}" placeholder="${p.type==='pants'?'Waist':'Chest'} cm (optional, precise)" style="flex:1;font-size:12px;padding:6px;border:1px solid var(--line);border-radius:2px;">
+          <select class="reco-fitpref" data-idx="${realIdx}" style="font-size:12px;padding:6px;border:1px solid var(--line);border-radius:2px;">
+            <option value="slim">Slim</option>
+            <option value="regular" selected>Regular</option>
+            <option value="relaxed">Relaxed</option>
+          </select>
+        </div>
+        <button class="btn btn-primary reco-find" data-idx="${realIdx}" style="width:100%;margin-top:6px;font-size:12px;padding:7px;">Find Size</button>
+        <div class="reco-result" id="recoResult-${realIdx}" style="display:none;font-size:12px;margin-top:8px;padding:8px;background:#efe8d8;border-left:3px solid var(--rust);line-height:1.4;"></div>
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+
+  if(visibleCount < filtered.length){
+    const loadMore = document.createElement('div');
+    loadMore.style.cssText = 'grid-column:1/-1;text-align:center;padding:10px;';
+    loadMore.innerHTML = `<button class="btn btn-ghost" id="loadMoreBtn">Load more (${filtered.length - visibleCount} remaining)</button>`;
+    grid.appendChild(loadMore);
+    document.getElementById('loadMoreBtn').addEventListener('click', ()=>{
+      gridPage++;
+      renderGrid();
+    });
+  }
+
+  document.querySelectorAll('.pimg-wrap[data-full]').forEach(w=>{
+    w.addEventListener('click', ()=>{
+      document.getElementById('lightboxImg').src = w.dataset.full;
+      document.getElementById('lightbox').classList.add('active');
+    });
+  });
+  document.querySelectorAll('.sizechart-toggle').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const panel = document.getElementById(btn.dataset.panel);
+      panel.classList.toggle('open');
+      const isChart = btn.dataset.panel.startsWith('chart-');
+      const label = isChart ? 'size chart' : 'size recommendation';
+      btn.textContent = panel.classList.contains('open') ? `Hide ${label} ▴` : `View ${label} ▾`;
+    });
+  });
+  document.querySelectorAll('.reco-find').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const idx = +btn.dataset.idx;
+      const p = PRODUCTS[idx];
+      const w = document.querySelector(`.reco-weight[data-idx="${idx}"]`).value;
+      const h = document.querySelector(`.reco-height[data-idx="${idx}"]`).value;
+      const bodyCm = document.querySelector(`.reco-bodycm[data-idx="${idx}"]`).value;
+      const fitPref = document.querySelector(`.reco-fitpref[data-idx="${idx}"]`).value;
+      const box = document.getElementById('recoResult-'+idx);
+      const result = bodyCm.trim()
+        ? recommendSizeByMeasurement(p, bodyCm, fitPref)
+        : recommendSize(p, w, h);
+      box.textContent = result ? formatRecoText(p, result) : 'Enter weight/height, or a chest/waist measurement.';
+      box.style.display = 'block';
+    });
+  });
+  document.querySelectorAll('.pedit').forEach(btn=>{
+    btn.addEventListener('click', ()=> openEditModal(+btn.dataset.idx));
+  });
+  document.querySelectorAll('.pdelete').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const p = PRODUCTS[+btn.dataset.idx];
+      if(confirm(`Remove ${p.code} — ${p.name} from the catalog?`)){
+        PRODUCTS.splice(+btn.dataset.idx,1);
+        renderAll();
+        trySaveToStorage();
+      }
+    });
+  });
+}
+
+document.getElementById('lightbox').addEventListener('click', ()=>{
+  document.getElementById('lightbox').classList.remove('active');
+});
+
+function renderSizeGuide(){
+  const sel = document.getElementById('sizeGuideProduct');
+  sel.innerHTML = PRODUCTS.map((p,i)=>`<option value="${i}">${p.code} — ${p.name} (${p.type})</option>`).join('');
+  renderSizeTableFor(0);
+  sel.onchange = ()=>{ renderSizeTableFor(+sel.value); document.getElementById('finderResult').style.display='none'; };
+}
+function renderSizeTableFor(idx){
+  const p = PRODUCTS[idx];
+  const head = document.getElementById('sizeGuideHead');
+  const tbody = document.getElementById('sizeTable');
+  if(!p){ tbody.innerHTML=''; return; }
+  head.innerHTML = sizeChartHeadRow(p.type);
+  if(!p.sizeChart || !p.sizeChart.length){
+    tbody.innerHTML = '<tr><td colspan="8">No size data for this product yet</td></tr>';
+    return;
+  }
+  tbody.innerHTML = p.sizeChart.map(r=>sizeChartRow(p.type, r)).join('');
+}
+
+document.getElementById('findSizeBtn').addEventListener('click', ()=>{
+  const idx = +document.getElementById('sizeGuideProduct').value;
+  const p = PRODUCTS[idx];
+  const w = document.getElementById('finderWeight').value;
+  const h = document.getElementById('finderHeight').value;
+  const bodyCm = document.getElementById('finderBodyCm').value;
+  const fitPref = document.getElementById('finderFitPref').value;
+  const box = document.getElementById('finderResult');
+
+  const result = bodyCm.trim()
+    ? recommendSizeByMeasurement(p, bodyCm, fitPref)
+    : recommendSize(p, w, h);
+
+  if(!result){
+    box.textContent = 'Enter weight/height, or a chest/waist measurement, to get a recommendation.';
+    box.style.display = 'block';
+    return;
+  }
+  box.textContent = formatRecoText(p, result);
+  box.style.display = 'block';
+});
+
+function formatRecoText(p, result){
+  if(result.source === 'measurement'){
+    let text = `Recommended: ${result.best.size} — ${result.best.label} (${result.best.ease>=0?'+':''}${result.best.ease.toFixed(1)}cm room at ${p.type==='pants'?'waist':'chest'})`;
+    if(result.tooSmallForAll){
+      text += `. Note: even the largest size is snug for this measurement — check with the customer.`;
+    } else if(result.close.length){
+      text += `. Other options: ${result.close.map(c=>`${c.size} (${c.label}, ${c.ease>=0?'+':''}${c.ease.toFixed(1)}cm)`).join(', ')}.`;
+    }
+    return text;
+  }
+  let text = `Recommended: ${result.best.size}`;
+  text += result.best.exact ? ' (fits this bracket).' : ' (closest match, no exact bracket).';
+  if(result.close.length){
+    text += ` Also consider: ${result.close.map(c=>c.size).join(', ')} depending on fit preference.`;
+  }
+  return text;
+}
+
+function renderFabric(){
+  const grid = document.getElementById('fabricGrid');
+  const withFabric = PRODUCTS.filter(p=>p.fabricTitle || p.fabricDesc || p.fabricCare);
+  if(!withFabric.length){
+    grid.innerHTML = '<div style="grid-column:1/-1;color:#8a8375;font-family:Space Mono,monospace;font-size:13px;">No fabric info added yet.</div>';
+    return;
+  }
+  grid.innerHTML = withFabric.map(p=>`
+    <div class="fcard">
+      <b>${p.fabricTitle || 'Fabric'}</b>
+      <span class="fcode">${p.code} — ${p.name}</span>
+      <p>${p.fabricDesc || ''}</p>
+      <div class="care">${p.fabricCare || ''}</div>
+    </div>
+  `).join('');
+}
+
+function renderAll(){
+  initFilters();
+  gridPage = 1;
+  renderGrid();
+  renderSizeGuide();
+  renderFabric();
+}
+
+const GRID_PAGE_SIZE = 60;
+let gridPage = 1;
+
+document.querySelectorAll('nav button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.view).classList.add('active');
+  });
+});
+
+let searchDebounceTimer;
+document.getElementById('search').addEventListener('input', ()=>{
+  clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(()=>{ gridPage=1; renderGrid(); }, 180);
+});
+document.getElementById('filterType').addEventListener('change', ()=>{ gridPage=1; renderGrid(); });
+document.getElementById('filterColor').addEventListener('change', ()=>{ gridPage=1; renderGrid(); });
+document.getElementById('filterSize').addEventListener('change', ()=>{ gridPage=1; renderGrid(); });
+
+// ---------- Add Product modal ----------
+const modalBackdrop = document.getElementById('modalBackdrop');
+const sizeCheckRow = document.getElementById('sizeCheckRow');
+const sizeMeasureBlocks = document.getElementById('sizeMeasureBlocks');
+
+function currentType(){
+  return document.querySelector('input[name="ptype"]:checked').value;
+}
+
+function measureBlockHtml(type, size, existing){
+  if(type==='pants'){
+    const d = existing || MASTER_MEASURE_PANTS[size] || {outerCm:0,innerCm:0,legOpeningCm:0,riseCm:0,hemCm:0,weightKg:'',heightCm:''};
+    return `
+      <div class="sm-title">${size}</div>
+      <div class="sm-inputs">
+        <div><label>Outer cm</label><input type="text" class="m-outercm" value="${d.outerCm}"></div>
+        <div><label>Inner cm</label><input type="text" class="m-innercm" value="${d.innerCm}"></div>
+        <div><label>Leg open cm</label><input type="text" class="m-legopeningcm" value="${d.legOpeningCm}"></div>
+        <div><label>Rise cm</label><input type="text" class="m-risecm" value="${d.riseCm}"></div>
+        <div><label>Hem cm</label><input type="text" class="m-hemcm" value="${d.hemCm}"></div>
+        <div><label>Weight range kg</label><input type="text" class="m-weightkg" value="${d.weightKg}"></div>
+        <div><label>Height range cm</label><input type="text" class="m-heightcm" value="${d.heightCm}"></div>
+      </div>`;
+  }
+  const d = existing || MASTER_MEASURE_SHIRT[size] || {chestCm:0,chestIn:0,lengthCm:0,shoulderCm:0,sleeveCm:0,weightKg:'',heightCm:''};
+  return `
+    <div class="sm-title">${size}</div>
+    <div class="sm-inputs">
+      <div><label>Chest cm</label><input type="text" class="m-chestcm" value="${d.chestCm}"></div>
+      <div><label>Chest in</label><input type="text" class="m-chestin" value="${d.chestIn}"></div>
+      <div><label>Length cm</label><input type="text" class="m-lengthcm" value="${d.lengthCm}"></div>
+      <div><label>Shoulder cm</label><input type="text" class="m-shouldercm" value="${d.shoulderCm}"></div>
+      <div><label>Sleeve cm</label><input type="text" class="m-sleevecm" value="${d.sleeveCm}"></div>
+      <div><label>Weight range kg</label><input type="text" class="m-weightkg" value="${d.weightKg}"></div>
+      <div><label>Height range cm</label><input type="text" class="m-heightcm" value="${d.heightCm}"></div>
+    </div>`;
+}
+
+function addSizeBlock(size, prefillChart){
+  const type = currentType();
+  const existing = prefillChart ? prefillChart.find(e=>e.size===size) : null;
+  const div = document.createElement('div');
+  div.className = 'size-measure-block';
+  div.id = 'sm-'+size;
+  div.innerHTML = measureBlockHtml(type, size, existing);
+  sizeMeasureBlocks.appendChild(div);
+}
+
+function buildSizeCheckboxes(prefillChart){
+  const type = currentType();
+  const sizeList = type==='pants' ? PANTS_SIZES : SHIRT_SIZES;
+  const prefillSizes = prefillChart ? new Set(prefillChart.map(e=>e.size)) : null;
+  sizeCheckRow.innerHTML = sizeList.map(s=>{
+    const checked = prefillSizes && prefillSizes.has(s) ? 'checked' : '';
+    return `<label><input type="checkbox" value="${s}" class="size-check" ${checked}> ${s}</label>`;
+  }).join('');
+  sizeMeasureBlocks.innerHTML = '';
+  document.querySelectorAll('.size-check').forEach(cb=>{
+    if(cb.checked) addSizeBlock(cb.value, prefillChart);
+    cb.addEventListener('change', ()=>{
+      if(cb.checked) addSizeBlock(cb.value, null);
+      else { const el=document.getElementById('sm-'+cb.value); if(el) el.remove(); }
+    });
+  });
+}
+document.querySelectorAll('input[name="ptype"]').forEach(radio=>{
+  radio.addEventListener('change', ()=>buildSizeCheckboxes(null));
+});
+
+// Google Drive share-link auto-convert (paste `.../file/d/ID/view...` -> reliable embed URL)
+function driveIdFromUrl(url){
+  let m = url.match(/drive\.google\.com\/file\/d\/([^/]+)/); if(m) return m[1];
+  m = url.match(/[?&]id=([^&]+)/); if(m) return m[1];
+  m = url.match(/googleusercontent\.com\/d\/([^=?/]+)/); if(m) return m[1];
+  return null;
+}
+function driveCandidates(url){
+  const id = driveIdFromUrl(url);
+  if(!id) return [url];
+  return [
+    `https://lh3.googleusercontent.com/d/${id}=w1000`,
+    `https://drive.usercontent.google.com/download?id=${id}&export=view`,
+    `https://drive.google.com/uc?export=view&id=${id}`
+  ];
+}
+function convertDriveLink(url){
+  const candidates = driveCandidates(url);
+  return candidates[0];
+}
+// Accepts a plain URL, or a pasted HTML/BBCode/Markdown embed snippet, and extracts the raw image URL
+function extractImageUrl(text){
+  text = text.trim();
+  let m = text.match(/<img[^>]+src=["']([^"']+)["']/i);
+  if(m) return m[1];
+  m = text.match(/\[img\]([^\[]+)\[\/img\]/i);
+  if(m) return m[1];
+  m = text.match(/!\[[^\]]*\]\(([^)]+)\)/);
+  if(m) return m[1];
+  return text;
+}
+document.getElementById('f_image').addEventListener('blur', (e)=>{
+  const extracted = extractImageUrl(e.target.value);
+  const converted = convertDriveLink(extracted);
+  if(converted !== e.target.value.trim()) e.target.value = converted;
+});
+
+let editingIndex = null;
+
+function fillFormFromProduct(p){
+  document.getElementById('f_code').value = p.code;
+  document.getElementById('f_price').value = p.price || '';
+  document.getElementById('f_image').value = p.image || '';
+  document.getElementById('f_album').value = p.albumLink || '';
+  document.getElementById('f_name').value = p.name || '';
+  document.getElementById('f_namekh').value = p.nameKh || '';
+  document.getElementById('f_keywords').value = p.keywords || '';
+  document.getElementById('f_fabrictitle').value = p.fabricTitle || '';
+  document.getElementById('f_fabricdesc').value = p.fabricDesc || '';
+  document.getElementById('f_fabriccare').value = p.fabricCare || '';
+  document.querySelector(`input[name="ptype"][value="${p.type||'shirt'}"]`).checked = true;
+}
+
+function openEditModal(idx){
+  editingIndex = idx;
+  const p = PRODUCTS[idx];
+  document.getElementById('modalTitle').textContent = `Edit Product — ${p.code}`;
+  document.getElementById('modalSub').textContent = '// changes apply after clicking Save Changes';
+  document.getElementById('submitAdd').textContent = 'Save Changes';
+  document.getElementById('formError').classList.remove('show');
+  fillFormFromProduct(p);
+  buildColorPicker(p.colors);
+  buildSizeCheckboxes(p.sizeChart);
+  modalBackdrop.classList.add('active');
+}
+
+document.getElementById('openAddModal').addEventListener('click', ()=>{
+  editingIndex = null;
+  document.getElementById('modalTitle').textContent = 'Add New Product';
+  document.getElementById('modalSub').textContent = '// fill in what you know — everything can be edited later';
+  document.getElementById('submitAdd').textContent = 'Add Product';
+  document.getElementById('f_code').value='';
+  document.getElementById('f_price').value='';
+  document.getElementById('f_image').value='';
+  document.getElementById('f_album').value='';
+  document.getElementById('f_name').value='';
+  document.getElementById('f_namekh').value='';
+  document.getElementById('f_keywords').value='';
+  document.getElementById('f_fabrictitle').value='';
+  document.getElementById('f_fabricdesc').value='';
+  document.getElementById('f_fabriccare').value='';
+  document.getElementById('formError').classList.remove('show');
+  document.querySelector('input[name="ptype"][value="shirt"]').checked = true;
+  buildColorPicker(null);
+  buildSizeCheckboxes(null);
+  modalBackdrop.classList.add('active');
+});
+document.getElementById('cancelAdd').addEventListener('click', ()=>{ editingIndex=null; modalBackdrop.classList.remove('active'); });
+modalBackdrop.addEventListener('click', (e)=>{ if(e.target===modalBackdrop){ editingIndex=null; modalBackdrop.classList.remove('active'); } });
+
+document.getElementById('submitAdd').addEventListener('click', ()=>{
+  const code = document.getElementById('f_code').value.trim();
+  const name = document.getElementById('f_name').value.trim();
+  const errBox = document.getElementById('formError');
+  const type = currentType();
+
+  if(!code || !name){
+    errBox.textContent = 'Product code and name are required.';
+    errBox.classList.add('show');
+    return;
+  }
+  const duplicate = PRODUCTS.some((p,i)=> p.code.toLowerCase()===code.toLowerCase() && i!==editingIndex);
+  if(duplicate){
+    errBox.textContent = `Code "${code}" already exists — use a different code or delete the old one first.`;
+    errBox.classList.add('show');
+    return;
+  }
+  errBox.classList.remove('show');
+
+  const selectedPalette = [...document.querySelectorAll('.color-check:checked')].map(cb=>({...COLOR_PALETTE[+cb.value]}));
+  const customColors = parseColorsText(document.getElementById('f_colors_custom').value.trim());
+  const colors = [...selectedPalette, ...customColors];
+
+  const sizeChart = [];
+  document.querySelectorAll('.size-measure-block').forEach(block=>{
+    const size = block.querySelector('.sm-title').textContent;
+    if(type==='pants'){
+      sizeChart.push({
+        size,
+        outerCm: parseFloat(block.querySelector('.m-outercm').value)||0,
+        innerCm: parseFloat(block.querySelector('.m-innercm').value)||0,
+        legOpeningCm: parseFloat(block.querySelector('.m-legopeningcm').value)||0,
+        riseCm: parseFloat(block.querySelector('.m-risecm').value)||0,
+        hemCm: parseFloat(block.querySelector('.m-hemcm').value)||0,
+        weightKg: block.querySelector('.m-weightkg').value.trim(),
+        heightCm: block.querySelector('.m-heightcm').value.trim()
+      });
+    } else {
+      sizeChart.push({
+        size,
+        chestCm: parseFloat(block.querySelector('.m-chestcm').value)||0,
+        chestIn: parseFloat(block.querySelector('.m-chestin').value)||0,
+        lengthCm: parseFloat(block.querySelector('.m-lengthcm').value)||0,
+        shoulderCm: parseFloat(block.querySelector('.m-shouldercm').value)||0,
+        sleeveCm: parseFloat(block.querySelector('.m-sleevecm').value)||0,
+        weightKg: block.querySelector('.m-weightkg').value.trim(),
+        heightCm: block.querySelector('.m-heightcm').value.trim()
+      });
+    }
+  });
+
+  const productData = {
+    code, type, name,
+    nameKh: document.getElementById('f_namekh').value.trim(),
+    keywords: document.getElementById('f_keywords').value.trim(),
+    price: parseFloat(document.getElementById('f_price').value)||0,
+    colors, sizeChart,
+    image: document.getElementById('f_image').value.trim(),
+    albumLink: document.getElementById('f_album').value.trim(),
+    fabricTitle: document.getElementById('f_fabrictitle').value.trim(),
+    fabricDesc: document.getElementById('f_fabricdesc').value.trim(),
+    fabricCare: document.getElementById('f_fabriccare').value.trim()
+  };
+
+  if(editingIndex !== null){
+    PRODUCTS[editingIndex] = productData;
+  } else {
+    PRODUCTS.push(productData);
+  }
+
+  modalBackdrop.classList.remove('active');
+  editingIndex = null;
+  renderAll();
+  trySaveToStorage();
+});
+
+// ---------- Manage Colors modal ----------
+const colorModalBackdrop = document.getElementById('colorModalBackdrop');
+function renderColorRows(){
+  const container = document.getElementById('colorRows');
+  container.innerHTML = COLOR_PALETTE.map((c,i)=>`
+    <div class="color-manage-row" data-idx="${i}">
+      <input type="color" class="cm-hex" value="${/^#([0-9a-f]{6})$/i.test(c.hex)?c.hex:'#888888'}">
+      <input type="text" class="cm-kh" placeholder="Khmer name" value="${c.nameKh||''}">
+      <input type="text" class="cm-en" placeholder="English (optional)" value="${c.name||''}">
+      <button class="cm-delete" title="Remove">×</button>
+    </div>
+  `).join('');
+  container.querySelectorAll('.cm-delete').forEach(btn=>{
+    btn.addEventListener('click', ()=> btn.closest('.color-manage-row').remove());
+  });
+}
+document.getElementById('openColorManage').addEventListener('click', ()=>{
+  renderColorRows();
+  colorModalBackdrop.classList.add('active');
+});
+document.getElementById('addColorRow').addEventListener('click', ()=>{
+  const container = document.getElementById('colorRows');
+  const row = document.createElement('div');
+  row.className = 'color-manage-row';
+  row.innerHTML = `
+    <input type="color" class="cm-hex" value="#888888">
+    <input type="text" class="cm-kh" placeholder="Khmer name" value="">
+    <input type="text" class="cm-en" placeholder="English (optional)" value="">
+    <button class="cm-delete" title="Remove">×</button>
+  `;
+  row.querySelector('.cm-delete').addEventListener('click', ()=> row.remove());
+  container.appendChild(row);
+});
+document.getElementById('cancelColorManage').addEventListener('click', ()=> colorModalBackdrop.classList.remove('active'));
+colorModalBackdrop.addEventListener('click', (e)=>{ if(e.target===colorModalBackdrop) colorModalBackdrop.classList.remove('active'); });
+document.getElementById('saveColorManage').addEventListener('click', ()=>{
+  const rows = [...document.querySelectorAll('.color-manage-row')];
+  const updated = rows.map(row=>({
+    hex: row.querySelector('.cm-hex').value,
+    nameKh: row.querySelector('.cm-kh').value.trim(),
+    name: row.querySelector('.cm-en').value.trim()
+  })).filter(c=>c.nameKh || c.name);
+  COLOR_PALETTE = updated;
+  colorModalBackdrop.classList.remove('active');
+  trySavePaletteToStorage();
+});
+
+// ---------- Import from an older version of this file ----------
+document.getElementById('importBtn').addEventListener('click', ()=>{
+  document.getElementById('importFileInput').click();
+});
+document.getElementById('importFileInput').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev)=>{
+    const text = ev.target.result;
+    const match = text.match(/<script type="application\/json" id="product-data">([\s\S]*?)<\/script>/);
+    if(!match){
+      alert('Could not find product data in that file — make sure you selected a VHM Club catalog .html file.');
+      return;
+    }
+    let parsed;
+    try{ parsed = JSON.parse(match[1]); }
+    catch(err){
+      alert('That file\'s data looks corrupted and could not be read. No changes were made.');
+      return;
+    }
+    const importedProducts = parsed.products || [];
+    const importedPalette = parsed.colorPalette || [];
+    const msg = `Found ${importedProducts.length} product(s)${importedPalette.length ? ` and ${importedPalette.length} custom color(s)` : ''} in that file.\n\nReplace everything currently loaded with this imported data? (Your current products will be discarded — export first if you want to keep them too.)`;
+    if(confirm(msg)){
+      PRODUCTS = importedProducts;
+      if(importedPalette.length) COLOR_PALETTE = importedPalette;
+      renderAll();
+      trySaveToStorage();
+      if(importedPalette.length) trySavePaletteToStorage();
+      alert(`Imported ${importedProducts.length} product(s) successfully. This file now has your old data plus all the newest features. Click "⬇ Save Updated File" to save this merged version.`);
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = ''; // allow re-selecting the same file later
+});
+
+// ---------- Export updated file ----------
+document.getElementById('exportBtn').addEventListener('click', ()=>{
+  document.getElementById('product-data').textContent = JSON.stringify({products: PRODUCTS, colorPalette: COLOR_PALETTE}, null, 2);
+  const html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+  const blob = new Blob([html], {type:'text/html'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `vhm-catalog-${CATALOG_VERSION}.html`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+// ---------- Init ----------
+renderAll();
+checkCatalogStorageConnection();
+tryLoadFromStorage();
+</script>
+
+
+
+</body></html>
