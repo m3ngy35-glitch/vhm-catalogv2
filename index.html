@@ -182,12 +182,16 @@
 
   .edit-hint{margin-top:36px;font-family:'Space Mono',monospace;font-size:11px;color:#8a8375;border-top:1px dashed var(--line);padding-top:14px;line-height:1.6;}
 
-  .stock-paste{width:100%;min-height:110px;font-family:'Space Mono',monospace;font-size:12.5px;padding:12px;border:1.5px solid var(--line);border-radius:2px;background:var(--card);color:var(--ink);resize:vertical;}
+  .stock-paste{width:100%;min-height:110px;font-family:'Space Mono',monospace;font-size:12.5px;padding:12px 40px 12px 12px;border:1.5px solid var(--line);border-radius:2px;background:var(--card);color:var(--ink);resize:vertical;}
+  .stock-paste-wrap{position:relative;}
+  .stock-paste-clear{position:absolute;top:10px;right:10px;width:26px;height:26px;border-radius:50%;border:1px solid var(--line);background:var(--paper);color:var(--rust);font-size:15px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+  .stock-paste-clear:hover{background:var(--rust);color:var(--paper);border-color:var(--rust);}
   .stock-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;margin-bottom:22px;}
   .stock-empty{font-family:'Space Mono',monospace;font-size:12.5px;color:#8a8375;border:1px dashed var(--line);border-radius:2px;padding:18px;text-align:center;}
   .stock-group{background:var(--card);border:1.5px solid var(--line);border-radius:3px;padding:16px 18px;margin-bottom:16px;}
-  .stock-group-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;}
-  .stock-code{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:.5px;color:var(--olive-dark);}
+  .stock-group-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:4px;flex-wrap:wrap;}
+  .stock-code{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:.5px;color:var(--olive-dark);display:block;}
+  .stock-price{font-family:'Space Mono',monospace;font-size:12px;color:var(--rust);margin-bottom:12px;}
   .stock-color-row{display:flex;align-items:baseline;gap:10px;padding:8px 0;border-top:1px solid var(--line);flex-wrap:wrap;}
   .stock-color-row:first-of-type{border-top:none;}
   .stock-color-label{font-family:'Noto Sans Khmer','Archivo',sans-serif;font-size:13.5px;color:#5c5749;min-width:70px;flex-shrink:0;}
@@ -195,8 +199,11 @@
   .size-pill{display:inline-flex;align-items:center;gap:4px;font-family:'Space Mono',monospace;font-size:11.5px;padding:4px 9px;border-radius:2px;font-weight:700;}
   .size-pill.ok{background:#e3e9d9;color:var(--olive-dark);border:1px solid var(--olive);}
   .size-pill.out{background:#f1ddd4;color:var(--rust);border:1px solid var(--rust);}
-  .stock-card-preview{background:var(--paper);border:1.5px dashed var(--line);border-radius:3px;padding:14px 16px;margin-top:12px;}
-  .stock-card-preview .stock-code{font-size:20px;}
+  .stock-sizeguide{margin-top:12px;border-top:1px dashed var(--line);padding-top:10px;}
+  .stock-sizeguide-label{font-family:'Space Mono',monospace;font-size:10.5px;color:#8a8375;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;}
+  .stock-sizeguide table{width:100%;border-collapse:collapse;font-size:11px;}
+  .stock-sizeguide th,.stock-sizeguide td{border:1px solid var(--line);padding:4px 5px;text-align:center;}
+  .stock-sizeguide th{background:var(--olive-dark);color:var(--paper);font-family:'Space Mono',monospace;font-weight:400;font-size:10px;}
   .bookmarklet-note{background:#efe8d8;border-left:3px solid var(--olive);padding:12px 14px;font-size:12.5px;margin-bottom:20px;line-height:1.6;}
   .bookmarklet-note summary{cursor:pointer;font-weight:700;font-family:'Space Mono',monospace;letter-spacing:.3px;}
   .bookmarklet-code{display:block;background:var(--ink);color:#cfe0b8;font-family:'Space Mono',monospace;font-size:10.5px;padding:10px;border-radius:2px;margin-top:10px;word-break:break-all;user-select:all;}
@@ -752,10 +759,12 @@
       <div style="margin-top:8px;">4. On Vrich's Sale/Search screen, click <b>Copy stock</b> once, then paste below.</div>
     </details>
 
-    <textarea class="stock-paste" id="stockPasteBox" placeholder="Paste the copied Vrich rows here — e.g. E202 អាវ សរ L 6.20 1 0 / 1"></textarea>
+    <div class="stock-paste-wrap">
+      <textarea class="stock-paste" id="stockPasteBox" placeholder="Paste the copied Vrich rows here — e.g. E202 អាវ សរ L 6.20 1 0 / 1"></textarea>
+      <button type="button" class="stock-paste-clear" id="stockPasteClearX" title="Clear and paste new code">×</button>
+    </div>
     <div class="stock-actions">
       <button class="btn btn-primary" id="stockParseBtn">Show stock</button>
-      <button class="btn btn-ghost" id="stockClearBtn">Clear</button>
     </div>
 
     <div id="stockResults"><div class="stock-empty">// paste stock rows above, then tap "Show stock"</div></div>
@@ -3010,14 +3019,39 @@ function parseStockPaste(raw){
     const size = tokens.length ? tokens.pop() : '';
     if(tokens.length) tokens.shift();
     const color = tokens.join(' ');
+    const price = m[2];
     const remain = parseInt(m[5], 10);
-    if(!codes.has(code)) codes.set(code, new Map());
-    const colorMap = codes.get(code);
+    if(!codes.has(code)) codes.set(code, {price: price, colorMap: new Map()});
+    const entry = codes.get(code);
+    const colorMap = entry.colorMap;
     const key = color || '';
     if(!colorMap.has(key)) colorMap.set(key, []);
     colorMap.get(key).push({size: size || '—', remain});
   }
   return codes;
+}
+
+function findCatalogProduct(code){
+  if(typeof PRODUCTS === 'undefined' || !PRODUCTS) return null;
+  const target = code.trim().toUpperCase();
+  return PRODUCTS.find(p => (p.code||'').trim().toUpperCase() === target) || null;
+}
+
+function renderSizeGuideBlock(code, sizesPresent){
+  const product = findCatalogProduct(code);
+  if(!product || !product.sizeChart || !product.sizeChart.length) return '';
+  const wanted = new Set(sizesPresent.map(s=>String(s).toUpperCase()));
+  const rows = product.sizeChart.filter(r => wanted.has(String(r.size||'').toUpperCase()));
+  if(!rows.length) return '';
+  const cell = v => (v === undefined || v === null || v === '') ? '' : v;
+  let html = `<div class="stock-sizeguide">
+    <div class="stock-sizeguide-label">size guide</div>
+    <table><thead><tr><th>Size</th><th>Chest cm</th><th>Length cm</th><th>Weight kg</th><th>Height cm</th></tr></thead><tbody>`;
+  rows.forEach(r=>{
+    html += `<tr><td>${cell(r.size)}</td><td>${cell(r.chestCm)}</td><td>${cell(r.lengthCm)}</td><td>${cell(r.weightKg)}</td><td>${cell(r.heightCm)}</td></tr>`;
+  });
+  html += `</tbody></table></div>`;
+  return html;
 }
 
 function renderStockResults(codes){
@@ -3027,14 +3061,17 @@ function renderStockResults(codes){
     return;
   }
   let html = '';
-  codes.forEach((colorMap, code)=>{
-    const groupId = 'sg_' + code.replace(/[^a-zA-Z0-9]/g,'');
+  codes.forEach((entry, code)=>{
+    const colorMap = entry.colorMap;
+    const allSizes = [];
+    colorMap.forEach(sizes => sizes.forEach(s => allSizes.push(s.size)));
     html += `<div class="stock-group">
       <div class="stock-group-head">
-        <span class="stock-code">${code}</span>
-        <div style="display:flex;gap:8px;">
-          <button class="btn btn-ghost stock-copy-btn" data-code="${code}" style="font-size:12px;padding:7px 12px;">Copy message</button>
+        <div>
+          <span class="stock-code">${code}</span>
+          <span class="stock-price">តម្លៃ: ${entry.price}</span>
         </div>
+        <button class="btn btn-ghost stock-copy-btn" data-code="${code}" style="font-size:12px;padding:7px 12px;">Copy message</button>
       </div>`;
     colorMap.forEach((sizes, color)=>{
       sizes.sort((a,b)=>sizeSortKey(a.size)-sizeSortKey(b.size));
@@ -3047,6 +3084,7 @@ function renderStockResults(codes){
       });
       html += `</div></div>`;
     });
+    html += renderSizeGuideBlock(code, allSizes);
     html += `</div>`;
   });
   box.innerHTML = html;
@@ -3054,11 +3092,11 @@ function renderStockResults(codes){
   box.querySelectorAll('.stock-copy-btn').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const code = btn.dataset.code;
-      const colorMap = codes.get(code);
-      let lines = [code];
-      colorMap.forEach((sizes, color)=>{
+      const entry = codes.get(code);
+      let lines = ['📏 ទំហំដែលនៅមានក្នុងស្តុក', code, `តម្លៃ: ${entry.price}`, ''];
+      entry.colorMap.forEach((sizes, color)=>{
         const sorted = sizes.slice().sort((a,b)=>sizeSortKey(a.size)-sizeSortKey(b.size));
-        const sizeText = sorted.map(s=>`${s.size}${s.remain>0?'✅':'❌'}`).join(' ');
+        const sizeText = sorted.map(s=>`${s.remain>0?'✅':'❌'} ${s.size}`).join(' ');
         lines.push(color ? `${color}: ${sizeText}` : sizeText);
       });
       const msg = lines.join('\n');
@@ -3086,8 +3124,10 @@ document.getElementById('stockParseBtn').addEventListener('click', ()=>{
   const raw = document.getElementById('stockPasteBox').value;
   renderStockResults(parseStockPaste(raw));
 });
-document.getElementById('stockClearBtn').addEventListener('click', ()=>{
-  document.getElementById('stockPasteBox').value = '';
+document.getElementById('stockPasteClearX').addEventListener('click', ()=>{
+  const box = document.getElementById('stockPasteBox');
+  box.value = '';
+  box.focus();
   document.getElementById('stockResults').innerHTML = '<div class="stock-empty">// paste stock rows above, then tap "Show stock"</div>';
 });
 
