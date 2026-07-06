@@ -755,11 +755,24 @@
         2. Name it <b>Send stock</b><br>
         3. Paste this as the URL, then save:
       </div>
-      <code class="bookmarklet-code" id="bookmarkletCode">javascript:(function(){var name=localStorage.getItem('vhm_stock_name');if(!name){name=prompt('ឈ្មោះរបស់អ្នក? (វាយម្តងគត់ — used to keep your stock sends separate from others)');if(!name)return;localStorage.setItem('vhm_stock_name',name);}var key='stock_relay_'+name.trim().toUpperCase().replace(/[^A-Z0-9]/g,'');var lines=[];document.querySelectorAll('.monitor-item:not(.dummy)').forEach(function(li){if(li.style.display==='none'||li.getAttribute('hide')==='1')return;var code=li.querySelector('.code'),price=li.querySelector('.price'),qty=li.querySelector('.quantity'),remain=li.querySelector('.remain');if(!code||!remain)return;var line=[code.innerText,price?price.innerText:'',qty?qty.innerText:'',remain.innerText].join(' ');lines.push(line.replace(/\s+/g,' ').trim());});var text=lines.join('\n');function toast(m,c){var n=document.createElement('div');n.textContent=m;n.style.cssText='position:fixed;top:16px;left:50%;transform:translateX(-50%);background:'+(c||'#1D9E75')+';color:#fff;padding:10px 18px;border-radius:8px;font-size:15px;z-index:999999;font-family:sans-serif';document.body.appendChild(n);setTimeout(function(){n.remove();},2200);}var url='https://firestore.googleapis.com/v1/projects/vhm-catalog/databases/(default)/documents/kv/'+key+'?key=AIzaSyDDQp5_gvuRdX0flKQ3gm3zXJM_SXWUJSE';fetch(url,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({fields:{data:{stringValue:text},updatedAt:{timestampValue:new Date().toISOString()}}})}).then(function(r){if(r.ok){toast('ផ្ញើទៅទូរស័ព្ទបានហើយ ✅ ('+lines.length+')');}else{toast('មិនបានជោគជ័យ ❌','#E24B4A');}}).catch(function(){toast('មិនបានជោគជ័យ ❌','#E24B4A');});})();</code>
-      <div style="margin-top:8px;">4. First time only: it'll ask for your name — keeps your stock sends separate from your teammates'.<br>5. On Vrich's Monitor view (laptop), click <b>Send stock</b>.<br>6. On the phone, tap <b>⬇ Load from laptop</b> below (same name, so it finds your mailbox).</div>
+      <code class="bookmarklet-code" id="bookmarkletCode">javascript:(function(){var valid=['KIN','JINH','YAA','RY','NITH','VID','LY','DAVID'];var name=localStorage.getItem('vhm_stock_name');if(!name||valid.indexOf(name.trim().toUpperCase())===-1){name=prompt('ឈ្មោះរបស់អ្នក? Type exactly one of: KIN, JINH, Yaa, Ry, NITH, VID, LY, David');if(!name||valid.indexOf(name.trim().toUpperCase())===-1){alert('Please use one of: KIN, JINH, Yaa, Ry, NITH, VID, LY, David');return;}localStorage.setItem('vhm_stock_name',name);}var key='stock_relay_'+name.trim().toUpperCase().replace(/[^A-Z0-9]/g,'');var lines=[];document.querySelectorAll('.monitor-item:not(.dummy)').forEach(function(li){if(li.style.display==='none'||li.getAttribute('hide')==='1')return;var code=li.querySelector('.code'),price=li.querySelector('.price'),qty=li.querySelector('.quantity'),remain=li.querySelector('.remain');if(!code||!remain)return;var line=[code.innerText,price?price.innerText:'',qty?qty.innerText:'',remain.innerText].join(' ');lines.push(line.replace(/\s+/g,' ').trim());});var text=lines.join('\n');function toast(m,c){var n=document.createElement('div');n.textContent=m;n.style.cssText='position:fixed;top:16px;left:50%;transform:translateX(-50%);background:'+(c||'#1D9E75')+';color:#fff;padding:10px 18px;border-radius:8px;font-size:15px;z-index:999999;font-family:sans-serif';document.body.appendChild(n);setTimeout(function(){n.remove();},2200);}var url='https://firestore.googleapis.com/v1/projects/vhm-catalog/databases/(default)/documents/kv/'+key+'?key=AIzaSyDDQp5_gvuRdX0flKQ3gm3zXJM_SXWUJSE';fetch(url,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({fields:{data:{stringValue:text},updatedAt:{timestampValue:new Date().toISOString()}}})}).then(function(r){if(r.ok){toast('ផ្ញើទៅទូរស័ព្ទបានហើយ ✅ ('+lines.length+')');}else{toast('មិនបានជោគជ័យ ❌','#E24B4A');}}).catch(function(){toast('មិនបានជោគជ័យ ❌','#E24B4A');});})();</code>
+      <div style="margin-top:8px;">4. First time only: it'll ask for your name — must be exactly one of KIN, JINH, Yaa, Ry, NITH, VID, LY, David (same list as the phone dropdown).<br>5. On Vrich's Monitor view (laptop), click <b>Send stock</b>.<br>6. On the phone, pick the same name from the dropdown, then tap <b>⬇ Load from laptop</b>.</div>
     </details>
 
-    <div style="font-size:11px;color:#8a8375;margin-bottom:14px;font-family:'Space Mono',monospace;" id="stockNameLine"></div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+      <label for="stockNameSelect" style="font-family:'Space Mono',monospace;font-size:11px;color:#8a8375;">Your name:</label>
+      <select id="stockNameSelect" style="font-family:'Archivo',sans-serif;font-size:13px;padding:6px 10px;border:1.5px solid var(--line);border-radius:2px;background:var(--card);color:var(--ink);">
+        <option value="">-- select --</option>
+        <option value="KIN">KIN</option>
+        <option value="JINH">JINH</option>
+        <option value="Yaa">Yaa</option>
+        <option value="Ry">Ry</option>
+        <option value="NITH">NITH</option>
+        <option value="VID">VID</option>
+        <option value="LY">LY</option>
+        <option value="David">David</option>
+      </select>
+    </div>
 
     <div class="stock-paste-wrap">
       <textarea class="stock-paste" id="stockPasteBox" placeholder="Tap 'Load from laptop', or paste rows manually — e.g. E202 អាវ សរ L 6.20 1 0 / 1"></textarea>
@@ -3128,26 +3141,21 @@ function getStockName(){
 }
 function setStockName(v){
   localStorage.setItem('vhm_stock_name', v);
-  renderStockNameLine();
 }
 function stockNameKey(name){
   return 'stock_relay_' + name.trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
 }
-function renderStockNameLine(){
-  const el = document.getElementById('stockNameLine');
-  if(!el) return;
-  const name = getStockName();
-  el.innerHTML = name
-    ? `loading as <b>${name}</b> · <a href="#" id="stockNameChange" style="color:var(--olive-dark)">change</a>`
-    : `<a href="#" id="stockNameChange" style="color:var(--olive-dark)">set your name (so you load your own laptop, not a teammate's)</a>`;
-  const link = document.getElementById('stockNameChange');
-  if(link){
-    link.addEventListener('click', (e)=>{
-      e.preventDefault();
-      const v = prompt('ឈ្មោះរបស់អ្នក? (Your name — same one used on the laptop bookmark)', name || '');
-      if(v && v.trim()) setStockName(v.trim());
-    });
+function initStockNameSelect(){
+  const sel = document.getElementById('stockNameSelect');
+  if(!sel) return;
+  const saved = getStockName();
+  if(saved){
+    const match = Array.from(sel.options).find(o => o.value === saved);
+    if(match) sel.value = saved;
   }
+  sel.addEventListener('change', ()=>{
+    setStockName(sel.value);
+  });
 }
 
 document.getElementById('stockParseBtn').addEventListener('click', ()=>{
@@ -3157,13 +3165,15 @@ document.getElementById('stockParseBtn').addEventListener('click', ()=>{
 document.getElementById('stockLoadBtn').addEventListener('click', async ()=>{
   const btn = document.getElementById('stockLoadBtn');
   const old = btn.textContent;
-  let name = getStockName();
+  const sel = document.getElementById('stockNameSelect');
+  const name = sel ? sel.value : getStockName();
   if(!name){
-    const v = prompt('ឈ្មោះរបស់អ្នក? (Your name — same one used on the laptop bookmark, keeps your sends separate)');
-    if(!v || !v.trim()) return;
-    name = v.trim();
-    setStockName(name);
+    sel.focus();
+    btn.textContent = 'Select your name first';
+    setTimeout(()=>{ btn.textContent = old; }, 1800);
+    return;
   }
+  setStockName(name);
   btn.textContent = 'Loading…';
   btn.disabled = true;
   try{
@@ -3183,7 +3193,7 @@ document.getElementById('stockLoadBtn').addEventListener('click', async ()=>{
   btn.disabled = false;
   setTimeout(()=>{ btn.textContent = old; }, 1800);
 });
-renderStockNameLine();
+initStockNameSelect();
 document.getElementById('stockPasteClearX').addEventListener('click', ()=>{
   const box = document.getElementById('stockPasteBox');
   box.value = '';
