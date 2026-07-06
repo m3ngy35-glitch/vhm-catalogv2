@@ -182,6 +182,25 @@
 
   .edit-hint{margin-top:36px;font-family:'Space Mono',monospace;font-size:11px;color:#8a8375;border-top:1px dashed var(--line);padding-top:14px;line-height:1.6;}
 
+  .stock-paste{width:100%;min-height:110px;font-family:'Space Mono',monospace;font-size:12.5px;padding:12px;border:1.5px solid var(--line);border-radius:2px;background:var(--card);color:var(--ink);resize:vertical;}
+  .stock-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;margin-bottom:22px;}
+  .stock-empty{font-family:'Space Mono',monospace;font-size:12.5px;color:#8a8375;border:1px dashed var(--line);border-radius:2px;padding:18px;text-align:center;}
+  .stock-group{background:var(--card);border:1.5px solid var(--line);border-radius:3px;padding:16px 18px;margin-bottom:16px;}
+  .stock-group-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;}
+  .stock-code{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:.5px;color:var(--olive-dark);}
+  .stock-color-row{display:flex;align-items:baseline;gap:10px;padding:8px 0;border-top:1px solid var(--line);flex-wrap:wrap;}
+  .stock-color-row:first-of-type{border-top:none;}
+  .stock-color-label{font-family:'Noto Sans Khmer','Archivo',sans-serif;font-size:13.5px;color:#5c5749;min-width:70px;flex-shrink:0;}
+  .stock-sizes{display:flex;gap:6px;flex-wrap:wrap;}
+  .size-pill{display:inline-flex;align-items:center;gap:4px;font-family:'Space Mono',monospace;font-size:11.5px;padding:4px 9px;border-radius:2px;font-weight:700;}
+  .size-pill.ok{background:#e3e9d9;color:var(--olive-dark);border:1px solid var(--olive);}
+  .size-pill.out{background:#f1ddd4;color:var(--rust);border:1px solid var(--rust);}
+  .stock-card-preview{background:var(--paper);border:1.5px dashed var(--line);border-radius:3px;padding:14px 16px;margin-top:12px;}
+  .stock-card-preview .stock-code{font-size:20px;}
+  .bookmarklet-note{background:#efe8d8;border-left:3px solid var(--olive);padding:12px 14px;font-size:12.5px;margin-bottom:20px;line-height:1.6;}
+  .bookmarklet-note summary{cursor:pointer;font-weight:700;font-family:'Space Mono',monospace;letter-spacing:.3px;}
+  .bookmarklet-code{display:block;background:var(--ink);color:#cfe0b8;font-family:'Space Mono',monospace;font-size:10.5px;padding:10px;border-radius:2px;margin-top:10px;word-break:break-all;user-select:all;}
+
   @media(max-width:640px){
     header{flex-direction:column;align-items:flex-start;}
     nav{width:100%;overflow-x:auto;}
@@ -205,6 +224,7 @@
     <button class="active" data-view="catalog">Catalog</button>
     <button data-view="sizing">Size Guide</button>
     <button data-view="fabric">Fabric Info</button>
+    <button data-view="stock">Stock Check</button>
   </nav>
 </header>
 
@@ -714,6 +734,31 @@
       <div class="care"></div>
     </div>
   </div>
+  </section>
+
+  <!-- STOCK CHECK VIEW -->
+  <section id="stock" class="view">
+    <h1 class="section-title">Stock Check</h1>
+    <div class="section-sub">// paste the Vrich search result — get a clean reply, no typing needed</div>
+
+    <details class="bookmarklet-note">
+      <summary>How to copy from Vrich (one-time setup)</summary>
+      <div style="margin-top:8px;">
+        1. In Chrome, right-click the bookmarks bar → <b>Add page</b><br>
+        2. Name it <b>Copy stock</b><br>
+        3. Paste this as the URL, then save:
+      </div>
+      <code class="bookmarklet-code" id="bookmarkletCode">javascript:(function(){var rows=Array.from(document.querySelectorAll('tr')),lines=[];rows.forEach(function(r){var t=r.innerText.trim();if(/\d+\s*\/\s*\d+/.test(t)){lines.push(t.replace(/\s+/g,' ').trim());}});var text=lines.join('\n');function toast(m){var n=document.createElement('div');n.textContent=m;n.style.cssText='position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#1D9E75;color:#fff;padding:10px 18px;border-radius:8px;font-size:15px;z-index:999999;font-family:sans-serif';document.body.appendChild(n);setTimeout(function(){n.remove();},1800);}if(navigator.clipboard&amp;&amp;navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(function(){toast('ចម្លងស្តុកបានហើយ ✅');});}else{var ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);toast('ចម្លងស្តុកបានហើយ ✅');}})();</code>
+      <div style="margin-top:8px;">4. On Vrich's Sale/Search screen, click <b>Copy stock</b> once, then paste below.</div>
+    </details>
+
+    <textarea class="stock-paste" id="stockPasteBox" placeholder="Paste the copied Vrich rows here — e.g. E202 អាវ សរ L 6.20 1 0 / 1"></textarea>
+    <div class="stock-actions">
+      <button class="btn btn-primary" id="stockParseBtn">Show stock</button>
+      <button class="btn btn-ghost" id="stockClearBtn">Clear</button>
+    </div>
+
+    <div id="stockResults"><div class="stock-empty">// paste stock rows above, then tap "Show stock"</div></div>
   </section>
 
 </main>
@@ -1916,13 +1961,18 @@ if (!window.storage) {
       const doc = await db.collection('kv').doc(key).get();
       if (!doc.exists) return null;
       const data = doc.data();
-      if (data.value === null || data.value === undefined) return null;
-      return { key, value: data.value, shared: true };
+      if (data.data === undefined || data.data === null) return null;
+      return { key, value: JSON.stringify(data.data), shared: true };
     },
     async set(key, value){
       const db = catalogFirestore_();
+      // Store as real structured fields (not one text blob) so Firebase
+      // Console's own data viewer is genuinely readable — each product's
+      // fields show up separately, not as a wall of code text.
+      let parsed;
+      try { parsed = JSON.parse(value); } catch(e) { parsed = value; }
       await db.collection('kv').doc(key).set({
-        value: value,
+        data: parsed,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       });
       return { key, value, shared:true };
@@ -2932,6 +2982,113 @@ document.getElementById('exportBtn').addEventListener('click', ()=>{
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+});
+
+// ---------- Stock Check ----------
+const SIZE_ORDER = ['XS','S','M','L','XL','2XL','3XL','4XL','5XL'];
+function sizeSortKey(s){
+  const i = SIZE_ORDER.indexOf(s);
+  if(i !== -1) return i;
+  const n = parseFloat(s);
+  return isNaN(n) ? 999 : 100 + n;
+}
+
+function parseStockPaste(raw){
+  const recordRe = /([\s\S]+?)\s*(\d+\.\d+)\s+(\d+)\s+(\d+)\s*\/\s*(\d+)/g;
+  const codes = new Map();
+  let m;
+  while((m = recordRe.exec(raw)) !== null){
+    let nameBlock = m[1];
+    const lines = nameBlock.split('\n').map(l=>l.trim()).filter(Boolean);
+    let line = lines.length ? lines[lines.length-1] : '';
+    line = line.replace(/^\*+\s*/,'').replace(/!/g,'').trim();
+    if(!line) continue;
+    const parts = line.split(/\s+/);
+    const code = parts.shift();
+    if(!code) continue;
+    const tokens = parts.slice();
+    const size = tokens.length ? tokens.pop() : '';
+    if(tokens.length) tokens.shift();
+    const color = tokens.join(' ');
+    const remain = parseInt(m[5], 10);
+    if(!codes.has(code)) codes.set(code, new Map());
+    const colorMap = codes.get(code);
+    const key = color || '';
+    if(!colorMap.has(key)) colorMap.set(key, []);
+    colorMap.get(key).push({size: size || '—', remain});
+  }
+  return codes;
+}
+
+function renderStockResults(codes){
+  const box = document.getElementById('stockResults');
+  if(!codes.size){
+    box.innerHTML = '<div class="stock-empty">// no stock rows recognized — check the pasted text and try again</div>';
+    return;
+  }
+  let html = '';
+  codes.forEach((colorMap, code)=>{
+    const groupId = 'sg_' + code.replace(/[^a-zA-Z0-9]/g,'');
+    html += `<div class="stock-group">
+      <div class="stock-group-head">
+        <span class="stock-code">${code}</span>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-ghost stock-copy-btn" data-code="${code}" style="font-size:12px;padding:7px 12px;">Copy message</button>
+        </div>
+      </div>`;
+    colorMap.forEach((sizes, color)=>{
+      sizes.sort((a,b)=>sizeSortKey(a.size)-sizeSortKey(b.size));
+      html += `<div class="stock-color-row">
+        <span class="stock-color-label">${color || '—'}</span>
+        <div class="stock-sizes">`;
+      sizes.forEach(s=>{
+        const ok = s.remain > 0;
+        html += `<span class="size-pill ${ok?'ok':'out'}">${ok?'✅':'❌'} ${s.size}</span>`;
+      });
+      html += `</div></div>`;
+    });
+    html += `</div>`;
+  });
+  box.innerHTML = html;
+
+  box.querySelectorAll('.stock-copy-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const code = btn.dataset.code;
+      const colorMap = codes.get(code);
+      let lines = [code];
+      colorMap.forEach((sizes, color)=>{
+        const sorted = sizes.slice().sort((a,b)=>sizeSortKey(a.size)-sizeSortKey(b.size));
+        const sizeText = sorted.map(s=>`${s.size}${s.remain>0?'✅':'❌'}`).join(' ');
+        lines.push(color ? `${color}: ${sizeText}` : sizeText);
+      });
+      const msg = lines.join('\n');
+      const done = ()=>{
+        const old = btn.textContent;
+        btn.textContent = 'Copied ✅';
+        setTimeout(()=>{ btn.textContent = old; }, 1500);
+      };
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(msg).then(done);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = msg;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        done();
+      }
+    });
+  });
+}
+
+document.getElementById('stockParseBtn').addEventListener('click', ()=>{
+  const raw = document.getElementById('stockPasteBox').value;
+  renderStockResults(parseStockPaste(raw));
+});
+document.getElementById('stockClearBtn').addEventListener('click', ()=>{
+  document.getElementById('stockPasteBox').value = '';
+  document.getElementById('stockResults').innerHTML = '<div class="stock-empty">// paste stock rows above, then tap "Show stock"</div>';
 });
 
 // ---------- Init ----------
