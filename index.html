@@ -784,6 +784,11 @@
     </div>
 
     <div id="stockResults"><div class="stock-empty">// paste stock rows above, then tap "Show stock"</div></div>
+
+    <details class="bookmarklet-note" style="margin-top:10px;" id="searchCountDetails">
+      <summary>📊 Today's most-searched codes</summary>
+      <div id="searchCountList" style="margin-top:10px;font-family:'Space Mono',monospace;font-size:12px;line-height:1.8;">Tap to load…</div>
+    </details>
   </section>
 
 </main>
@@ -921,8 +926,10 @@
     Adding photos: create a folder named "images" next to this file, drop photos in, then set the product's Photo URL to "images/yourfile.jpg" (or paste any ImgBB/Drive link or embed code — it auto-extracts). Click any photo to zoom.<br><br>
     Saving your changes: this file has no server, so new products live only in this open tab until you click <b>"⬇ Save Updated File"</b> — that downloads a new .html with everything included, named with the version number. Replace the old file with it, or send it to teammates so everyone has the same catalog.<br><br>
     Getting a new version from me without losing your data: click <b>"📥 Import from Old File"</b> and select your current working file (the one with your real products) — it pulls in all your codes, photos, colors, and prices, merged with whatever new features this version adds. Then Save to lock it in.<br><br>
-    <b>Version <span id="versionTagFooter">v2.8</span> — what's changed:</b><br>
-    <span id="changelogList">• v2.8 — "📥 Import from Old File" button: select any older version of your catalog file and it pulls in all your real products (codes, photos, colors, prices) into this newer version, so updates never wipe your data again.<br>• v2.7 — More accurate size finder, Uniqlo MySize-style: enter an actual chest/waist measurement (optional) and it's compared directly against this product's real garment measurements, with a Slim/Regular/Relaxed fit preference and an ease/room number per size (e.g. "+8cm at chest"). Falls back to the weight/height bracket when no measurement is given.<br>• v2.6 — Color palette rebuilt from your actual inventory sheets (ខ្មៅ, ប្រផេះ, ប៊ិច, សាច់, បៃតង, មេឃ, ឈូក, កាហ្វេ, ដី, ខៀវ, ក្រហម, ពពក, លឿង, ឈាមជ្រូក, ប្រាក់, and more). New "🎨 Manage Colors" button lets you add, rename, recolor, or remove any palette entry — changes persist through Save/Export.<br>• v2.5 — Colors are now tap-to-select from a fixed palette (no typos, consistent swatches). Khmer name is what search matches on; English is just a label. Custom color field still available for anything not in the list.<br>• v2.4 — Khmer-only colors now map to accurate swatch colors (no English name required). Common Khmer color terms recognized directly.<br>• v2.3 — Smart photo URL: paste ImgBB/Drive embed code, BBCode, or Markdown, it auto-extracts the link. Clearer edit/delete buttons.<br>• v2.2 — Drive link auto-convert with fallback chain if a photo format fails to load.<br>• v2.1 — Edit button on every product (opens pre-filled form instead of re-adding).<br>• v2.0 — Shirt vs Pants sizing (letter sizes vs waist numbers), joint height+weight bracket matching, Khmer color names, price, keywords, album link.<br>• v1.2 — Inline size recommendation finder on each card; weight/height columns.<br>• v1.1 — Per-product size charts, add-product form, keyword search.<br>• v1.0 — Initial catalog: products, size guide, fabric info, photos.</span>
+    <b>Version <span id="versionTagFooter">v2.8</span></b> — imports/exports preserve your data across updates. <a href="#" id="changelogToggle" style="color:var(--olive-dark);text-decoration:underline;">full history</a>
+    <div id="changelogFull" style="display:none;margin-top:8px;">
+      <span id="changelogList">• v2.8 — "📥 Import from Old File" button: select any older version of your catalog file and it pulls in all your real products (codes, photos, colors, prices) into this newer version, so updates never wipe your data again.<br>• v2.7 — More accurate size finder, Uniqlo MySize-style: enter an actual chest/waist measurement (optional) and it's compared directly against this product's real garment measurements, with a Slim/Regular/Relaxed fit preference and an ease/room number per size (e.g. "+8cm at chest"). Falls back to the weight/height bracket when no measurement is given.<br>• v2.6 — Color palette rebuilt from your actual inventory sheets (ខ្មៅ, ប្រផេះ, ប៊ិច, សាច់, បៃតង, មេឃ, ឈូក, កាហ្វេ, ដី, ខៀវ, ក្រហម, ពពក, លឿង, ឈាមជ្រូក, ប្រាក់, and more). New "🎨 Manage Colors" button lets you add, rename, recolor, or remove any palette entry — changes persist through Save/Export.<br>• v2.5 — Colors are now tap-to-select from a fixed palette (no typos, consistent swatches). Khmer name is what search matches on; English is just a label. Custom color field still available for anything not in the list.<br>• v2.4 — Khmer-only colors now map to accurate swatch colors (no English name required). Common Khmer color terms recognized directly.<br>• v2.3 — Smart photo URL: paste ImgBB/Drive embed code, BBCode, or Markdown, it auto-extracts the link. Clearer edit/delete buttons.<br>• v2.2 — Drive link auto-convert with fallback chain if a photo format fails to load.<br>• v2.1 — Edit button on every product (opens pre-filled form instead of re-adding).<br>• v2.0 — Shirt vs Pants sizing (letter sizes vs waist numbers), joint height+weight bracket matching, Khmer color names, price, keywords, album link.<br>• v1.2 — Inline size recommendation finder on each card; weight/height columns.<br>• v1.1 — Per-product size charts, add-product form, keyword search.<br>• v1.0 — Initial catalog: products, size guide, fabric info, photos.</span>
+    </div>
   </div>
 </div>
 
@@ -2314,6 +2321,13 @@ const CHANGELOG = [
 document.getElementById('versionTag').textContent = CATALOG_VERSION;
 document.getElementById('versionTagFooter').textContent = CATALOG_VERSION;
 document.getElementById('changelogList').innerHTML = CHANGELOG.map(c=>`• ${c}`).join('<br>');
+document.getElementById('changelogToggle').addEventListener('click', (e)=>{
+  e.preventDefault();
+  const box = document.getElementById('changelogFull');
+  const isOpen = box.style.display !== 'none';
+  box.style.display = isOpen ? 'none' : 'block';
+  e.target.textContent = isOpen ? 'full history' : 'hide history';
+});
 
 // ---------- Load embedded data ----------
 let PRODUCTS = [];
@@ -3059,7 +3073,7 @@ function renderSizeGuideBlock(code, sizesPresent){
   const wanted = new Set(sizesPresent.map(s=>String(s).toUpperCase()));
   const rows = product.sizeChart.filter(r => wanted.has(String(r.size||'').toUpperCase()));
   if(!rows.length) return '';
-  const cell = v => (v === undefined || v === null || v === '') ? '' : v;
+  const cell = v => (v === undefined || v === null || v === '') ? '' : escapeHtml(v);
   let html = `<div class="stock-sizeguide">
     <div class="stock-sizeguide-label">size guide</div>
     <table><thead><tr><th>Size</th><th>Chest cm</th><th>Length cm</th><th>Weight kg</th><th>Height cm</th></tr></thead><tbody>`;
@@ -3070,12 +3084,56 @@ function renderSizeGuideBlock(code, sizesPresent){
   return html;
 }
 
+function escapeHtml(v){
+  return String(v).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+
+function todayKey(){
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+async function recordSearchCounts(codeList){
+  if(!codeList.length) return;
+  try{
+    const db = catalogFirestore_();
+    const increments = {};
+    codeList.forEach(c => { increments[c.trim().toUpperCase()] = firebase.firestore.FieldValue.increment(1); });
+    await db.collection('searchCounts').doc(todayKey()).set(increments, {merge:true});
+  }catch(e){
+    console.warn('search count not recorded', e);
+  }
+}
+
+async function loadSearchCounts(){
+  const el = document.getElementById('searchCountList');
+  if(!el) return;
+  el.textContent = 'Loading…';
+  try{
+    const db = catalogFirestore_();
+    const doc = await db.collection('searchCounts').doc(todayKey()).get();
+    if(!doc.exists){ el.textContent = 'No searches recorded yet today.'; return; }
+    const data = doc.data() || {};
+    const rows = Object.keys(data)
+      .filter(k => typeof data[k] === 'number')
+      .map(k => [k, data[k]])
+      .sort((a,b)=>b[1]-a[1]);
+    el.innerHTML = rows.length
+      ? rows.map(([code,count])=>`${escapeHtml(code)} — ${count}`).join('<br>')
+      : 'No searches recorded yet today.';
+  }catch(e){
+    el.textContent = 'Could not load (check connection).';
+    console.error(e);
+  }
+}
+
 function renderStockResults(codes){
   const box = document.getElementById('stockResults');
   if(!codes.size){
     box.innerHTML = '<div class="stock-empty">// no stock rows recognized — check the pasted text and try again</div>';
     return;
   }
+  recordSearchCounts(Array.from(codes.keys()));
   let html = '';
   codes.forEach((entry, code)=>{
     const colorMap = entry.colorMap;
@@ -3084,20 +3142,23 @@ function renderStockResults(codes){
     html += `<div class="stock-group">
       <div class="stock-group-head">
         <div>
-          <span class="stock-code">${code}</span>
-          <span class="stock-price">តម្លៃ: ${entry.price}</span>
+          <span class="stock-code">${escapeHtml(code)}</span>
+          <span class="stock-price">តម្លៃ: ${escapeHtml(entry.price)}</span>
         </div>
-        <button class="btn btn-ghost stock-copy-btn" data-code="${code}" style="font-size:12px;padding:7px 12px;">Copy message</button>
+        <button class="btn btn-ghost stock-copy-btn" data-code="${escapeHtml(code)}" style="font-size:12px;padding:7px 12px;">Copy message</button>
       </div>`;
     colorMap.forEach((sizes, color)=>{
-      sizes.sort((a,b)=>sizeSortKey(a.size)-sizeSortKey(b.size));
+      const available = sizes.filter(s => s.remain > 0).sort((a,b)=>sizeSortKey(a.size)-sizeSortKey(b.size));
       html += `<div class="stock-color-row">
-        <span class="stock-color-label">${color || '—'}</span>
+        <span class="stock-color-label">${escapeHtml(color || '—')}</span>
         <div class="stock-sizes">`;
-      sizes.forEach(s=>{
-        const ok = s.remain > 0;
-        html += `<span class="size-pill ${ok?'ok':'out'}">${ok?'✅':'❌'} ${s.size}</span>`;
-      });
+      if(available.length){
+        available.forEach(s=>{
+          html += `<span class="size-pill ok">✅ ${escapeHtml(s.size)}</span>`;
+        });
+      } else {
+        html += `<span style="font-family:'Space Mono',monospace;font-size:11.5px;color:#8a8375;">អស់ស្តុកទាំងអស់ (none available)</span>`;
+      }
       html += `</div></div>`;
     });
     html += renderSizeGuideBlock(code, allSizes);
@@ -3111,8 +3172,9 @@ function renderStockResults(codes){
       const entry = codes.get(code);
       let lines = ['📏 ទំហំដែលនៅមានក្នុងស្តុក', code, `តម្លៃ: ${entry.price}`, ''];
       entry.colorMap.forEach((sizes, color)=>{
-        const sorted = sizes.slice().sort((a,b)=>sizeSortKey(a.size)-sizeSortKey(b.size));
-        const sizeText = sorted.map(s=>`${s.remain>0?'✅':'❌'} ${s.size}`).join(' ');
+        const available = sizes.filter(s => s.remain > 0).sort((a,b)=>sizeSortKey(a.size)-sizeSortKey(b.size));
+        if(!available.length) return;
+        const sizeText = available.map(s=>`✅ ${s.size}`).join(' ');
         lines.push(color ? `${color}: ${sizeText}` : sizeText);
       });
       const msg = lines.join('\n');
@@ -3194,6 +3256,12 @@ document.getElementById('stockLoadBtn').addEventListener('click', async ()=>{
   setTimeout(()=>{ btn.textContent = old; }, 1800);
 });
 initStockNameSelect();
+const searchCountDetails = document.getElementById('searchCountDetails');
+if(searchCountDetails){
+  searchCountDetails.addEventListener('toggle', function(){
+    if(this.open) loadSearchCounts();
+  });
+}
 document.getElementById('stockPasteClearX').addEventListener('click', ()=>{
   const box = document.getElementById('stockPasteBox');
   box.value = '';
