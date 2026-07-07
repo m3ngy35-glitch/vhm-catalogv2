@@ -3174,7 +3174,7 @@ function renderStockResults(codes){
       entry.colorMap.forEach((sizes, color)=>{
         const available = sizes.filter(s => s.remain > 0).sort((a,b)=>sizeSortKey(a.size)-sizeSortKey(b.size));
         if(!available.length) return;
-        const sizeText = available.map(s=>`✅ ${s.size}`).join(' ');
+        const sizeText = available.map(s=>s.size).join(' ');
         lines.push(color ? `${color}: ${sizeText}` : sizeText);
       });
       const msg = lines.join('\n');
