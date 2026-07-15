@@ -157,22 +157,33 @@
   <details class="note" style="margin-top:26px;">
     <summary>📊 Export / Import via spreadsheet</summary>
     <div class="note-body">
-      <div class="field-hint" style="margin-bottom:10px;">Export gives every saved code as rows for Google Sheets/Excel. Add or edit rows, paste the whole thing back, then Import — only the codes present in what you paste are created/updated, nothing else is touched.</div>
-      <b style="font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--olive-dark);">Export</b>
-      <div class="stock-actions">
-        <button class="btn btn-primary" id="liveExportBtn">📤 Export all saved codes</button>
-        <button class="btn btn-ghost" id="liveExportCopyBtn" style="display:none;">Copy for spreadsheet</button>
-        <button class="btn btn-ghost" id="liveExportDownloadBtn" style="display:none;">⬇ Download .csv</button>
-      </div>
-      <textarea id="liveExportBox" class="stock-paste" readonly style="min-height:90px;display:none;"></textarea>
+      <div class="field-hint" style="margin-bottom:10px;">Two separate sheets, because weight belongs to a SIZE (same for every color), while colors/sizes availability is per COLOR. Splitting them means editing one weight only takes one edit, not one per color. Import only touches the codes present in what you paste — nothing else is touched.</div>
 
-      <b style="font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--olive-dark);display:block;margin-top:18px;">Import</b>
-      <div class="field-hint" style="margin:6px 0;">4 columns: Code, Color, Size, Weight.</div>
-      <textarea id="liveImportSheetBox" class="stock-paste" style="min-height:100px;" placeholder="E90&#9;ខ្មៅ&#9;M&#9;50-60&#10;E90&#9;ខ្មៅ&#9;L&#9;58-68"></textarea>
+      <b style="font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--olive-dark);">Colors &amp; sizes sheet</b>
+      <div class="field-hint" style="margin:6px 0;">3 columns: Code, Color, Sizes (space-separated, e.g. "M L XL").</div>
       <div class="stock-actions">
-        <button class="btn btn-primary" id="liveImportPreviewBtn">Preview import</button>
+        <button class="btn btn-primary" id="liveExportColorsBtn">📤 Export colors</button>
+        <button class="btn btn-ghost" id="liveExportColorsCopyBtn" style="display:none;">Copy for spreadsheet</button>
       </div>
-      <div id="liveImportPreview"></div>
+      <textarea id="liveExportColorsBox" class="stock-paste" readonly style="min-height:80px;display:none;"></textarea>
+      <textarea id="liveImportColorsBox" class="stock-paste" style="min-height:90px;margin-top:8px;" placeholder="E90&#9;ខ្មៅ&#9;M L XL 2XL&#10;E90&#9;ស្លែ&#9;M L"></textarea>
+      <div class="stock-actions">
+        <button class="btn btn-primary" id="liveImportColorsPreviewBtn">Preview colors import</button>
+      </div>
+      <div id="liveImportColorsPreview"></div>
+
+      <b style="font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--olive-dark);display:block;margin-top:22px;">Weights sheet</b>
+      <div class="field-hint" style="margin:6px 0;">3 columns: Code, Size, Weight — one row per size, not per color.</div>
+      <div class="stock-actions">
+        <button class="btn btn-primary" id="liveExportWeightsBtn">📤 Export weights</button>
+        <button class="btn btn-ghost" id="liveExportWeightsCopyBtn" style="display:none;">Copy for spreadsheet</button>
+      </div>
+      <textarea id="liveExportWeightsBox" class="stock-paste" readonly style="min-height:80px;display:none;"></textarea>
+      <textarea id="liveImportWeightsBox" class="stock-paste" style="min-height:90px;margin-top:8px;" placeholder="E90&#9;M&#9;50-60&#10;E90&#9;L&#9;58-68"></textarea>
+      <div class="stock-actions">
+        <button class="btn btn-primary" id="liveImportWeightsPreviewBtn">Preview weights import</button>
+      </div>
+      <div id="liveImportWeightsPreview"></div>
     </div>
   </details>
 
@@ -226,10 +237,6 @@ window.storage = {
       data: parsed,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     });
-    const verifySnap = await db.collection('kv').doc(key).get({source:'server'});
-    if(!verifySnap.exists){
-      throw new Error('Save could not be confirmed on the server. This usually means an ad blocker or privacy extension is blocking requests to Firestore — try disabling it, or use a private/incognito window.');
-    }
     return { key, value };
   },
   async delete(key){
@@ -317,7 +324,7 @@ function sizeSortKey(s){
   return isNaN(n) ? 999 : 100 + n;
 }
 const LIVE_DEFAULT_WEIGHTS = {
-  'M':'50-60','L':'58-68','XL':'65-75','2XL':'75-85','3XL':'85-95','4XL':'90-105'
+  'S':'45-55','M':'50-60','L':'58-68','XL':'65-75','2XL':'75-85','3XL':'85-95','4XL':'90-105'
 };
 function liveWeightRangeDisplay(rangeStr){
   if(!rangeStr) return '—';
@@ -546,7 +553,11 @@ function liveApplyImportedCode(code, codesMap){
   document.getElementById('liveColorsBox').value = liveColorsArrToText(colorsArr);
   document.getElementById('liveFormError').classList.remove('show');
   document.getElementById('importCodePicker').innerHTML = '';
-  liveRenderWeightInputs(colorsArr, null);
+  // If this code already has a saved live log, use its weights instead of
+  // resetting to blank/default — otherwise re-importing colors/sizes from a
+  // fresh stock check would silently wipe out weight already saved for it.
+  const savedEntry = liveLogEntriesCache.find(en => (en.code||'').toUpperCase() === code.toUpperCase());
+  liveRenderWeightInputs(colorsArr, savedEntry ? savedEntry.weights : null);
 }
 document.getElementById('importParseBtn').addEventListener('click', ()=>{
   const raw = document.getElementById('importBox').value;
@@ -636,6 +647,10 @@ document.getElementById('liveSaveBtn').addEventListener('click', async ()=>{
   statusBox.style.color = '';
   btn.disabled = true;
   btn.textContent = 'Saving…';
+  const startedAt = Date.now();
+  const tickTimer = setInterval(()=>{
+    btn.textContent = `Saving… (${Math.round((Date.now()-startedAt)/1000)}s)`;
+  }, 1000);
   try{
     const {code, colorsArr} = liveGetFormState();
     if(!code || !colorsArr.length){
@@ -646,14 +661,14 @@ document.getElementById('liveSaveBtn').addEventListener('click', async ()=>{
     errBox.classList.remove('show');
     liveRefreshWeightInputs();
     const weights = liveCollectWeights();
-    await window.storage.set(liveLogKey(code), JSON.stringify({
+    await withTimeout(window.storage.set(liveLogKey(code), JSON.stringify({
       code, colorsText: document.getElementById('liveColorsBox').value,
       colors: colorsArr, weights, updatedAt: new Date().toISOString()
-    }));
+    })), 25000, 'Save timed out after 25s — the server never responded. Check your connection and try again.');
     btn.textContent = 'Saved ✅';
     const now = new Date();
     statusBox.style.color = 'var(--olive-dark)';
-    statusBox.textContent = `✅ Saved "${code}" at ${now.toLocaleTimeString()} — confirmed on the server.`;
+    statusBox.textContent = `✅ Saved "${code}" at ${now.toLocaleTimeString()}.`;
     loadLiveLogList();
   }catch(e){
     console.error('Live log save failed:', e);
@@ -661,6 +676,7 @@ document.getElementById('liveSaveBtn').addEventListener('click', async ()=>{
     statusBox.style.color = 'var(--rust)';
     statusBox.textContent = '❌ Save failed: ' + (e && e.message ? e.message : 'unknown error — check your connection and try again.');
   } finally {
+    clearInterval(tickTimer);
     btn.disabled = false;
     setTimeout(()=>{ btn.textContent = old; }, 1500);
   }
@@ -803,19 +819,7 @@ document.getElementById('liveLogSearchBox').addEventListener('input', (e)=>{
   loadLiveLogList();
 });
 
-/* ---- Export / Import via spreadsheet ---- */
-function liveBuildExportRows(entries){
-  const rows = [['Code','Color','Size','Weight']];
-  entries.forEach(entry=>{
-    const weights = entry.weights || {};
-    entry.colors.forEach(c=>{
-      c.sizes.forEach(size=>{
-        rows.push([entry.code, c.color, size, weights[size] || '']);
-      });
-    });
-  });
-  return rows;
-}
+/* ---- Export / Import via spreadsheet (two sheets: colors, weights) ---- */
 function cellEscapeForDelimited(v, delim){
   const s = String(v==null?'':v);
   if(delim === '\t') return s.replace(/\t/g,' ').replace(/\n/g,' ');
@@ -850,74 +854,62 @@ function parseDelimitedText(text){
   if(rows.length && /^code$/i.test(rows[0][0]||'')) rows = rows.slice(1);
   return rows;
 }
-function todayKey(){
-  const d = new Date();
-  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+
+/* -- Colors sheet: Code | Color | Sizes -- */
+function liveBuildColorsExportRows(entries){
+  const rows = [['Code','Color','Sizes']];
+  entries.forEach(entry=>{
+    entry.colors.forEach(c=>{ rows.push([entry.code, c.color, c.sizes.join(' ')]); });
+  });
+  return rows;
 }
-document.getElementById('liveExportBtn').addEventListener('click', ()=>{
-  const rows = liveBuildExportRows(liveLogEntriesCache);
-  const box = document.getElementById('liveExportBox');
-  box.value = rowsToDelimited(rows, '\t');
+document.getElementById('liveExportColorsBtn').addEventListener('click', ()=>{
+  const box = document.getElementById('liveExportColorsBox');
+  box.value = rowsToDelimited(liveBuildColorsExportRows(liveLogEntriesCache), '\t');
   box.style.display = '';
-  document.getElementById('liveExportCopyBtn').style.display = '';
-  document.getElementById('liveExportDownloadBtn').style.display = '';
+  document.getElementById('liveExportColorsCopyBtn').style.display = '';
 });
-document.getElementById('liveExportCopyBtn').addEventListener('click', ()=>{
-  copyTextToClipboard(document.getElementById('liveExportBox').value, document.getElementById('liveExportCopyBtn'));
+document.getElementById('liveExportColorsCopyBtn').addEventListener('click', ()=>{
+  copyTextToClipboard(document.getElementById('liveExportColorsBox').value, document.getElementById('liveExportColorsCopyBtn'));
 });
-document.getElementById('liveExportDownloadBtn').addEventListener('click', ()=>{
-  const rows = liveBuildExportRows(liveLogEntriesCache);
-  const csv = rowsToDelimited(rows, ',');
-  const blob = new Blob([csv], {type:'text/csv'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `vhm-live-logs-${todayKey()}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-});
-document.getElementById('liveImportPreviewBtn').addEventListener('click', ()=>{
-  const raw = document.getElementById('liveImportSheetBox').value;
-  const rows = parseDelimitedText(raw);
-  const preview = document.getElementById('liveImportPreview');
+document.getElementById('liveImportColorsPreviewBtn').addEventListener('click', ()=>{
+  const rows = parseDelimitedText(document.getElementById('liveImportColorsBox').value);
+  const preview = document.getElementById('liveImportColorsPreview');
   const validRows = rows.filter(r => (r[0]||'').trim() && (r[1]||'').trim() && (r[2]||'').trim());
   if(!validRows.length){
-    preview.innerHTML = '<div class="stock-empty">No valid rows found — make sure Code, Color, and Size are filled in for each row.</div>';
+    preview.innerHTML = '<div class="stock-empty">No valid rows — make sure Code, Color, and Sizes are filled in for each row.</div>';
     return;
   }
   const byCode = new Map();
-  validRows.forEach(row=>{
-    const [code, color, size, weight] = row;
+  validRows.forEach(([code, color, sizesText])=>{
     const key = code.trim().toUpperCase();
-    if(!byCode.has(key)) byCode.set(key, {code: code.trim(), colorsMap: new Map(), weights: {}});
+    if(!byCode.has(key)) byCode.set(key, {code: code.trim(), colorsMap: new Map()});
     const g = byCode.get(key);
+    const sizes = sizesText.trim().split(/\s+/).filter(Boolean).map(s=>s.toUpperCase());
     if(!g.colorsMap.has(color)) g.colorsMap.set(color, new Set());
-    g.colorsMap.get(color).add(size.toUpperCase());
-    if(weight) g.weights[size.toUpperCase()] = weight.trim();
+    sizes.forEach(s => g.colorsMap.get(color).add(s));
   });
-  const existingCodes = new Set(liveLogEntriesCache.map(e=>(e.code||'').toUpperCase()));
+  const existingByCode = new Map(liveLogEntriesCache.map(e=>[(e.code||'').toUpperCase(), e]));
   const built = Array.from(byCode.values()).map(g=>{
     const colors = Array.from(g.colorsMap.entries()).map(([color, sizeSet])=>({
       color, sizes: Array.from(sizeSet).sort((a,b)=>sizeSortKey(a)-sizeSortKey(b))
     }));
-    return { code: g.code, colors, weights: g.weights, isNew: !existingCodes.has(g.code.toUpperCase()) };
+    const existing = existingByCode.get(g.code.toUpperCase());
+    return { code: g.code, colors, weights: existing ? (existing.weights||{}) : {}, isNew: !existing };
   });
   const newCount = built.filter(b=>b.isNew).length;
   preview.innerHTML = `
-    <div class="field-hint" style="margin:10px 0;">Found ${built.length} code(s): <b style="color:var(--olive-dark);">${newCount} new</b>, <b style="color:var(--rust);">${built.length-newCount} updating existing</b>. No other saved code will be touched.</div>
+    <div class="field-hint" style="margin:10px 0;">Found ${built.length} code(s): <b style="color:var(--olive-dark);">${newCount} new</b>, <b style="color:var(--rust);">${built.length-newCount} updating existing</b>. This only replaces COLORS for these codes — weights are kept as-is. No other saved code is touched.</div>
     <div style="max-height:200px;overflow-y:auto;border:1px solid var(--line);border-radius:2px;margin-bottom:10px;">
       ${built.map(b=>`<div style="padding:6px 10px;border-bottom:1px solid var(--line);font-size:12.5px;font-family:'Space Mono',monospace;">${b.isNew?'🆕':'✏️'} <b>${escapeHtml(b.code)}</b> — ${b.colors.length} color(s)</div>`).join('')}
     </div>
-    <button class="btn btn-primary" id="liveImportConfirmBtn">✅ Confirm import — write ${built.length} code(s)</button>
-    <span id="liveImportStatus" style="margin-left:10px;font-size:12.5px;font-family:'Space Mono',monospace;"></span>
+    <button class="btn btn-primary" id="liveImportColorsConfirmBtn">✅ Confirm — write ${built.length} code(s)</button>
+    <span id="liveImportColorsStatus" style="margin-left:10px;font-size:12.5px;font-family:'Space Mono',monospace;"></span>
   `;
-  document.getElementById('liveImportConfirmBtn').addEventListener('click', async ()=>{
-    const btn = document.getElementById('liveImportConfirmBtn');
-    const statusEl = document.getElementById('liveImportStatus');
-    btn.disabled = true;
-    btn.textContent = 'Saving…';
+  document.getElementById('liveImportColorsConfirmBtn').addEventListener('click', async ()=>{
+    const btn = document.getElementById('liveImportColorsConfirmBtn');
+    const statusEl = document.getElementById('liveImportColorsStatus');
+    btn.disabled = true; btn.textContent = 'Saving…';
     let okCount = 0, failCount = 0;
     for(const b of built){
       try{
@@ -926,12 +918,91 @@ document.getElementById('liveImportPreviewBtn').addEventListener('click', ()=>{
           colors: b.colors, weights: b.weights, updatedAt: new Date().toISOString()
         }));
         okCount++;
-      }catch(e){ console.error('Import failed for', b.code, e); failCount++; }
+      }catch(e){ console.error('Colors import failed for', b.code, e); failCount++; }
     }
     statusEl.style.color = failCount ? 'var(--rust)' : 'var(--olive-dark)';
-    statusEl.textContent = failCount ? `⚠️ ${okCount} saved, ${failCount} failed — check your connection and retry.` : `✅ Saved ${okCount} code(s), confirmed.`;
+    statusEl.textContent = failCount ? `⚠️ ${okCount} saved, ${failCount} failed.` : `✅ Saved ${okCount} code(s).`;
     btn.textContent = 'Done';
-    document.getElementById('liveImportSheetBox').value = '';
+    document.getElementById('liveImportColorsBox').value = '';
+    loadLiveLogList();
+  });
+});
+
+/* -- Weights sheet: Code | Size | Weight (one row per size, not per color) -- */
+function liveBuildWeightsExportRows(entries){
+  const rows = [['Code','Size','Weight']];
+  entries.forEach(entry=>{
+    const weights = entry.weights || {};
+    liveAllSizes(entry.colors).forEach(size=>{
+      rows.push([entry.code, size, weights[size] || '']);
+    });
+  });
+  return rows;
+}
+document.getElementById('liveExportWeightsBtn').addEventListener('click', ()=>{
+  const box = document.getElementById('liveExportWeightsBox');
+  box.value = rowsToDelimited(liveBuildWeightsExportRows(liveLogEntriesCache), '\t');
+  box.style.display = '';
+  document.getElementById('liveExportWeightsCopyBtn').style.display = '';
+});
+document.getElementById('liveExportWeightsCopyBtn').addEventListener('click', ()=>{
+  copyTextToClipboard(document.getElementById('liveExportWeightsBox').value, document.getElementById('liveExportWeightsCopyBtn'));
+});
+document.getElementById('liveImportWeightsPreviewBtn').addEventListener('click', ()=>{
+  const rows = parseDelimitedText(document.getElementById('liveImportWeightsBox').value);
+  const preview = document.getElementById('liveImportWeightsPreview');
+  const validRows = rows.filter(r => (r[0]||'').trim() && (r[1]||'').trim());
+  if(!validRows.length){
+    preview.innerHTML = '<div class="stock-empty">No valid rows — make sure Code and Size are filled in for each row.</div>';
+    return;
+  }
+  const byCode = new Map();
+  validRows.forEach(([code, size, weight])=>{
+    const key = code.trim().toUpperCase();
+    if(!byCode.has(key)) byCode.set(key, {code: code.trim(), weights: {}});
+    byCode.get(key).weights[size.trim().toUpperCase()] = (weight||'').trim();
+  });
+  const existingByCode = new Map(liveLogEntriesCache.map(e=>[(e.code||'').toUpperCase(), e]));
+  const notLogged = [];
+  const built = Array.from(byCode.values()).map(g=>{
+    const existing = existingByCode.get(g.code.toUpperCase());
+    if(!existing){ notLogged.push(g.code); return null; }
+    // Additive merge: only the sizes present in this sheet get updated —
+    // any other size's weight already saved for this code is left alone.
+    const mergedWeights = {...(existing.weights||{}), ...g.weights};
+    return { code: g.code, colors: existing.colors, weights: mergedWeights, sizesUpdated: Object.keys(g.weights).length };
+  }).filter(Boolean);
+  const skipNote = notLogged.length ? `<div class="field-hint" style="margin-bottom:8px;color:var(--rust);">Skipped (no colors logged yet for these — add them via the Colors sheet first): ${notLogged.map(escapeHtml).join(', ')}</div>` : '';
+  if(!built.length){
+    preview.innerHTML = skipNote + '<div class="stock-empty">Nothing to update — none of these codes have colors logged yet.</div>';
+    return;
+  }
+  preview.innerHTML = skipNote + `
+    <div class="field-hint" style="margin:10px 0;">Will update weight for ${built.length} code(s). Only the sizes listed here change — any other saved size keeps its existing weight. No other saved code is touched.</div>
+    <div style="max-height:200px;overflow-y:auto;border:1px solid var(--line);border-radius:2px;margin-bottom:10px;">
+      ${built.map(b=>`<div style="padding:6px 10px;border-bottom:1px solid var(--line);font-size:12.5px;font-family:'Space Mono',monospace;">✏️ <b>${escapeHtml(b.code)}</b> — ${b.sizesUpdated} size(s) updated</div>`).join('')}
+    </div>
+    <button class="btn btn-primary" id="liveImportWeightsConfirmBtn">✅ Confirm — write ${built.length} code(s)</button>
+    <span id="liveImportWeightsStatus" style="margin-left:10px;font-size:12.5px;font-family:'Space Mono',monospace;"></span>
+  `;
+  document.getElementById('liveImportWeightsConfirmBtn').addEventListener('click', async ()=>{
+    const btn = document.getElementById('liveImportWeightsConfirmBtn');
+    const statusEl = document.getElementById('liveImportWeightsStatus');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    let okCount = 0, failCount = 0;
+    for(const b of built){
+      try{
+        await window.storage.set(liveLogKey(b.code), JSON.stringify({
+          code: b.code, colorsText: liveColorsArrToText(b.colors),
+          colors: b.colors, weights: b.weights, updatedAt: new Date().toISOString()
+        }));
+        okCount++;
+      }catch(e){ console.error('Weights import failed for', b.code, e); failCount++; }
+    }
+    statusEl.style.color = failCount ? 'var(--rust)' : 'var(--olive-dark)';
+    statusEl.textContent = failCount ? `⚠️ ${okCount} saved, ${failCount} failed.` : `✅ Saved ${okCount} code(s).`;
+    btn.textContent = 'Done';
+    document.getElementById('liveImportWeightsBox').value = '';
     loadLiveLogList();
   });
 });
