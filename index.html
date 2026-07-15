@@ -814,7 +814,8 @@
 
     <div class="field">
       <label>Product code</label>
-      <input type="text" id="liveCode" placeholder="e.g. E90">
+      <input type="text" id="liveCode" placeholder="e.g. E90" autocomplete="off">
+      <div id="liveCodeSuggestions"></div>
     </div>
 
     <div class="field">
@@ -3476,6 +3477,68 @@ function liveRefreshWeightInputs(){
   liveRenderWeightInputs(colorsArr, code, existing);
 }
 document.getElementById('liveCode').addEventListener('blur', liveRefreshWeightInputs);
+
+// ---- Product code search: suggests matches from the catalog and from codes already logged ----
+function liveSearchCodes(query){
+  const q = query.trim().toUpperCase();
+  if(!q) return [];
+  const results = [];
+  const byCode = new Map();
+  PRODUCTS.forEach(p=>{
+    const code = (p.code||'').trim();
+    if(!code) return;
+    const haystack = (code + ' ' + (p.name||'') + ' ' + (p.nameKh||'') + ' ' + (p.keywords||'')).toUpperCase();
+    if(haystack.includes(q)){
+      const entry = {code, label: `${code} — ${p.name || p.nameKh || 'catalog product'}`, hasLog:false};
+      byCode.set(code.toUpperCase(), entry);
+      results.push(entry);
+    }
+  });
+  liveLogEntriesCache.forEach(log=>{
+    const code = (log.code||'').trim();
+    if(!code || !code.toUpperCase().includes(q)) return;
+    const key = code.toUpperCase();
+    if(byCode.has(key)){
+      byCode.get(key).hasLog = true;
+    } else {
+      const entry = {code, label: `${code} — saved live log`, hasLog:true};
+      byCode.set(key, entry);
+      results.push(entry);
+    }
+  });
+  return results.slice(0, 8);
+}
+function liveRenderCodeSuggestions(results){
+  const box = document.getElementById('liveCodeSuggestions');
+  if(!results.length){ box.innerHTML = ''; return; }
+  box.innerHTML = results.map(r=>{
+    const tag = r.hasLog ? ' 📋' : '';
+    return `<button type="button" class="btn btn-ghost live-code-suggest" data-code="${escapeHtml(r.code)}" style="display:block;width:100%;text-align:left;font-size:12.5px;padding:8px 10px;margin-top:4px;">${escapeHtml(r.label)}${tag}</button>`;
+  }).join('');
+  box.querySelectorAll('.live-code-suggest').forEach(btn=>{
+    // mousedown (not click) fires before the input's blur, so selection registers reliably
+    btn.addEventListener('mousedown', (e)=>{
+      e.preventDefault();
+      const code = btn.dataset.code;
+      const savedEntry = liveLogEntriesCache.find(en => (en.code||'').toUpperCase() === code.toUpperCase());
+      box.innerHTML = '';
+      if(savedEntry){
+        liveLoadIntoForm(savedEntry);
+      } else {
+        document.getElementById('liveCode').value = code;
+        liveRefreshWeightInputs();
+        document.getElementById('liveColorsBox').focus();
+      }
+    });
+  });
+}
+document.getElementById('liveCode').addEventListener('input', ()=>{
+  const q = document.getElementById('liveCode').value;
+  liveRenderCodeSuggestions(liveSearchCodes(q));
+});
+document.getElementById('liveCode').addEventListener('blur', ()=>{
+  setTimeout(()=>{ document.getElementById('liveCodeSuggestions').innerHTML = ''; }, 200);
+});
 document.getElementById('liveColorsBox').addEventListener('blur', liveRefreshWeightInputs);
 
 // ---- Import from stock paste (reuses parseStockPaste from Stock Check) ----
@@ -3618,6 +3681,8 @@ function liveLoadIntoForm(entry){
   window.scrollTo({top:0, behavior:'smooth'});
 }
 
+let liveLogEntriesCache = [];
+
 async function loadLiveLogList(){
   const el = document.getElementById('liveLogList');
   el.innerHTML = '<div class="stock-empty">Loading…</div>';
@@ -3626,6 +3691,7 @@ async function loadLiveLogList(){
     const keys = (listRes && listRes.keys) || [];
     if(!keys.length){
       el.innerHTML = '<div class="stock-empty">// no live logs saved yet</div>';
+      liveLogEntriesCache = [];
       return;
     }
     const entries = [];
@@ -3636,6 +3702,7 @@ async function loadLiveLogList(){
       }catch(e){ /* skip unreadable entry */ }
     }
     entries.sort((a,b)=> (b.updatedAt||'').localeCompare(a.updatedAt||''));
+    liveLogEntriesCache = entries;
     el.innerHTML = entries.map(entry=>{
       const colorSummary = entry.colors.map(c=>`${c.color}: ${c.sizes.join(' ')}`).join(' &nbsp;|&nbsp; ');
       const weights = entry.weights || {};
