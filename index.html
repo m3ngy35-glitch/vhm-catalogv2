@@ -3176,7 +3176,11 @@ function parseStockPaste(raw){
     if(!code) continue;
     const tokens = parts.slice();
     const size = tokens.length ? tokens.pop() : '';
-    if(tokens.length) tokens.shift();
+    // Rows are usually "CODE TYPE COLOR SIZE ..." (e.g. E202 អាវ សរ L), but some
+    // pastes omit the TYPE word entirely: "CODE COLOR SIZE ..." (e.g. E203 ខ្សៅ L).
+    // Only discard a leading word as TYPE when something is still left over to
+    // use as the color — otherwise that single remaining word IS the color.
+    if(tokens.length > 1) tokens.shift();
     const color = tokens.join(' ');
     const price = m[2];
     const remain = parseInt(m[5], 10);
