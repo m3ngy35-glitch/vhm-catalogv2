@@ -187,6 +187,20 @@
     </div>
   </details>
 
+  <details class="note" style="margin-top:16px;">
+    <summary>📄 Import from message-format text (paste, or upload one or many .txt files)</summary>
+    <div class="note-body">
+      <div class="field-hint" style="margin-bottom:10px;">Handles both a bare code line ("E90") and a labeled one ("កូដ E90" / "កូត : E90"), colors with or without a colon before the sizes, and weight lines written as "M: 50-60kg", "M 50–60kg", or "M → 50-60kg". Upload every .txt file from a folder at once — one code per file is expected, but multiple codes in one file/paste works too.</div>
+      <input type="file" id="liveMessageFileInput" accept=".txt,.text,text/plain" multiple style="margin-bottom:10px;">
+      <textarea id="liveMessageImportBox" class="stock-paste" style="min-height:140px;" placeholder="E90&#10;ខ្មៅ: M L XL 2XL 3XL 4XL&#10;...&#10;&#10;គីឡូ&#10;M: 50kg-60kg&#10;..."></textarea>
+      <div class="stock-actions">
+        <button class="btn btn-primary" id="liveMessageImportPreviewBtn">Preview import</button>
+        <button class="btn btn-ghost" id="liveMessageImportClearBtn">Clear</button>
+      </div>
+      <div id="liveMessageImportPreview"></div>
+    </div>
+  </details>
+
   <h2 class="section-title">Saved live logs</h2>
   <div class="section-sub">// tap Copy message on any saved code — weight comes from what you logged here</div>
   <input type="text" id="liveLogSearchBox" placeholder="Search saved codes…" style="width:100%;font-family:'Archivo',sans-serif;font-size:14px;padding:9px 11px;border:1.5px solid var(--line);border-radius:2px;background:var(--card);color:var(--ink);margin-bottom:14px;">
@@ -418,6 +432,91 @@ function liveColorsArrFromStockEntry(entry){
 }
 function liveColorsArrToText(colorsArr){
   return colorsArr.map(c => `${c.color}:${c.sizes.join(' ')}`).join('\n');
+}
+
+/* ============ Flexible message-format parser ============
+   Handles both the clean "ready-to-send message" format this site generates
+   (bare code line, "color: sizes" lines, គីឡូ header, "size: weight" lines)
+   and messy real-world hand-typed notes: labeled code lines ("កូដ"/"កូត",
+   with or without a colon, code on the same or next line), colors with or
+   without a colon before the sizes, weight lines separated by a colon, an
+   arrow (→), or just a space, en-dashes as well as hyphens, and a height
+   section (កម្ពស់) that must be ignored rather than mistaken for weight. */
+function stripColons(tok){ return String(tok||'').replace(/^[:：]+|[:：]+$/g, ''); }
+function isSizeToken(tok){
+  return /^(XS|S|M|L|XL|2XL|3XL|4XL|5XL)$/i.test(stripColons(tok).trim());
+}
+function normalizeWeightText(text){
+  const cleaned = String(text||'').replace(/kg/gi, '').replace(/[–—]/g, '-').trim();
+  const parts = cleaned.split('-').map(s=>s.trim()).filter(Boolean);
+  if(parts.length===2) return `${parts[0]}-${parts[1]}`;
+  if(parts.length===1) return parts[0];
+  return cleaned;
+}
+const WEIGHT_LINE_RE = /^(XS|S|M|L|XL|2XL|3XL|4XL|5XL)\s*[:：→]?\s*(.+)$/i;
+const HAS_KHMER_RE = /[\u1780-\u17FF]/;
+const BARE_CODE_RE = /^[A-Za-z0-9\-\/]+$/;
+
+function parseFlexibleLiveText(text){
+  const lines = String(text||'').split(/\r?\n/).map(l=>l.trim());
+  const blocks = [];
+  let current = null;
+  let mode = 'weights';
+  const pushCurrent = () => { if(current) blocks.push(current); };
+
+  for(let i=0;i<lines.length;i++){
+    const line = lines[i];
+    if(!line) continue;
+
+    const codeLabelMatch = line.match(/^(កូដ|កូត)\s*[:：]?\s*(.*)$/);
+    if(codeLabelMatch){
+      let codeVal = codeLabelMatch[2].trim();
+      if(!codeVal){
+        let j = i+1;
+        while(j < lines.length && !lines[j].trim()) j++;
+        if(j < lines.length){ codeVal = lines[j].trim(); i = j; }
+      }
+      codeVal = codeVal.replace(/\.+$/,'').trim();
+      if(codeVal){
+        pushCurrent();
+        current = {code: codeVal, colors: [], weights: {}};
+        mode = 'weights';
+      }
+      continue;
+    }
+    if(/តម្លៃ/.test(line)) continue;
+    if(/^គីឡ/.test(line.replace(/[:：]/g,'').trim())){ mode='weights'; continue; }
+    if(/^កម្ពស់/.test(line)){ mode='ignore'; continue; }
+    if(mode === 'ignore') continue;
+
+    const weightMatch = mode === 'weights' ? line.match(WEIGHT_LINE_RE) : null;
+    if(weightMatch && weightMatch[2] && /\d/.test(weightMatch[2]) && !/cm/i.test(weightMatch[2])){
+      if(current) current.weights[weightMatch[1].toUpperCase()] = normalizeWeightText(weightMatch[2]);
+      continue;
+    }
+
+    const parts = line.split(/\s+/);
+    let splitIdx = -1;
+    for(let k=0;k<parts.length;k++){ if(isSizeToken(parts[k])){ splitIdx=k; break; } }
+    if(splitIdx > 0){
+      const colorName = parts.slice(0, splitIdx).join(' ').replace(/[:：]\s*$/,'').trim();
+      const sizes = Array.from(new Set(parts.slice(splitIdx).map(p=>stripColons(p).toUpperCase()).filter(isSizeToken)))
+        .sort((a,b)=>sizeSortKey(a)-sizeSortKey(b));
+      if(colorName && sizes.length && current){
+        current.colors.push({color: colorName, sizes});
+      }
+      continue;
+    }
+
+    if(!HAS_KHMER_RE.test(line) && BARE_CODE_RE.test(line) && line.length <= 12 && !isSizeToken(line)){
+      pushCurrent();
+      current = {code: line, colors: [], weights: {}};
+      mode = 'weights';
+      continue;
+    }
+  }
+  pushCurrent();
+  return blocks;
 }
 
 /* ============ Name (shared with the "Load from laptop" bookmarklet) ============ */
@@ -1006,6 +1105,114 @@ document.getElementById('liveImportWeightsPreviewBtn').addEventListener('click',
     loadLiveLogList();
   });
 });
+
+/* ---- Import from message-format text (paste or multi-file upload) ---- */
+function readFileAsText(file){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsText(file);
+  });
+}
+let liveMessageParsedBlocks = [];
+document.getElementById('liveMessageFileInput').addEventListener('change', async (e)=>{
+  const files = Array.from(e.target.files || []);
+  if(!files.length) return;
+  const preview = document.getElementById('liveMessageImportPreview');
+  preview.innerHTML = `<div class="stock-empty">Reading ${files.length} file(s)…</div>`;
+  const allBlocks = [];
+  for(const file of files){
+    try{
+      const text = await readFileAsText(file);
+      const blocks = parseFlexibleLiveText(text);
+      if(blocks.length){
+        blocks.forEach(b => allBlocks.push(b));
+      } else {
+        // nothing recognized at all — still record it so it shows as skipped
+        allBlocks.push({code: file.name.replace(/\.(txt|text)$/i,''), colors: [], weights: {}, unparsed: true});
+      }
+    }catch(err){
+      console.error('Could not read', file.name, err);
+      allBlocks.push({code: file.name, colors: [], weights: {}, unparsed: true});
+    }
+  }
+  liveMessageParsedBlocks = allBlocks;
+  renderMessageImportPreview(allBlocks);
+});
+document.getElementById('liveMessageImportPreviewBtn').addEventListener('click', ()=>{
+  const text = document.getElementById('liveMessageImportBox').value;
+  liveMessageParsedBlocks = parseFlexibleLiveText(text);
+  renderMessageImportPreview(liveMessageParsedBlocks);
+});
+document.getElementById('liveMessageImportClearBtn').addEventListener('click', ()=>{
+  document.getElementById('liveMessageImportBox').value = '';
+  document.getElementById('liveMessageFileInput').value = '';
+  document.getElementById('liveMessageImportPreview').innerHTML = '';
+  liveMessageParsedBlocks = [];
+});
+function renderMessageImportPreview(blocks){
+  const preview = document.getElementById('liveMessageImportPreview');
+  if(!blocks.length){
+    preview.innerHTML = '<div class="stock-empty">Nothing recognized — check the text/files and try again.</div>';
+    return;
+  }
+  const existingByCode = new Map(liveLogEntriesCache.map(e=>[(e.code||'').toUpperCase(), e]));
+  const rows = blocks.map(b=>{
+    const hasColors = b.colors && b.colors.length > 0;
+    const hasWeights = b.weights && Object.keys(b.weights).length > 0;
+    const existing = existingByCode.get((b.code||'').toUpperCase());
+    let status;
+    if(b.unparsed || (!hasColors && !hasWeights)) status = 'skip';
+    else if(hasColors && hasWeights) status = 'full';
+    else status = 'partial';
+    return {block: b, hasColors, hasWeights, existing, status};
+  });
+  const ready = rows.filter(r => r.status !== 'skip');
+  const skipped = rows.filter(r => r.status === 'skip');
+  const statusIcon = {full:'✅', partial:'⚠️', skip:'❌'};
+  const statusLabel = r => {
+    if(r.status === 'skip') return 'no colors or weight found — skipped';
+    const parts = [];
+    parts.push(r.hasColors ? `${r.block.colors.length} color(s)` : (r.existing ? 'keeping existing colors' : 'no colors'));
+    parts.push(r.hasWeights ? `${Object.keys(r.block.weights).length} weight size(s)` : (r.existing ? 'keeping existing weight' : 'no weight'));
+    return parts.join(', ');
+  };
+  preview.innerHTML = `
+    <div class="field-hint" style="margin:10px 0;">${ready.length} code(s) will be saved, ${skipped.length} skipped (no usable data found). Only what's actually found in each file/block is written — if a code already has colors or weight saved and this import doesn't include that field, the existing value is kept, not erased. No other saved code is touched.</div>
+    <div style="max-height:260px;overflow-y:auto;border:1px solid var(--line);border-radius:2px;margin-bottom:10px;">
+      ${rows.map(r=>`<div style="padding:6px 10px;border-bottom:1px solid var(--line);font-size:12.5px;font-family:'Space Mono',monospace;">
+        ${statusIcon[r.status]} <b>${escapeHtml(r.block.code)}</b>${r.existing?' (existing)':' (new)'} — ${statusLabel(r)}
+      </div>`).join('')}
+    </div>
+    ${ready.length ? `<button class="btn btn-primary" id="liveMessageImportConfirmBtn">✅ Confirm — write ${ready.length} code(s)</button>
+    <span id="liveMessageImportStatus" style="margin-left:10px;font-size:12.5px;font-family:'Space Mono',monospace;"></span>` : ''}
+  `;
+  const confirmBtn = document.getElementById('liveMessageImportConfirmBtn');
+  if(confirmBtn){
+    confirmBtn.addEventListener('click', async ()=>{
+      const statusEl = document.getElementById('liveMessageImportStatus');
+      confirmBtn.disabled = true;
+      confirmBtn.textContent = 'Saving…';
+      let okCount = 0, failCount = 0;
+      for(const r of ready){
+        try{
+          const colors = r.hasColors ? r.block.colors : (r.existing ? r.existing.colors : []);
+          const weights = r.hasWeights ? {...(r.existing ? r.existing.weights : {}), ...r.block.weights} : (r.existing ? r.existing.weights : {});
+          await window.storage.set(liveLogKey(r.block.code), JSON.stringify({
+            code: r.block.code, colorsText: liveColorsArrToText(colors),
+            colors, weights, updatedAt: new Date().toISOString()
+          }));
+          okCount++;
+        }catch(e){ console.error('Message import failed for', r.block.code, e); failCount++; }
+      }
+      statusEl.style.color = failCount ? 'var(--rust)' : 'var(--olive-dark)';
+      statusEl.textContent = failCount ? `⚠️ ${okCount} saved, ${failCount} failed.` : `✅ Saved ${okCount} code(s).`;
+      confirmBtn.textContent = 'Done';
+      loadLiveLogList();
+    });
+  }
+}
 
 /* ---- Init ---- */
 (async function init(){
