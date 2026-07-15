@@ -2503,31 +2503,14 @@ const pendingDeletedCodes = new Set();
 
 async function trySaveToStorage(){
   try{
-    // Safety merge: before overwriting the cloud copy, pull the LATEST cloud
-    // state and fold in any product that exists there but not in this tab's
-    // local copy — e.g. added from another device/tab after this page was
-    // opened. Without this, a tab left open while someone else adds products
-    // elsewhere will silently wipe those new products the next time this tab
-    // saves anything (last-write-wins overwrite of the whole list).
-    try{
-      const cloudRes = await window.storage.get('vhm-catalog-products', true);
-      if(cloudRes && cloudRes.value){
-        const cloudProducts = JSON.parse(cloudRes.value);
-        if(Array.isArray(cloudProducts) && cloudProducts.length){
-          const localCodes = new Set(PRODUCTS.map(p => (p.code||'').trim().toUpperCase()));
-          const recovered = cloudProducts.filter(p=>{
-            const c = (p.code||'').trim().toUpperCase();
-            return c && !localCodes.has(c) && !pendingDeletedCodes.has(c);
-          });
-          if(recovered.length){
-            console.warn(`Recovered ${recovered.length} product(s) that existed in the cloud but not in this tab (likely added elsewhere): `, recovered.map(p=>p.code));
-            PRODUCTS = [...PRODUCTS, ...recovered];
-            renderAll();
-          }
-        }
-      }
-    }catch(mergeErr){ console.warn('Pre-save cloud merge check failed — saving local copy as-is:', mergeErr); }
-
+    // Save immediately, nothing else runs first — any delay here is a window
+    // where an interruption (closing the tab, refreshing, losing connection)
+    // could lose whatever was just added or edited. checkCatalogStorageConnection
+    // (shown on every page load and after every save) is the actual safeguard
+    // against stale-tab data loss: it warns BEFORE someone starts editing if
+        // this tab's copy doesn't match the cloud, so they can refresh first —
+    // trying to auto-merge AFTER a save doesn't work reliably here, since our
+    // own overwrite would already have destroyed whatever it's trying to recover.
     await window.storage.set('vhm-catalog-products', JSON.stringify(PRODUCTS), true);
     checkCatalogStorageConnection();
   }
@@ -3456,7 +3439,7 @@ function copyTextToClipboard(text, btn){
 function liveLogKey(code){ return 'live_log:' + code.trim().toUpperCase().replace(/\//g, '-'); }
 
 function parseStockPaste(raw){
-  const recordRe = /([\s\S]+?)\s*(\d+\.\d+)\s+(\d+)\s+(\d+)\s*\/\s*(\d+)/g;
+  const recordRe = /([\s\S]+?)\s*(\d+(?:\.\d+)?)\s+(\d+)\s+(\d+)\s*\/\s*(\d+)/g;
   const codes = new Map();
   let m;
   while((m = recordRe.exec(raw)) !== null){
