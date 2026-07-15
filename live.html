@@ -251,7 +251,7 @@ async function runConnectionSelfTest(){
   const textEl = document.getElementById('connBannerText');
   banner.className = 'conn-banner checking';
   textEl.textContent = 'Checking connection…';
-  const testKey = '__live_app_selftest__';
+  const testKey = 'live_app_selftest_probe';
   const testValue = 'ping-' + Date.now();
   try{
     await window.storage.set(testKey, JSON.stringify(testValue));
