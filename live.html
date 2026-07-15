@@ -239,12 +239,31 @@ window.storage = {
   },
   async list(prefix){
     const db = firestoreDb();
-    const snapshot = await db.collection('kv').get({source:'server'});
+    const p = prefix || '';
+    // Efficient prefix query using Firestore's document-ID range trick, instead
+    // of pulling every document in the whole 'kv' collection and filtering
+    // client-side — that collection also holds all catalog products now, so a
+    // full scan gets slower (and more failure-prone) as the catalog grows.
+    const snapshot = await db.collection('kv')
+      .orderBy(firebase.firestore.FieldPath.documentId())
+      .startAt(p)
+      .endAt(p + '\uf8ff')
+      .get({source:'server'});
     const keys = [];
-    snapshot.forEach(doc => { if(doc.id.indexOf(prefix||'') === 0) keys.push(doc.id); });
+    snapshot.forEach(doc => keys.push(doc.id));
     return { keys, prefix };
   }
 };
+
+// Prevents any storage call from hanging forever (silently blocked network,
+// stuck query, etc.) — after `ms`, it gives up and reports a clear error
+// instead of leaving the UI stuck on "Loading…" indefinitely.
+function withTimeout(promise, ms, message){
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(()=> reject(new Error(message || `Timed out after ${ms/1000}s`)), ms))
+  ]);
+}
 
 async function runConnectionSelfTest(){
   const banner = document.getElementById('connBanner');
@@ -254,8 +273,8 @@ async function runConnectionSelfTest(){
   const testKey = 'live_app_selftest_probe';
   const testValue = 'ping-' + Date.now();
   try{
-    await window.storage.set(testKey, JSON.stringify(testValue));
-    const res = await window.storage.get(testKey);
+    await withTimeout(window.storage.set(testKey, JSON.stringify(testValue)), 10000, 'Connection check timed out after 10s — the server never responded.');
+    const res = await withTimeout(window.storage.get(testKey), 10000, 'Connection check timed out after 10s while reading back.');
     const confirmed = res && JSON.parse(res.value) === testValue;
     if(!confirmed) throw new Error('Write succeeded but could not be read back correctly.');
     banner.className = 'conn-banner ok';
@@ -412,16 +431,12 @@ function initNameSelect(){
 let CATALOG_CACHE = [];
 async function loadCatalogCacheReadOnly(){
   try{
-    const listRes = await window.storage.list('catalog_product:');
+    const listRes = await withTimeout(window.storage.list('catalog_product:'), 15000, 'Catalog lookup timed out.');
     const keys = (listRes && listRes.keys) || [];
-    const loaded = [];
-    for(const key of keys){
-      try{
-        const res = await window.storage.get(key);
-        if(res && res.value) loaded.push(JSON.parse(res.value));
-      }catch(e){ /* skip unreadable entry */ }
-    }
-    CATALOG_CACHE = loaded;
+    // Fetch all product docs in parallel instead of one at a time — with many
+    // products, sequential fetching compounds into a real, visible delay.
+    const results = await Promise.all(keys.map(key => window.storage.get(key).catch(()=>null)));
+    CATALOG_CACHE = results.filter(r => r && r.value).map(r => JSON.parse(r.value));
   }catch(e){ console.warn('Catalog lookup unavailable (search will only use saved live logs):', e); }
 }
 
@@ -663,20 +678,15 @@ async function loadLiveLogList(){
   const el = document.getElementById('liveLogList');
   el.innerHTML = '<div class="stock-empty">Loading…</div>';
   try{
-    const listRes = await window.storage.list('live_log:');
+    const listRes = await withTimeout(window.storage.list('live_log:'), 15000, 'Loading saved codes timed out after 15s — check your connection and tap the search box to retry.');
     const keys = (listRes && listRes.keys) || [];
     if(!keys.length){
       el.innerHTML = '<div class="stock-empty">// no live logs saved yet</div>';
       liveLogEntriesCache = [];
       return;
     }
-    const allEntries = [];
-    for(const key of keys){
-      try{
-        const res = await window.storage.get(key);
-        if(res && res.value) allEntries.push(JSON.parse(res.value));
-      }catch(e){ /* skip unreadable entry */ }
-    }
+    const results = await Promise.all(keys.map(key => window.storage.get(key).catch(()=>null)));
+    const allEntries = results.filter(r => r && r.value).map(r => JSON.parse(r.value));
     allEntries.sort((a,b)=> (b.updatedAt||'').localeCompare(a.updatedAt||''));
     liveLogEntriesCache = allEntries;
 
@@ -785,7 +795,7 @@ async function loadLiveLogList(){
     });
   }catch(e){
     console.error(e);
-    el.innerHTML = '<div class="stock-empty">Could not load (check connection).</div>';
+    el.innerHTML = `<div class="stock-empty">❌ Could not load: ${escapeHtml(e && e.message ? e.message : 'check your connection and try again.')}</div>`;
   }
 }
 document.getElementById('liveLogSearchBox').addEventListener('input', (e)=>{
