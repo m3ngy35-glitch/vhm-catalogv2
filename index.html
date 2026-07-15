@@ -267,6 +267,29 @@
       <input type="file" id="importFileInput" accept=".html,.htm" style="display:none;">
     </div>
 
+    <details class="bookmarklet-note" style="margin-bottom:20px;">
+      <summary>📊 Bulk add/edit via spreadsheet (safe — never removes existing codes)</summary>
+      <div style="margin-top:10px;">
+        <div class="field-hint" style="margin-bottom:10px;">// Export gives every product as rows for Google Sheets/Excel. Add new rows for new codes, or edit existing rows, then paste the whole thing back and Import. Import only creates/updates the codes present in what you paste — it never deletes or touches any other saved product. Photos, albums, and fabric notes are kept as-is when updating a code that already has them; add those separately via Edit.</div>
+
+        <b style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--olive-dark);">Export</b>
+        <div class="stock-actions" style="margin-top:8px;margin-bottom:8px;">
+          <button class="btn btn-primary" id="catalogExportBtn">📤 Export all products</button>
+          <button class="btn btn-ghost" id="catalogExportCopyBtn" style="display:none;">Copy for spreadsheet</button>
+          <button class="btn btn-ghost" id="catalogExportDownloadBtn" style="display:none;">⬇ Download .csv</button>
+        </div>
+        <textarea id="catalogExportBox" class="stock-paste" readonly style="min-height:100px;display:none;"></textarea>
+
+        <b style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--olive-dark);display:block;margin-top:20px;">Import</b>
+        <div class="field-hint" style="margin:6px 0;">Paste spreadsheet rows below — 8 columns: Code, Name (EN), Name (KH), Price, Type (shirt/pants), Sizes, Colors, Keywords. Sizes are space-separated (e.g. "M L XL"); colors are comma-separated (Khmer or English names from your palette, or "EN/KH" for a new one).</div>
+        <textarea id="catalogImportSheetBox" class="stock-paste" style="min-height:120px;" placeholder="E300&#9;Cargo Shirt&#9;អាវខារហ្គោ&#9;7.50&#9;shirt&#9;M L XL 2XL&#9;ខ្មៅ, ស្លែ&#9;cargo utility"></textarea>
+        <div class="stock-actions" style="margin-top:8px;">
+          <button class="btn btn-primary" id="catalogImportPreviewBtn">Preview import</button>
+        </div>
+        <div id="catalogImportPreview"></div>
+      </div>
+    </details>
+
     <div class="grid" id="grid"><div class="pcard">
       <button class="pdelete" data-idx="0" title="Delete product">×</button>
       <button class="pedit" data-idx="0" title="Edit product">✎</button>
@@ -799,6 +822,20 @@
     <details class="bookmarklet-note" open="">
       <summary>📥 Import from stock paste (same as Stock Check — skip retyping colors/sizes)</summary>
       <div style="margin-top:10px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+          <label for="liveImportNameSelect" style="font-family:'Space Mono',monospace;font-size:11px;color:#8a8375;">Your name:</label>
+          <select id="liveImportNameSelect" style="font-family:'Archivo',sans-serif;font-size:13px;padding:6px 10px;border:1.5px solid var(--line);border-radius:2px;background:var(--card);color:var(--ink);">
+            <option value="">-- select --</option>
+            <option value="KIN">KIN</option>
+            <option value="JINH">JINH</option>
+            <option value="Yaa">Yaa</option>
+            <option value="Ry">Ry</option>
+            <option value="NITH">NITH</option>
+            <option value="VID">VID</option>
+            <option value="LY">LY</option>
+            <option value="David">David</option>
+          </select>
+        </div>
         <div class="stock-paste-wrap">
           <textarea class="stock-paste" id="liveImportBox" placeholder="Tap 'Load from laptop', or paste rows manually — e.g. E202 អាវ សរ L 6.20 1 0 / 1"></textarea>
           <button type="button" class="stock-paste-clear" id="liveImportClearX" title="Clear">×</button>
@@ -807,7 +844,7 @@
           <button class="btn btn-primary" id="liveImportLoadBtn">⬇ Load from laptop</button>
           <button class="btn btn-ghost" id="liveImportParseBtn">Import code</button>
         </div>
-        <div class="field-hint">Uses the same name as Stock Check's "Load from laptop" — set it there first if you haven't.</div>
+        <div class="field-hint">This name is shared with Stock Check's "Load from laptop" — pick it here or there, it stays in sync.</div>
         <div id="liveImportCodePicker"></div>
       </div>
     </details>
@@ -835,6 +872,30 @@
       <button class="btn btn-ghost" id="liveClearBtn">Clear form</button>
     </div>
     <div class="form-error" id="liveFormError"></div>
+    <div id="liveSaveStatus" style="font-size:12.5px;margin-top:8px;font-family:'Space Mono',monospace;"></div>
+
+    <details class="bookmarklet-note" style="margin-top:24px;">
+      <summary>📊 Export / Import via spreadsheet (bulk-add or bulk-edit codes safely)</summary>
+      <div style="margin-top:10px;">
+        <div class="field-hint" style="margin-bottom:10px;">// Export gives you every saved code as rows you can open in Google Sheets or Excel. Fill in new codes/colors/sizes/weights (or edit existing ones), then paste the whole thing back in and Import. Import only creates/updates the codes present in what you paste — every other saved code is left completely untouched.</div>
+
+        <b style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--olive-dark);">Export</b>
+        <div class="stock-actions" style="margin-top:8px;margin-bottom:8px;">
+          <button class="btn btn-primary" id="liveExportBtn">📤 Export all saved codes</button>
+          <button class="btn btn-ghost" id="liveExportCopyBtn" style="display:none;">Copy for spreadsheet</button>
+          <button class="btn btn-ghost" id="liveExportDownloadBtn" style="display:none;">⬇ Download .csv</button>
+        </div>
+        <textarea id="liveExportBox" class="stock-paste" readonly style="min-height:100px;display:none;"></textarea>
+
+        <b style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--olive-dark);display:block;margin-top:20px;">Import</b>
+        <div class="field-hint" style="margin:6px 0;">Paste spreadsheet rows below — 4 columns: Code, Color, Size, Weight (copy straight out of Google Sheets/Excel, tab-separated is fine).</div>
+        <textarea id="liveImportSheetBox" class="stock-paste" style="min-height:120px;" placeholder="E90&#9;ខ្មៅ&#9;M&#9;50-60&#10;E90&#9;ខ្មៅ&#9;L&#9;58-68&#10;E91&#9;ស&#9;M&#9;50-60"></textarea>
+        <div class="stock-actions" style="margin-top:8px;">
+          <button class="btn btn-primary" id="liveImportPreviewBtn">Preview import</button>
+        </div>
+        <div id="liveImportPreview"></div>
+      </div>
+    </details>
 
     <h1 class="section-title" style="font-size:24px;margin-top:32px;">Saved live logs</h1>
     <div class="section-sub">// tap Copy message on any saved code — weight comes from what you logged here</div>
@@ -2084,7 +2145,24 @@ async function checkCatalogStorageConnection(){
     dot.style.background = '#7ED0A0';
     pill.style.background = '#1a1a1a';
     text.style.color = '#ddd';
-    text.textContent = 'Cloud storage connected — changes save for everyone';
+    // Cross-check this tab's local product count against what's actually in
+    // the cloud — if they differ, this tab is out of sync and needs a
+    // refresh before it's safe to add/edit anything (saving now could
+    // overwrite newer cloud data with this tab's stale copy).
+    let cloudCount = null;
+    try{
+      const cloudRes = await window.storage.get('vhm-catalog-products', true);
+      if(cloudRes && cloudRes.value){
+        const cloudProducts = JSON.parse(cloudRes.value);
+        if(Array.isArray(cloudProducts)) cloudCount = cloudProducts.length;
+      }
+    }catch(e){ /* count check is best-effort */ }
+    if(cloudCount !== null && cloudCount !== PRODUCTS.length){
+      dot.style.background = '#e0a83c';
+      text.textContent = `⚠️ This tab shows ${PRODUCTS.length} products but the cloud has ${cloudCount} — refresh the page before adding or editing anything.`;
+    } else {
+      text.textContent = `Cloud storage connected — ${PRODUCTS.length} products — changes save for everyone`;
+    }
   }catch(e){
     dot.style.background = '#c0392b';
     pill.style.background = '#3a1f1f';
@@ -2418,8 +2496,38 @@ async function tryLoadFromStorage(){
   }
   renderAll();
 }
+// Codes deleted in THIS browser tab during this session — the merge-safety
+// check in trySaveToStorage must never resurrect these, even though they'll
+// look "missing from local" (that's the point — they were deleted on purpose).
+const pendingDeletedCodes = new Set();
+
 async function trySaveToStorage(){
   try{
+    // Safety merge: before overwriting the cloud copy, pull the LATEST cloud
+    // state and fold in any product that exists there but not in this tab's
+    // local copy — e.g. added from another device/tab after this page was
+    // opened. Without this, a tab left open while someone else adds products
+    // elsewhere will silently wipe those new products the next time this tab
+    // saves anything (last-write-wins overwrite of the whole list).
+    try{
+      const cloudRes = await window.storage.get('vhm-catalog-products', true);
+      if(cloudRes && cloudRes.value){
+        const cloudProducts = JSON.parse(cloudRes.value);
+        if(Array.isArray(cloudProducts) && cloudProducts.length){
+          const localCodes = new Set(PRODUCTS.map(p => (p.code||'').trim().toUpperCase()));
+          const recovered = cloudProducts.filter(p=>{
+            const c = (p.code||'').trim().toUpperCase();
+            return c && !localCodes.has(c) && !pendingDeletedCodes.has(c);
+          });
+          if(recovered.length){
+            console.warn(`Recovered ${recovered.length} product(s) that existed in the cloud but not in this tab (likely added elsewhere): `, recovered.map(p=>p.code));
+            PRODUCTS = [...PRODUCTS, ...recovered];
+            renderAll();
+          }
+        }
+      }
+    }catch(mergeErr){ console.warn('Pre-save cloud merge check failed — saving local copy as-is:', mergeErr); }
+
     await window.storage.set('vhm-catalog-products', JSON.stringify(PRODUCTS), true);
     checkCatalogStorageConnection();
   }
@@ -2439,6 +2547,187 @@ async function trySavePaletteToStorage(){
   try{ await window.storage.set('vhm-catalog-palette', JSON.stringify(COLOR_PALETTE), true); }
   catch(e){}
 }
+
+// ---------- Catalog bulk export / import via spreadsheet ----------
+function catalogColorsToText(colors){
+  return (colors||[]).map(c=>{
+    if(c.nameKh && c.name) return `${c.nameKh}/${c.name}`;
+    return c.nameKh || c.name || '';
+  }).filter(Boolean).join(', ');
+}
+function catalogBuildExportRows(products){
+  const rows = [['Code','Name (EN)','Name (KH)','Price','Type','Sizes','Colors','Keywords']];
+  products.forEach(p=>{
+    const sizes = (p.sizeChart||[]).map(e=>e.size).join(' ');
+    rows.push([p.code||'', p.name||'', p.nameKh||'', p.price||'', p.type||'shirt', sizes, catalogColorsToText(p.colors), p.keywords||'']);
+  });
+  return rows;
+}
+function cellEscapeForDelimited(v, delim){
+  const s = String(v==null?'':v);
+  if(delim === '\t') return s.replace(/\t/g,' ').replace(/\n/g,' ');
+  // CSV: quote if it contains the delimiter, quotes, or newlines
+  if(/[",\n]/.test(s)) return '"' + s.replace(/"/g,'""') + '"';
+  return s;
+}
+function rowsToDelimited(rows, delim){
+  return rows.map(r => r.map(cell => cellEscapeForDelimited(cell, delim)).join(delim)).join('\n');
+}
+// Splits one line of pasted/typed spreadsheet data into cells. Auto-detects
+// tab vs comma, and handles simple double-quoted CSV cells.
+function splitDelimitedLine(line, delim){
+  if(delim === '\t') return line.split('\t');
+  // basic CSV split supporting "quoted, cells"
+  const cells = [];
+  let cur = '', inQuotes = false;
+  for(let i=0;i<line.length;i++){
+    const ch = line[i];
+    if(inQuotes){
+      if(ch === '"'){
+        if(line[i+1] === '"'){ cur += '"'; i++; }
+        else inQuotes = false;
+      } else cur += ch;
+    } else {
+      if(ch === '"') inQuotes = true;
+      else if(ch === delim){ cells.push(cur); cur=''; }
+      else cur += ch;
+    }
+  }
+  cells.push(cur);
+  return cells;
+}
+function parseDelimitedText(text){
+  const lines = String(text||'').split('\n').map(l=>l.replace(/\r$/,'')).filter(l=>l.trim().length);
+  if(!lines.length) return [];
+  const delim = lines[0].includes('\t') ? '\t' : ',';
+  let rows = lines.map(l => splitDelimitedLine(l, delim).map(c=>c.trim()));
+  // drop a header row if it looks like one
+  if(rows.length && /^code$/i.test(rows[0][0]||'')) rows = rows.slice(1);
+  return rows;
+}
+function resolveImportColors(text){
+  const parsed = parseColorsText(text);
+  return parsed.map(c=>{
+    const match = COLOR_PALETTE.find(m => colorsMatch(c, m));
+    return match ? {...match} : c;
+  });
+}
+function catalogSizeChartEntry(type, size, existingEntry, masterTable){
+  if(existingEntry) return existingEntry; // keep hand-tuned measurements already set for this code+size
+  const d = masterTable[size] || {};
+  return type==='pants'
+    ? {size, outerCm:d.outerCm||0, innerCm:d.innerCm||0, legOpeningCm:d.legOpeningCm||0, riseCm:d.riseCm||0, hemCm:d.hemCm||0, weightKg:d.weightKg||'', heightCm:d.heightCm||''}
+    : {size, chestCm:d.chestCm||0, chestIn:d.chestIn||0, lengthCm:d.lengthCm||0, shoulderCm:d.shoulderCm||0, sleeveCm:d.sleeveCm||0, weightKg:d.weightKg||'', heightCm:d.heightCm||''};
+}
+// Builds/updates a product from one parsed sheet row. Preserves photo/album/
+// fabric fields (and any already-tuned size-chart measurements) when the
+// code already exists — the sheet only ever controls the columns it has.
+function catalogApplyImportRow(row, existingProduct){
+  const [code, nameEn, nameKh, price, typeRaw, sizesText, colorsText, keywords] = row;
+  const type = /pant|ខោ/i.test(typeRaw||'') ? 'pants' : 'shirt';
+  const masterTable = type==='pants' ? MASTER_MEASURE_PANTS : MASTER_MEASURE_SHIRT;
+  const sizeList = (sizesText||'').trim().split(/\s+/).filter(Boolean).map(s=>s.toUpperCase());
+  const existingChart = (existingProduct && existingProduct.sizeChart) || [];
+  const sizeChart = sizeList.map(size => catalogSizeChartEntry(type, size, existingChart.find(e=>e.size===size), masterTable));
+  const colors = (colorsText||'').trim()
+    ? resolveImportColors(colorsText)
+    : (existingProduct ? existingProduct.colors : []);
+  return {
+    code: (code||'').trim(),
+    name: (nameEn||'').trim() || (existingProduct ? existingProduct.name : ''),
+    nameKh: (nameKh||'').trim() || (existingProduct ? existingProduct.nameKh : ''),
+    price: (price||'').trim() || (existingProduct ? existingProduct.price : ''),
+    type,
+    colors,
+    sizeChart,
+    keywords: (keywords||'').trim() || (existingProduct ? existingProduct.keywords : ''),
+    image: existingProduct ? (existingProduct.image||'') : '',
+    albumLink: existingProduct ? (existingProduct.albumLink||'') : '',
+    fabricTitle: existingProduct ? (existingProduct.fabricTitle||'') : '',
+    fabricDesc: existingProduct ? (existingProduct.fabricDesc||'') : '',
+    fabricCare: existingProduct ? (existingProduct.fabricCare||'') : ''
+  };
+}
+
+document.getElementById('catalogExportBtn').addEventListener('click', ()=>{
+  const rows = catalogBuildExportRows(PRODUCTS);
+  const tsv = rowsToDelimited(rows, '\t');
+  const box = document.getElementById('catalogExportBox');
+  box.value = tsv;
+  box.style.display = '';
+  document.getElementById('catalogExportCopyBtn').style.display = '';
+  document.getElementById('catalogExportDownloadBtn').style.display = '';
+});
+document.getElementById('catalogExportCopyBtn').addEventListener('click', ()=>{
+  copyTextToClipboard(document.getElementById('catalogExportBox').value, document.getElementById('catalogExportCopyBtn'));
+});
+document.getElementById('catalogExportDownloadBtn').addEventListener('click', ()=>{
+  const rows = catalogBuildExportRows(PRODUCTS);
+  const csv = rowsToDelimited(rows, ',');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `vhm-catalog-export-${todayKey()}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById('catalogImportPreviewBtn').addEventListener('click', ()=>{
+  const raw = document.getElementById('catalogImportSheetBox').value;
+  const rows = parseDelimitedText(raw);
+  const preview = document.getElementById('catalogImportPreview');
+  const validRows = rows.filter(r => (r[0]||'').trim());
+  if(!validRows.length){
+    preview.innerHTML = '<div class="stock-empty">No valid rows found — make sure the first column (Code) is filled in for each row.</div>';
+    return;
+  }
+  const built = validRows.map(row=>{
+    const code = (row[0]||'').trim();
+    const existingIdx = PRODUCTS.findIndex(p => (p.code||'').trim().toUpperCase() === code.toUpperCase());
+    const existing = existingIdx > -1 ? PRODUCTS[existingIdx] : null;
+    const product = catalogApplyImportRow(row, existing);
+    return {product, isNew: !existing, existingIdx};
+  });
+  const newCount = built.filter(b=>b.isNew).length;
+  const updateCount = built.length - newCount;
+  preview.innerHTML = `
+    <div class="field-hint" style="margin:10px 0;">Found ${built.length} row(s): <b style="color:var(--olive-dark);">${newCount} new</b>, <b style="color:var(--rust);">${updateCount} updating existing</b>. Nothing else in your catalog will be touched.</div>
+    <div style="max-height:220px;overflow-y:auto;border:1px solid var(--line);border-radius:2px;margin-bottom:10px;">
+      ${built.map(b=>`<div style="padding:6px 10px;border-bottom:1px solid var(--line);font-size:12.5px;font-family:'Space Mono',monospace;">
+        ${b.isNew ? '🆕' : '✏️'} <b>${escapeHtml(b.product.code)}</b> — ${escapeHtml(b.product.name||b.product.nameKh||'(no name)')}
+      </div>`).join('')}
+    </div>
+    <button class="btn btn-primary" id="catalogImportConfirmBtn">✅ Confirm import — write ${built.length} code(s)</button>
+    <span id="catalogImportStatus" style="margin-left:10px;font-size:12.5px;font-family:'Space Mono',monospace;"></span>
+  `;
+  document.getElementById('catalogImportConfirmBtn').addEventListener('click', async ()=>{
+    const btn = document.getElementById('catalogImportConfirmBtn');
+    const statusEl = document.getElementById('catalogImportStatus');
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+    try{
+      built.forEach(b=>{
+        if(b.isNew) PRODUCTS.push(b.product);
+        else PRODUCTS[b.existingIdx] = b.product;
+      });
+      renderAll();
+      await trySaveToStorage();
+      statusEl.style.color = 'var(--olive-dark)';
+      statusEl.textContent = `✅ Saved — ${newCount} added, ${updateCount} updated.`;
+      document.getElementById('catalogImportSheetBox').value = '';
+      btn.textContent = 'Done ✅';
+    }catch(e){
+      console.error('Catalog import failed:', e);
+      statusEl.style.color = 'var(--rust)';
+      statusEl.textContent = '❌ Save failed: ' + (e && e.message ? e.message : 'unknown error — check your connection and try again.');
+      btn.disabled = false;
+      btn.textContent = `✅ Confirm import — write ${built.length} code(s)`;
+    }
+  });
+});
 
 // ---------- Helpers ----------
 function productSearchText(p){
@@ -2622,6 +2911,7 @@ function renderGrid(){
     btn.addEventListener('click', ()=>{
       const p = PRODUCTS[+btn.dataset.idx];
       if(confirm(`Remove ${p.code} — ${p.name} from the catalog?`)){
+        pendingDeletedCodes.add((p.code||'').trim().toUpperCase());
         PRODUCTS.splice(+btn.dataset.idx,1);
         renderAll();
         trySaveToStorage();
@@ -3102,13 +3392,13 @@ function liveWeightRangeDisplay(rangeStr){
   if(parts.length===1) return `${parts[0]}kg`;
   return String(rangeStr).trim();
 }
-// catalog first, then the Live default table
+// Deliberately does NOT consult the catalog size chart — catalog weight ranges
+// are for general reference sizing and have been clashing with what the team
+// actually wants recommended live. This is only a starting suggestion for a
+// size that's never been logged before; once a code is logged, its saved
+// weights in the Live table always take priority over this (see the Save/
+// Copy handlers, which check the saved log first).
 function liveDefaultWeightForSize(code, size){
-  const product = findCatalogProduct(code);
-  if(product && product.sizeChart){
-    const entry = product.sizeChart.find(e=>e.size===size);
-    if(entry && entry.weightKg) return entry.weightKg;
-  }
   return LIVE_DEFAULT_WEIGHTS[size] || '';
 }
 // parses lines like "ខ្មៅ:M L XL 2XL" or "ខ្មៅ : M L XL" -> [{color, sizes:[...]}], preserving input order
@@ -3160,7 +3450,10 @@ function copyTextToClipboard(text, btn){
     done();
   }
 }
-function liveLogKey(code){ return 'live_log:' + code.trim().toUpperCase(); }
+// Firestore document IDs can't contain "/" — sanitized once here so every
+// caller (save, load, edit, delete, Stock Check's Live copy button) always
+// computes the exact same key for a given code.
+function liveLogKey(code){ return 'live_log:' + code.trim().toUpperCase().replace(/\//g, '-'); }
 
 function parseStockPaste(raw){
   const recordRe = /([\s\S]+?)\s*(\d+\.\d+)\s+(\d+)\s+(\d+)\s*\/\s*(\d+)/g;
@@ -3375,8 +3668,8 @@ function setStockName(v){
 function stockNameKey(name){
   return 'stock_relay_' + name.trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
 }
-function initStockNameSelect(){
-  const sel = document.getElementById('stockNameSelect');
+function initStockNameSelect(selectId){
+  const sel = document.getElementById(selectId || 'stockNameSelect');
   if(!sel) return;
   const saved = getStockName();
   if(saved){
@@ -3385,6 +3678,10 @@ function initStockNameSelect(){
   }
   sel.addEventListener('change', ()=>{
     setStockName(sel.value);
+    // keep both name selectors (Stock Check + Live) in sync with each other
+    document.querySelectorAll('#stockNameSelect, #liveImportNameSelect').forEach(other=>{
+      if(other !== sel) other.value = sel.value;
+    });
   });
 }
 
@@ -3423,7 +3720,8 @@ document.getElementById('stockLoadBtn').addEventListener('click', async ()=>{
   btn.disabled = false;
   setTimeout(()=>{ btn.textContent = old; }, 1800);
 });
-initStockNameSelect();
+initStockNameSelect('stockNameSelect');
+initStockNameSelect('liveImportNameSelect');
 const searchCountDetails = document.getElementById('searchCountDetails');
 if(searchCountDetails){
   searchCountDetails.addEventListener('toggle', function(){
@@ -3589,12 +3887,15 @@ document.getElementById('liveImportParseBtn').addEventListener('click', ()=>{
 document.getElementById('liveImportLoadBtn').addEventListener('click', async ()=>{
   const btn = document.getElementById('liveImportLoadBtn');
   const old = btn.textContent;
-  const name = getStockName();
+  const sel = document.getElementById('liveImportNameSelect');
+  const name = sel ? sel.value : getStockName();
   if(!name){
-    btn.textContent = 'Set your name in Stock Check first';
-    setTimeout(()=>{ btn.textContent = old; }, 2200);
+    if(sel) sel.focus();
+    btn.textContent = 'Select your name first';
+    setTimeout(()=>{ btn.textContent = old; }, 1800);
     return;
   }
+  setStockName(name);
   btn.textContent = 'Loading…';
   btn.disabled = true;
   try{
@@ -3641,33 +3942,42 @@ document.getElementById('liveClearBtn').addEventListener('click', ()=>{
 });
 
 document.getElementById('liveSaveBtn').addEventListener('click', async ()=>{
-  const {code, colorsArr} = liveGetFormState();
-  const errBox = document.getElementById('liveFormError');
-  if(!code || !colorsArr.length){
-    errBox.textContent = 'Enter a code and at least one color:sizes line first.';
-    errBox.classList.add('show');
-    return;
-  }
-  errBox.classList.remove('show');
-  liveRefreshWeightInputs();
-  const weights = liveCollectWeights();
   const btn = document.getElementById('liveSaveBtn');
+  const errBox = document.getElementById('liveFormError');
+  const statusBox = document.getElementById('liveSaveStatus');
   const old = btn.textContent;
-  btn.textContent = 'Saving…';
+  statusBox.textContent = '';
+  statusBox.style.color = '';
   btn.disabled = true;
+  btn.textContent = 'Saving…';
   try{
+    const {code, colorsArr} = liveGetFormState();
+    if(!code || !colorsArr.length){
+      errBox.textContent = 'Enter a code and at least one color:sizes line first.';
+      errBox.classList.add('show');
+      return;
+    }
+    errBox.classList.remove('show');
+    liveRefreshWeightInputs();
+    const weights = liveCollectWeights();
     await window.storage.set(liveLogKey(code), JSON.stringify({
       code, colorsText: document.getElementById('liveColorsBox').value,
       colors: colorsArr, weights, updatedAt: new Date().toISOString()
     }));
     btn.textContent = 'Saved ✅';
+    const now = new Date();
+    statusBox.style.color = 'var(--olive-dark)';
+    statusBox.textContent = `✅ Saved "${code}" at ${now.toLocaleTimeString()} — Stock Check will use this weight from now on.`;
     loadLiveLogList();
   }catch(e){
-    console.error(e);
-    btn.textContent = 'Error, try again';
+    console.error('Live log save failed:', e);
+    btn.textContent = 'Error';
+    statusBox.style.color = 'var(--rust)';
+    statusBox.textContent = '❌ Save failed: ' + (e && e.message ? e.message : 'unknown error — check your connection and try again.');
+  } finally {
+    btn.disabled = false;
+    setTimeout(()=>{ btn.textContent = old; }, 1500);
   }
-  btn.disabled = false;
-  setTimeout(()=>{ btn.textContent = old; }, 1500);
 });
 
 function liveLoadIntoForm(entry){
@@ -3703,32 +4013,45 @@ async function loadLiveLogList(){
     }
     entries.sort((a,b)=> (b.updatedAt||'').localeCompare(a.updatedAt||''));
     liveLogEntriesCache = entries;
-    el.innerHTML = entries.map(entry=>{
+    el.innerHTML = entries.map((entry, idx)=>{
       const colorSummary = entry.colors.map(c=>`${c.color}: ${c.sizes.join(' ')}`).join(' &nbsp;|&nbsp; ');
       const weights = entry.weights || {};
       const weightSizes = liveAllSizes(entry.colors);
       const weightSummary = weightSizes.length
         ? weightSizes.map(s=>`${s}: ${liveWeightRangeDisplay(weights[s])}`).join(' &nbsp;|&nbsp; ')
         : '';
-      return `<div class="stock-group">
+      const editInputsHtml = weightSizes.map(s=>`<div class="fcard" style="padding:10px 12px;">
+        <b style="font-size:15px;">${escapeHtml(s)}</b>
+        <input type="text" class="live-edit-weight-input" data-size="${escapeHtml(s)}" value="${escapeHtml(weights[s]||'')}" placeholder="e.g. 50-60" style="width:100%;font-family:'Space Mono',monospace;font-size:12.5px;padding:7px 9px;border:1.5px solid var(--line);border-radius:2px;background:var(--card);color:var(--ink);margin-top:4px;">
+      </div>`).join('');
+      return `<div class="stock-group" data-idx="${idx}">
         <div class="stock-group-head">
           <div>
             <span class="stock-code">${escapeHtml(entry.code)}</span>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button class="btn btn-ghost live-log-copy" data-code="${escapeHtml(entry.code)}" style="font-size:12px;padding:7px 12px;">Copy message</button>
-            <button class="btn btn-ghost live-log-edit" data-code="${escapeHtml(entry.code)}" style="font-size:12px;padding:7px 12px;">Edit</button>
-            <button class="btn btn-danger live-log-delete" data-code="${escapeHtml(entry.code)}" style="font-size:12px;padding:7px 12px;">Delete</button>
+            <button class="btn btn-ghost live-log-copy" data-idx="${idx}" style="font-size:12px;padding:7px 12px;">Copy message</button>
+            <button class="btn btn-ghost live-log-editweight" data-idx="${idx}" style="font-size:12px;padding:7px 12px;">✏️ Edit weight</button>
+            <button class="btn btn-ghost live-log-edit" data-idx="${idx}" style="font-size:12px;padding:7px 12px;">Edit all</button>
+            <button class="btn btn-danger live-log-delete" data-idx="${idx}" style="font-size:12px;padding:7px 12px;">Delete</button>
           </div>
         </div>
         <div style="font-size:12.5px;color:#5c5749;margin-top:6px;">${colorSummary}</div>
         <div style="font-size:12.5px;color:var(--rust);margin-top:6px;font-family:'Space Mono',monospace;">${weightSummary || '⚠️ no weight saved for this log'}</div>
+        <div class="live-log-weight-edit-panel" data-idx="${idx}" style="display:none;margin-top:12px;border-top:1px dashed var(--line);padding-top:12px;">
+          <div class="fabric-grid" style="margin-bottom:10px;">${editInputsHtml}</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <button class="btn btn-primary live-log-saveweight" data-idx="${idx}" style="font-size:12px;padding:7px 12px;">💾 Save weight</button>
+            <button class="btn btn-ghost live-log-canceledit" data-idx="${idx}" style="font-size:12px;padding:7px 12px;">Cancel</button>
+            <span class="live-log-weight-status" data-idx="${idx}" style="font-size:12px;font-family:'Space Mono',monospace;"></span>
+          </div>
+        </div>
       </div>`;
     }).join('');
 
     el.querySelectorAll('.live-log-copy').forEach(btn=>{
       btn.addEventListener('click', ()=>{
-        const entry = entries.find(e=>e.code===btn.dataset.code);
+        const entry = entries[+btn.dataset.idx];
         if(!entry) return;
         const msg = buildLiveMessage(entry.code, entry.colors, entry.weights || {});
         copyTextToClipboard(msg, btn);
@@ -3736,15 +4059,63 @@ async function loadLiveLogList(){
     });
     el.querySelectorAll('.live-log-edit').forEach(btn=>{
       btn.addEventListener('click', ()=>{
-        const entry = entries.find(e=>e.code===btn.dataset.code);
+        const entry = entries[+btn.dataset.idx];
         if(entry) liveLoadIntoForm(entry);
+      });
+    });
+    el.querySelectorAll('.live-log-editweight').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const panel = el.querySelector(`.live-log-weight-edit-panel[data-idx="${btn.dataset.idx}"]`);
+        if(panel) panel.style.display = panel.style.display === 'none' ? '' : 'none';
+      });
+    });
+    el.querySelectorAll('.live-log-canceledit').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const panel = el.querySelector(`.live-log-weight-edit-panel[data-idx="${btn.dataset.idx}"]`);
+        if(panel) panel.style.display = 'none';
+      });
+    });
+    el.querySelectorAll('.live-log-saveweight').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const idx = +btn.dataset.idx;
+        const entry = entries[idx];
+        const statusEl = el.querySelector(`.live-log-weight-status[data-idx="${idx}"]`);
+        const panel = el.querySelector(`.live-log-weight-edit-panel[data-idx="${idx}"]`);
+        const old = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = 'Saving…';
+        if(statusEl){ statusEl.textContent = ''; statusEl.style.color = ''; }
+        try{
+          if(!entry) throw new Error('This log is out of date — refresh the page and try again.');
+          const newWeights = {};
+          panel.querySelectorAll('.live-edit-weight-input').forEach(inp=>{
+            newWeights[inp.dataset.size] = inp.value.trim();
+          });
+          const updated = {...entry, weights: newWeights, updatedAt: new Date().toISOString()};
+          await window.storage.set(liveLogKey(entry.code), JSON.stringify(updated));
+          if(statusEl){
+            statusEl.style.color = 'var(--olive-dark)';
+            statusEl.textContent = '✅ Weight saved';
+          }
+          loadLiveLogList();
+        }catch(e){
+          console.error('Weight save failed:', e);
+          if(statusEl){
+            statusEl.style.color = 'var(--rust)';
+            statusEl.textContent = '❌ ' + (e && e.message ? e.message : 'Save failed — check your connection and try again.');
+          }
+          btn.disabled = false;
+          btn.textContent = old;
+        }
       });
     });
     el.querySelectorAll('.live-log-delete').forEach(btn=>{
       btn.addEventListener('click', async ()=>{
-        if(!confirm(`Delete live log for ${btn.dataset.code}?`)) return;
+        const entry = entries[+btn.dataset.idx];
+        if(!entry) return;
+        if(!confirm(`Delete live log for ${entry.code}?`)) return;
         try{
-          await window.storage.delete(liveLogKey(btn.dataset.code));
+          await window.storage.delete(liveLogKey(entry.code));
           loadLiveLogList();
         }catch(e){ console.error(e); alert('Could not delete — check connection.'); }
       });
