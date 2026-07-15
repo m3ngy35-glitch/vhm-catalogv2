@@ -232,6 +232,7 @@
     <button data-view="sizing">Size Guide</button>
     <button data-view="fabric">Fabric Info</button>
     <button data-view="stock">Stock Check</button>
+    <button data-view="live">Live</button>
   </nav>
 </header>
 
@@ -789,6 +790,54 @@
       <summary>📊 Today's most-searched codes</summary>
       <div id="searchCountList" style="margin-top:10px;font-family:'Space Mono',monospace;font-size:12px;line-height:1.8;">Tap to load…</div>
     </details>
+  </section>
+
+  <section id="live" class="view">
+    <h1 class="section-title">Live</h1>
+    <div class="section-sub">// log a code's colors, sizes &amp; weight guide for live-selling — get a ready-to-send message</div>
+
+    <details class="bookmarklet-note" open="">
+      <summary>📥 Import from stock paste (same as Stock Check — skip retyping colors/sizes)</summary>
+      <div style="margin-top:10px;">
+        <div class="stock-paste-wrap">
+          <textarea class="stock-paste" id="liveImportBox" placeholder="Tap 'Load from laptop', or paste rows manually — e.g. E202 អាវ សរ L 6.20 1 0 / 1"></textarea>
+          <button type="button" class="stock-paste-clear" id="liveImportClearX" title="Clear">×</button>
+        </div>
+        <div class="stock-actions" style="margin-bottom:8px;">
+          <button class="btn btn-primary" id="liveImportLoadBtn">⬇ Load from laptop</button>
+          <button class="btn btn-ghost" id="liveImportParseBtn">Import code</button>
+        </div>
+        <div class="field-hint">Uses the same name as Stock Check's "Load from laptop" — set it there first if you haven't.</div>
+        <div id="liveImportCodePicker"></div>
+      </div>
+    </details>
+
+    <div class="field">
+      <label>Product code</label>
+      <input type="text" id="liveCode" placeholder="e.g. E90">
+    </div>
+
+    <div class="field">
+      <label>Colors + sizes (one color per line)</label>
+      <textarea class="stock-paste" id="liveColorsBox" style="min-height:130px;" placeholder="ខ្មៅ:M L XL 2XL 3XL 4XL&#10;ស្លែ:M L XL 2XL 3XL 4XL&#10;ប៊ិច:M L XL 2XL 3XL 4XL"></textarea>
+      <div class="field-hint">Format: color: sizes separated by spaces — one color per line.</div>
+    </div>
+
+    <div id="liveWeightBlock">
+      <div class="field-hint" style="margin-bottom:8px;">// weight recommendation (kg) per size — write what your team recommends. Saved here once, then reused automatically by Stock Check's "Live copy message" for this code.</div>
+      <div id="liveWeightInputs" class="fabric-grid" style="margin-bottom:16px;"><div class="stock-empty">Type a code and at least one color:sizes line above — weight fields appear here.</div></div>
+    </div>
+
+    <div class="stock-actions">
+      <button class="btn btn-primary" id="liveSaveBtn">💾 Save log</button>
+      <button class="btn btn-ghost" id="liveCopyBtn">Copy message</button>
+      <button class="btn btn-ghost" id="liveClearBtn">Clear form</button>
+    </div>
+    <div class="form-error" id="liveFormError"></div>
+
+    <h1 class="section-title" style="font-size:24px;margin-top:32px;">Saved live logs</h1>
+    <div class="section-sub">// tap Copy message on any saved code — weight comes from what you logged here</div>
+    <div id="liveLogList"><div class="stock-empty">Loading…</div></div>
   </section>
 
 </main>
@@ -3032,6 +3081,86 @@ function sizeSortKey(s){
   return isNaN(n) ? 999 : 100 + n;
 }
 
+// ---------- Live tab defaults ----------
+// Fallback weight guide used only by the Live tab / Live copy message when a
+// code isn't found in the catalog. This is separate from MASTER_MEASURE_SHIRT
+// (used by the Add Product form) so it doesn't change any existing behavior.
+const LIVE_DEFAULT_WEIGHTS = {
+  'M':   '50-60',
+  'L':   '58-68',
+  'XL':  '65-75',
+  '2XL': '75-85',
+  '3XL': '85-95',
+  '4XL': '90-105'
+};
+function liveWeightRangeDisplay(rangeStr){
+  if(!rangeStr) return '—';
+  const clean = String(rangeStr).replace(/kg/gi, '').trim();
+  const parts = clean.split('-').map(s=>s.trim()).filter(Boolean);
+  if(parts.length===2) return `${parts[0]}kg-${parts[1]}kg`;
+  if(parts.length===1) return `${parts[0]}kg`;
+  return String(rangeStr).trim();
+}
+// catalog first, then the Live default table
+function liveDefaultWeightForSize(code, size){
+  const product = findCatalogProduct(code);
+  if(product && product.sizeChart){
+    const entry = product.sizeChart.find(e=>e.size===size);
+    if(entry && entry.weightKg) return entry.weightKg;
+  }
+  return LIVE_DEFAULT_WEIGHTS[size] || '';
+}
+// parses lines like "ខ្មៅ:M L XL 2XL" or "ខ្មៅ : M L XL" -> [{color, sizes:[...]}], preserving input order
+function parseLiveColorsText(raw){
+  const out = [];
+  String(raw||'').split('\n').forEach(line=>{
+    line = line.trim();
+    if(!line) return;
+    const idx = line.indexOf(':');
+    if(idx === -1) return;
+    const color = line.slice(0, idx).trim();
+    const sizes = line.slice(idx+1).trim().split(/\s+/).filter(Boolean).map(s=>s.toUpperCase());
+    if(!color || !sizes.length) return;
+    out.push({color, sizes});
+  });
+  return out;
+}
+function liveAllSizes(colorsArr){
+  const set = new Set();
+  colorsArr.forEach(c => c.sizes.forEach(s => set.add(s)));
+  return Array.from(set).sort((a,b)=>sizeSortKey(a)-sizeSortKey(b));
+}
+function buildLiveMessage(code, colorsArr, weightsMap){
+  const lines = [code];
+  colorsArr.forEach(c => { lines.push(`${c.color}: ${c.sizes.join(' ')}`); });
+  lines.push('');
+  lines.push('គីឡូ');
+  liveAllSizes(colorsArr).forEach(s => {
+    lines.push(`${s}: ${liveWeightRangeDisplay(weightsMap[s])}`);
+  });
+  return lines.join('\n');
+}
+function copyTextToClipboard(text, btn){
+  const done = ()=>{
+    if(!btn) return;
+    const old = btn.textContent;
+    btn.textContent = 'Copied ✅';
+    setTimeout(()=>{ btn.textContent = old; }, 1500);
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done);
+  } else {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    done();
+  }
+}
+function liveLogKey(code){ return 'live_log:' + code.trim().toUpperCase(); }
+
 function parseStockPaste(raw){
   const recordRe = /([\s\S]+?)\s*(\d+\.\d+)\s+(\d+)\s+(\d+)\s*\/\s*(\d+)/g;
   const codes = new Map();
@@ -3146,6 +3275,7 @@ function renderStockResults(codes){
           <span class="stock-price">តម្លៃ: ${escapeHtml(entry.price)}</span>
         </div>
         <button class="btn btn-ghost stock-copy-btn" data-code="${escapeHtml(code)}" style="font-size:12px;padding:7px 12px;">Copy message</button>
+        <button class="btn btn-ghost stock-live-copy-btn" data-code="${escapeHtml(code)}" style="font-size:12px;padding:7px 12px;">Live copy message</button>
       </div>`;
     colorMap.forEach((sizes, color)=>{
       const available = sizes.filter(s => s.remain > 0).sort((a,b)=>sizeSortKey(a.size)-sizeSortKey(b.size));
@@ -3194,6 +3324,39 @@ function renderStockResults(codes){
         document.body.removeChild(ta);
         done();
       }
+    });
+  });
+
+  box.querySelectorAll('.stock-live-copy-btn').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const code = btn.dataset.code;
+      const entry = codes.get(code);
+      const colorsArr = [];
+      entry.colorMap.forEach((sizes, color)=>{
+        const available = sizes.filter(s => s.remain > 0).sort((a,b)=>sizeSortKey(a.size)-sizeSortKey(b.size));
+        if(!available.length) return;
+        colorsArr.push({color: color || '—', sizes: available.map(s=>s.size)});
+      });
+      if(!colorsArr.length){
+        const old = btn.textContent;
+        btn.textContent = 'Nothing in stock';
+        setTimeout(()=>{ btn.textContent = old; }, 1500);
+        return;
+      }
+      const old = btn.textContent;
+      btn.textContent = 'Loading…';
+      let savedLog = null;
+      try{
+        const res = await window.storage.get(liveLogKey(code));
+        if(res && res.value) savedLog = JSON.parse(res.value);
+      }catch(e){ /* no saved log for this code yet — fall through to defaults */ }
+      const weightsMap = {};
+      liveAllSizes(colorsArr).forEach(s=>{
+        weightsMap[s] = (savedLog && savedLog.weights && savedLog.weights[s]) || liveDefaultWeightForSize(code, s);
+      });
+      const msg = buildLiveMessage(code, colorsArr, weightsMap);
+      btn.textContent = old;
+      copyTextToClipboard(msg, btn);
     });
   });
 }
@@ -3267,6 +3430,262 @@ document.getElementById('stockPasteClearX').addEventListener('click', ()=>{
   box.value = '';
   box.focus();
   document.getElementById('stockResults').innerHTML = '<div class="stock-empty">// paste stock rows above, then tap "Show stock"</div>';
+});
+
+// ---------- Live tab ----------
+function liveRenderWeightInputs(colorsArr, code, prefillWeights){
+  const wrap = document.getElementById('liveWeightInputs');
+  const sizes = liveAllSizes(colorsArr);
+  if(!sizes.length){
+    wrap.innerHTML = '<div class="stock-empty">Type a code and at least one color:sizes line above — weight fields appear here.</div>';
+    return;
+  }
+  wrap.innerHTML = sizes.map(s=>{
+    const val = (prefillWeights && prefillWeights[s]) || liveDefaultWeightForSize(code, s);
+    return `<div class="fcard" style="padding:10px 12px;">
+      <b style="font-size:15px;">${escapeHtml(s)}</b>
+      <input type="text" class="live-weight-input" data-size="${escapeHtml(s)}" value="${escapeHtml(val)}" placeholder="e.g. 50-60" style="width:100%;font-family:'Space Mono',monospace;font-size:12.5px;padding:7px 9px;border:1.5px solid var(--line);border-radius:2px;background:var(--card);color:var(--ink);margin-top:4px;">
+    </div>`;
+  }).join('');
+}
+
+function liveCollectWeights(){
+  const weights = {};
+  document.querySelectorAll('.live-weight-input').forEach(inp=>{
+    weights[inp.dataset.size] = inp.value.trim();
+  });
+  return weights;
+}
+
+function liveGetFormState(){
+  const code = document.getElementById('liveCode').value.trim().toUpperCase();
+  const colorsArr = parseLiveColorsText(document.getElementById('liveColorsBox').value);
+  return {code, colorsArr};
+}
+
+// Re-renders the weight fields to match whatever colors/sizes are currently typed,
+// while keeping any weight values already written by the team (only fills in
+// defaults for sizes that don't have a value yet).
+function liveRefreshWeightInputs(){
+  const {code, colorsArr} = liveGetFormState();
+  const existing = liveCollectWeights();
+  liveRenderWeightInputs(colorsArr, code, existing);
+}
+document.getElementById('liveCode').addEventListener('blur', liveRefreshWeightInputs);
+document.getElementById('liveColorsBox').addEventListener('blur', liveRefreshWeightInputs);
+
+// ---- Import from stock paste (reuses parseStockPaste from Stock Check) ----
+function liveColorsArrFromStockEntry(entry){
+  const arr = [];
+  entry.colorMap.forEach((sizes, color)=>{
+    const available = sizes.filter(s => s.remain > 0).sort((a,b)=>sizeSortKey(a.size)-sizeSortKey(b.size));
+    if(!available.length) return;
+    arr.push({color: color || '—', sizes: available.map(s=>s.size)});
+  });
+  return arr;
+}
+function liveColorsArrToText(colorsArr){
+  return colorsArr.map(c => `${c.color}:${c.sizes.join(' ')}`).join('\n');
+}
+function liveApplyImportedCode(code, codesMap){
+  const entry = codesMap.get(code);
+  const colorsArr = liveColorsArrFromStockEntry(entry);
+  document.getElementById('liveCode').value = code;
+  document.getElementById('liveColorsBox').value = liveColorsArrToText(colorsArr);
+  document.getElementById('liveFormError').classList.remove('show');
+  document.getElementById('liveImportCodePicker').innerHTML = '';
+  liveRenderWeightInputs(colorsArr, code, null);
+}
+document.getElementById('liveImportParseBtn').addEventListener('click', ()=>{
+  const raw = document.getElementById('liveImportBox').value;
+  const codesMap = parseStockPaste(raw);
+  const codeList = Array.from(codesMap.keys());
+  const errBox = document.getElementById('liveFormError');
+  const picker = document.getElementById('liveImportCodePicker');
+  picker.innerHTML = '';
+  if(!codeList.length){
+    errBox.textContent = 'No stock rows recognized in that paste — check the text and try again.';
+    errBox.classList.add('show');
+    return;
+  }
+  errBox.classList.remove('show');
+  if(codeList.length === 1){
+    liveApplyImportedCode(codeList[0], codesMap);
+  } else {
+    picker.innerHTML = '<div class="field-hint" style="margin-bottom:6px;">Multiple codes found — pick one to log:</div>' +
+      codeList.map(c => `<button type="button" class="btn btn-ghost live-import-pick" data-code="${escapeHtml(c)}" style="margin:0 6px 6px 0;font-size:12px;padding:6px 10px;">${escapeHtml(c)}</button>`).join('');
+    picker.querySelectorAll('.live-import-pick').forEach(btn=>{
+      btn.addEventListener('click', ()=> liveApplyImportedCode(btn.dataset.code, codesMap));
+    });
+  }
+});
+document.getElementById('liveImportLoadBtn').addEventListener('click', async ()=>{
+  const btn = document.getElementById('liveImportLoadBtn');
+  const old = btn.textContent;
+  const name = getStockName();
+  if(!name){
+    btn.textContent = 'Set your name in Stock Check first';
+    setTimeout(()=>{ btn.textContent = old; }, 2200);
+    return;
+  }
+  btn.textContent = 'Loading…';
+  btn.disabled = true;
+  try{
+    const res = await window.storage.get(stockNameKey(name));
+    if(!res || !res.value){
+      btn.textContent = 'No data yet';
+    } else {
+      const text = JSON.parse(res.value);
+      document.getElementById('liveImportBox').value = text;
+      btn.textContent = 'Loaded ✅';
+    }
+  }catch(e){
+    console.error(e);
+    btn.textContent = 'Error, try again';
+  }
+  btn.disabled = false;
+  setTimeout(()=>{ btn.textContent = old; }, 1800);
+});
+document.getElementById('liveImportClearX').addEventListener('click', ()=>{
+  document.getElementById('liveImportBox').value = '';
+  document.getElementById('liveImportCodePicker').innerHTML = '';
+});
+
+document.getElementById('liveCopyBtn').addEventListener('click', ()=>{
+  const {code, colorsArr} = liveGetFormState();
+  const errBox = document.getElementById('liveFormError');
+  if(!code || !colorsArr.length){
+    errBox.textContent = 'Enter a code and at least one color:sizes line first.';
+    errBox.classList.add('show');
+    return;
+  }
+  errBox.classList.remove('show');
+  liveRefreshWeightInputs();
+  const weights = liveCollectWeights();
+  const msg = buildLiveMessage(code, colorsArr, weights);
+  copyTextToClipboard(msg, document.getElementById('liveCopyBtn'));
+});
+
+document.getElementById('liveClearBtn').addEventListener('click', ()=>{
+  document.getElementById('liveCode').value = '';
+  document.getElementById('liveColorsBox').value = '';
+  document.getElementById('liveWeightInputs').innerHTML = '<div class="stock-empty">Type a code and at least one color:sizes line above — weight fields appear here.</div>';
+  document.getElementById('liveFormError').classList.remove('show');
+});
+
+document.getElementById('liveSaveBtn').addEventListener('click', async ()=>{
+  const {code, colorsArr} = liveGetFormState();
+  const errBox = document.getElementById('liveFormError');
+  if(!code || !colorsArr.length){
+    errBox.textContent = 'Enter a code and at least one color:sizes line first.';
+    errBox.classList.add('show');
+    return;
+  }
+  errBox.classList.remove('show');
+  liveRefreshWeightInputs();
+  const weights = liveCollectWeights();
+  const btn = document.getElementById('liveSaveBtn');
+  const old = btn.textContent;
+  btn.textContent = 'Saving…';
+  btn.disabled = true;
+  try{
+    await window.storage.set(liveLogKey(code), JSON.stringify({
+      code, colorsText: document.getElementById('liveColorsBox').value,
+      colors: colorsArr, weights, updatedAt: new Date().toISOString()
+    }));
+    btn.textContent = 'Saved ✅';
+    loadLiveLogList();
+  }catch(e){
+    console.error(e);
+    btn.textContent = 'Error, try again';
+  }
+  btn.disabled = false;
+  setTimeout(()=>{ btn.textContent = old; }, 1500);
+});
+
+function liveLoadIntoForm(entry){
+  document.getElementById('liveCode').value = entry.code;
+  document.getElementById('liveColorsBox').value = entry.colorsText || entry.colors.map(c=>`${c.color}:${c.sizes.join(' ')}`).join('\n');
+  liveRenderWeightInputs(entry.colors, entry.code, entry.weights);
+  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelector('nav button[data-view="live"]').classList.add('active');
+  document.getElementById('live').classList.add('active');
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+async function loadLiveLogList(){
+  const el = document.getElementById('liveLogList');
+  el.innerHTML = '<div class="stock-empty">Loading…</div>';
+  try{
+    const listRes = await window.storage.list('live_log:');
+    const keys = (listRes && listRes.keys) || [];
+    if(!keys.length){
+      el.innerHTML = '<div class="stock-empty">// no live logs saved yet</div>';
+      return;
+    }
+    const entries = [];
+    for(const key of keys){
+      try{
+        const res = await window.storage.get(key);
+        if(res && res.value) entries.push(JSON.parse(res.value));
+      }catch(e){ /* skip unreadable entry */ }
+    }
+    entries.sort((a,b)=> (b.updatedAt||'').localeCompare(a.updatedAt||''));
+    el.innerHTML = entries.map(entry=>{
+      const colorSummary = entry.colors.map(c=>`${c.color}: ${c.sizes.join(' ')}`).join(' &nbsp;|&nbsp; ');
+      const weights = entry.weights || {};
+      const weightSizes = liveAllSizes(entry.colors);
+      const weightSummary = weightSizes.length
+        ? weightSizes.map(s=>`${s}: ${liveWeightRangeDisplay(weights[s])}`).join(' &nbsp;|&nbsp; ')
+        : '';
+      return `<div class="stock-group">
+        <div class="stock-group-head">
+          <div>
+            <span class="stock-code">${escapeHtml(entry.code)}</span>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-ghost live-log-copy" data-code="${escapeHtml(entry.code)}" style="font-size:12px;padding:7px 12px;">Copy message</button>
+            <button class="btn btn-ghost live-log-edit" data-code="${escapeHtml(entry.code)}" style="font-size:12px;padding:7px 12px;">Edit</button>
+            <button class="btn btn-danger live-log-delete" data-code="${escapeHtml(entry.code)}" style="font-size:12px;padding:7px 12px;">Delete</button>
+          </div>
+        </div>
+        <div style="font-size:12.5px;color:#5c5749;margin-top:6px;">${colorSummary}</div>
+        <div style="font-size:12.5px;color:var(--rust);margin-top:6px;font-family:'Space Mono',monospace;">${weightSummary || '⚠️ no weight saved for this log'}</div>
+      </div>`;
+    }).join('');
+
+    el.querySelectorAll('.live-log-copy').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const entry = entries.find(e=>e.code===btn.dataset.code);
+        if(!entry) return;
+        const msg = buildLiveMessage(entry.code, entry.colors, entry.weights || {});
+        copyTextToClipboard(msg, btn);
+      });
+    });
+    el.querySelectorAll('.live-log-edit').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const entry = entries.find(e=>e.code===btn.dataset.code);
+        if(entry) liveLoadIntoForm(entry);
+      });
+    });
+    el.querySelectorAll('.live-log-delete').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        if(!confirm(`Delete live log for ${btn.dataset.code}?`)) return;
+        try{
+          await window.storage.delete(liveLogKey(btn.dataset.code));
+          loadLiveLogList();
+        }catch(e){ console.error(e); alert('Could not delete — check connection.'); }
+      });
+    });
+  }catch(e){
+    console.error(e);
+    el.innerHTML = '<div class="stock-empty">Could not load (check connection).</div>';
+  }
+}
+
+document.querySelector('nav button[data-view="live"]').addEventListener('click', ()=>{
+  loadLiveLogList();
 });
 
 // ---------- Init ----------
