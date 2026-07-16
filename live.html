@@ -178,6 +178,17 @@
   <div class="form-error" id="liveFormError"></div>
   <div id="liveSaveStatus" style="font-size:12.5px;margin-top:8px;font-family:'Space Mono',monospace;"></div>
 
+  <div id="obsPanel" style="margin-top:16px;padding:12px 14px;background:var(--card);border:1.5px solid var(--line);border-radius:3px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+      <div style="font-size:12.5px;font-family:'Space Mono',monospace;color:#6b6558;" id="obsStatusText">🎥 OBS text file: not linked</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <label style="font-size:12px;display:flex;align-items:center;gap:5px;"><input type="checkbox" id="obsAutoWriteCheckbox" checked> auto-update on Copy</label>
+        <button class="btn btn-ghost" id="obsLinkBtn" style="font-size:12px;padding:7px 12px;">🔗 Link a text file</button>
+      </div>
+    </div>
+    <div class="field-hint" id="obsUnsupportedNote" style="display:none;margin-top:6px;">This needs Chrome or Edge — not supported in this browser.</div>
+  </div>
+
   <details class="note" style="margin-top:26px;">
     <summary>📊 Export / Import via spreadsheet</summary>
     <div class="note-body">
@@ -354,6 +365,58 @@ function copyTextToClipboard(text, btn){
     done();
   }
 }
+
+/* ============ OBS text-file link (File System Access API — Chrome/Edge only) ============
+   Lets the page write the copy-ready message straight into a file on disk that
+   OBS's Text (GDI+) source reads from, so it updates live without any manual
+   copy/paste into a separate editor. Permission is granted once via the
+   native file picker; after that, writes to the same handle don't re-prompt
+   for the rest of this browser session. */
+let obsFileHandle = null;
+function obsSupported(){
+  return typeof window.showSaveFilePicker === 'function';
+}
+function obsSetStatus(text){
+  document.getElementById('obsStatusText').textContent = text;
+}
+async function obsLinkFile(){
+  if(!obsSupported()){
+    document.getElementById('obsUnsupportedNote').style.display = '';
+    return;
+  }
+  try{
+    obsFileHandle = await window.showSaveFilePicker({
+      suggestedName: 'vhm_live_message.txt',
+      types: [{description: 'Text file', accept: {'text/plain': ['.txt']}}]
+    });
+    obsSetStatus(`🎥 OBS text file: linked → ${obsFileHandle.name}`);
+  }catch(e){
+    // AbortError = user cancelled the picker, not a real failure
+    if(e && e.name !== 'AbortError'){
+      console.error('OBS file link failed:', e);
+      obsSetStatus('🎥 OBS text file: link failed — try again');
+    }
+  }
+}
+async function obsWriteMessage(text){
+  if(!obsFileHandle || !document.getElementById('obsAutoWriteCheckbox').checked) return;
+  try{
+    const writable = await obsFileHandle.createWritable();
+    await writable.write(text);
+    await writable.close();
+    obsSetStatus(`🎥 OBS text file: updated → ${obsFileHandle.name} (${new Date().toLocaleTimeString()})`);
+  }catch(e){
+    console.error('OBS file write failed:', e);
+    obsSetStatus('🎥 OBS text file: write failed — click "Link a text file" to relink');
+    obsFileHandle = null;
+  }
+}
+document.getElementById('obsLinkBtn').addEventListener('click', obsLinkFile);
+if(!obsSupported()){
+  document.getElementById('obsUnsupportedNote').style.display = '';
+  document.getElementById('obsLinkBtn').disabled = true;
+}
+
 const SIZE_ORDER = ['XS','S','M','L','XL','2XL','3XL','4XL','5XL'];
 function sizeSortKey(s){
   const i = SIZE_ORDER.indexOf(s);
@@ -776,6 +839,7 @@ document.getElementById('liveCopyBtn').addEventListener('click', ()=>{
   const weights = liveCollectWeights();
   const msg = buildLiveMessage(code, colorsArr, weights, liveGetMessageOptions());
   copyTextToClipboard(msg, document.getElementById('liveCopyBtn'));
+  obsWriteMessage(msg);
 });
 document.getElementById('liveClearBtn').addEventListener('click', ()=>{
   document.getElementById('liveCode').value = '';
@@ -902,7 +966,11 @@ async function loadLiveLogList(){
       btn.addEventListener('click', ()=>{
         const entry = entries[+btn.dataset.idx];
         if(!entry) return;
-        copyTextToClipboard(buildLiveMessage(entry.code, entry.colors, entry.weights || {}, {garmentType: entry.garmentType, price: entry.price, showWeight: entry.showWeight}), btn);
+        {
+          const msg = buildLiveMessage(entry.code, entry.colors, entry.weights || {}, {garmentType: entry.garmentType, price: entry.price, showWeight: entry.showWeight});
+          copyTextToClipboard(msg, btn);
+          obsWriteMessage(msg);
+        }
       });
     });
     el.querySelectorAll('.live-log-edit').forEach(btn=>{
