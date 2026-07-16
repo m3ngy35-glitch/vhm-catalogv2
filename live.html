@@ -137,6 +137,30 @@
   </div>
 
   <div class="field">
+    <label>Garment type</label>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13.5px;">
+      <label style="display:flex;align-items:center;gap:5px;"><input type="radio" name="liveGarmentType" value="អាវលេីខ្លួន"> អាវលើខ្លួន</label>
+      <label style="display:flex;align-items:center;gap:5px;"><input type="radio" name="liveGarmentType" value="ខោលេីខ្លួន"> ខោលើខ្លួន</label>
+      <label style="display:flex;align-items:center;gap:5px;"><input type="radio" name="liveGarmentType" value="អាវលេីដៃ"> អាវលើដៃ</label>
+      <label style="display:flex;align-items:center;gap:5px;"><input type="radio" name="liveGarmentType" value="ខោលេីដៃ"> ខោលើដៃ</label>
+      <label style="display:flex;align-items:center;gap:5px;color:#8a8375;"><input type="radio" name="liveGarmentType" value="" checked> none</label>
+    </div>
+  </div>
+
+  <div class="field">
+    <label>Price (តម្លៃ)</label>
+    <input type="text" id="livePrice" placeholder="e.g. 7.20">
+  </div>
+
+  <div class="field">
+    <label>Show weight recommendation in message?</label>
+    <div style="display:flex;gap:16px;font-size:13.5px;">
+      <label style="display:flex;align-items:center;gap:5px;"><input type="radio" name="liveShowWeight" value="yes" checked> Yes</label>
+      <label style="display:flex;align-items:center;gap:5px;"><input type="radio" name="liveShowWeight" value="no"> No</label>
+    </div>
+  </div>
+
+  <div class="field">
     <label>Colors + sizes (one color per line)</label>
     <textarea class="stock-paste" id="liveColorsBox" style="min-height:110px;" placeholder="ខ្មៅ:M L XL 2XL 3XL 4XL&#10;ស្លែ:M L XL 2XL 3XL 4XL&#10;ប៊ិច:M L XL 2XL 3XL 4XL"></textarea>
     <div class="field-hint">Format: color: sizes separated by spaces — one color per line.</div>
@@ -375,14 +399,19 @@ function liveAllSizes(colorsArr){
   colorsArr.forEach(c => c.sizes.forEach(s => set.add(s)));
   return Array.from(set).sort((a,b)=>sizeSortKey(a)-sizeSortKey(b));
 }
-function buildLiveMessage(code, colorsArr, weightsMap){
-  const lines = [code];
+function buildLiveMessage(code, colorsArr, weightsMap, options){
+  options = options || {};
+  const lines = [];
+  if(options.garmentType) lines.push(options.garmentType);
+  if(options.price) lines.push(`តម្លៃ :${options.price}`);
+  lines.push(`កូដ : ${code}`);
   colorsArr.forEach(c => { lines.push(`${c.color}: ${c.sizes.join(' ')}`); });
-  lines.push('');
-  lines.push('គីឡូ');
-  liveAllSizes(colorsArr).forEach(s => {
-    lines.push(`${s}: ${liveWeightRangeDisplay(weightsMap[s])}`);
-  });
+  if(options.showWeight !== false){
+    lines.push('គីឡូ');
+    liveAllSizes(colorsArr).forEach(s => {
+      lines.push(`${s}: ${liveWeightRangeDisplay(weightsMap[s])}`);
+    });
+  }
   return lines.join('\n');
 }
 // Firestore document IDs can't contain "/" — sanitized once here so every
@@ -576,6 +605,24 @@ function liveGetFormState(){
   const colorsArr = parseLiveColorsText(document.getElementById('liveColorsBox').value);
   return {code, colorsArr};
 }
+function liveGetMessageOptions(){
+  const garmentEl = document.querySelector('input[name="liveGarmentType"]:checked');
+  const weightEl = document.querySelector('input[name="liveShowWeight"]:checked');
+  return {
+    garmentType: garmentEl ? garmentEl.value : '',
+    price: document.getElementById('livePrice').value.trim(),
+    showWeight: weightEl ? weightEl.value !== 'no' : true
+  };
+}
+function liveSetMessageOptions(options){
+  options = options || {};
+  const garmentEl = document.querySelector(`input[name="liveGarmentType"][value="${(options.garmentType||'').replace(/"/g,'')}"]`)
+    || document.querySelector('input[name="liveGarmentType"][value=""]');
+  if(garmentEl) garmentEl.checked = true;
+  document.getElementById('livePrice').value = options.price || '';
+  const weightEl = document.querySelector(`input[name="liveShowWeight"][value="${options.showWeight === false ? 'no' : 'yes'}"]`);
+  if(weightEl) weightEl.checked = true;
+}
 function liveRefreshWeightInputs(){
   const {colorsArr} = liveGetFormState();
   const existing = liveCollectWeights();
@@ -727,7 +774,7 @@ document.getElementById('liveCopyBtn').addEventListener('click', ()=>{
   errBox.classList.remove('show');
   liveRefreshWeightInputs();
   const weights = liveCollectWeights();
-  const msg = buildLiveMessage(code, colorsArr, weights);
+  const msg = buildLiveMessage(code, colorsArr, weights, liveGetMessageOptions());
   copyTextToClipboard(msg, document.getElementById('liveCopyBtn'));
 });
 document.getElementById('liveClearBtn').addEventListener('click', ()=>{
@@ -736,6 +783,7 @@ document.getElementById('liveClearBtn').addEventListener('click', ()=>{
   document.getElementById('liveWeightInputs').innerHTML = '<div class="stock-empty">Type a code and at least one color:sizes line above — weight fields appear here.</div>';
   document.getElementById('liveFormError').classList.remove('show');
   document.getElementById('liveSaveStatus').textContent = '';
+  liveSetMessageOptions({});
 });
 document.getElementById('liveSaveBtn').addEventListener('click', async ()=>{
   const btn = document.getElementById('liveSaveBtn');
@@ -760,9 +808,12 @@ document.getElementById('liveSaveBtn').addEventListener('click', async ()=>{
     errBox.classList.remove('show');
     liveRefreshWeightInputs();
     const weights = liveCollectWeights();
+    const messageOptions = liveGetMessageOptions();
     await withTimeout(window.storage.set(liveLogKey(code), JSON.stringify({
       code, colorsText: document.getElementById('liveColorsBox').value,
-      colors: colorsArr, weights, updatedAt: new Date().toISOString()
+      colors: colorsArr, weights,
+      garmentType: messageOptions.garmentType, price: messageOptions.price, showWeight: messageOptions.showWeight,
+      updatedAt: new Date().toISOString()
     })), 25000, 'Save timed out after 25s — the server never responded. Check your connection and try again.');
     btn.textContent = 'Saved ✅';
     const now = new Date();
@@ -786,6 +837,7 @@ function liveLoadIntoForm(entry){
   document.getElementById('liveCode').value = entry.code;
   document.getElementById('liveColorsBox').value = entry.colorsText || entry.colors.map(c=>`${c.color}:${c.sizes.join(' ')}`).join('\n');
   liveRenderWeightInputs(entry.colors, entry.weights);
+  liveSetMessageOptions({garmentType: entry.garmentType, price: entry.price, showWeight: entry.showWeight});
   window.scrollTo({top:0, behavior:'smooth'});
 }
 let liveLogSearchTerm = '';
@@ -850,7 +902,7 @@ async function loadLiveLogList(){
       btn.addEventListener('click', ()=>{
         const entry = entries[+btn.dataset.idx];
         if(!entry) return;
-        copyTextToClipboard(buildLiveMessage(entry.code, entry.colors, entry.weights || {}), btn);
+        copyTextToClipboard(buildLiveMessage(entry.code, entry.colors, entry.weights || {}, {garmentType: entry.garmentType, price: entry.price, showWeight: entry.showWeight}), btn);
       });
     });
     el.querySelectorAll('.live-log-edit').forEach(btn=>{
@@ -994,7 +1046,7 @@ document.getElementById('liveImportColorsPreviewBtn').addEventListener('click', 
       color, sizes: Array.from(sizeSet).sort((a,b)=>sizeSortKey(a)-sizeSortKey(b))
     }));
     const existing = existingByCode.get(g.code.toUpperCase());
-    return { code: g.code, colors, weights: existing ? (existing.weights||{}) : {}, isNew: !existing };
+    return { code: g.code, colors, weights: existing ? (existing.weights||{}) : {}, isNew: !existing, existing };
   });
   const newCount = built.filter(b=>b.isNew).length;
   preview.innerHTML = `
@@ -1014,7 +1066,11 @@ document.getElementById('liveImportColorsPreviewBtn').addEventListener('click', 
       try{
         await window.storage.set(liveLogKey(b.code), JSON.stringify({
           code: b.code, colorsText: liveColorsArrToText(b.colors),
-          colors: b.colors, weights: b.weights, updatedAt: new Date().toISOString()
+          colors: b.colors, weights: b.weights,
+          garmentType: b.existing ? b.existing.garmentType : undefined,
+          price: b.existing ? b.existing.price : undefined,
+          showWeight: b.existing ? b.existing.showWeight : undefined,
+          updatedAt: new Date().toISOString()
         }));
         okCount++;
       }catch(e){ console.error('Colors import failed for', b.code, e); failCount++; }
@@ -1069,7 +1125,7 @@ document.getElementById('liveImportWeightsPreviewBtn').addEventListener('click',
     // Additive merge: only the sizes present in this sheet get updated —
     // any other size's weight already saved for this code is left alone.
     const mergedWeights = {...(existing.weights||{}), ...g.weights};
-    return { code: g.code, colors: existing.colors, weights: mergedWeights, sizesUpdated: Object.keys(g.weights).length };
+    return { code: g.code, colors: existing.colors, weights: mergedWeights, sizesUpdated: Object.keys(g.weights).length, existing };
   }).filter(Boolean);
   const skipNote = notLogged.length ? `<div class="field-hint" style="margin-bottom:8px;color:var(--rust);">Skipped (no colors logged yet for these — add them via the Colors sheet first): ${notLogged.map(escapeHtml).join(', ')}</div>` : '';
   if(!built.length){
@@ -1093,7 +1149,11 @@ document.getElementById('liveImportWeightsPreviewBtn').addEventListener('click',
       try{
         await window.storage.set(liveLogKey(b.code), JSON.stringify({
           code: b.code, colorsText: liveColorsArrToText(b.colors),
-          colors: b.colors, weights: b.weights, updatedAt: new Date().toISOString()
+          colors: b.colors, weights: b.weights,
+          garmentType: b.existing ? b.existing.garmentType : undefined,
+          price: b.existing ? b.existing.price : undefined,
+          showWeight: b.existing ? b.existing.showWeight : undefined,
+          updatedAt: new Date().toISOString()
         }));
         okCount++;
       }catch(e){ console.error('Weights import failed for', b.code, e); failCount++; }
@@ -1201,7 +1261,11 @@ function renderMessageImportPreview(blocks){
           const weights = r.hasWeights ? {...(r.existing ? r.existing.weights : {}), ...r.block.weights} : (r.existing ? r.existing.weights : {});
           await window.storage.set(liveLogKey(r.block.code), JSON.stringify({
             code: r.block.code, colorsText: liveColorsArrToText(colors),
-            colors, weights, updatedAt: new Date().toISOString()
+            colors, weights,
+            garmentType: r.existing ? r.existing.garmentType : undefined,
+            price: r.existing ? r.existing.price : undefined,
+            showWeight: r.existing ? r.existing.showWeight : undefined,
+            updatedAt: new Date().toISOString()
           }));
           okCount++;
         }catch(e){ console.error('Message import failed for', r.block.code, e); failCount++; }
