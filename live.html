@@ -179,14 +179,26 @@
   <div id="liveSaveStatus" style="font-size:12.5px;margin-top:8px;font-family:'Space Mono',monospace;"></div>
 
   <div id="obsPanel" style="margin-top:16px;padding:12px 14px;background:var(--card);border:1.5px solid var(--line);border-radius:3px;">
-    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
-      <div style="font-size:12.5px;font-family:'Space Mono',monospace;color:#6b6558;" id="obsStatusText">🎥 OBS text file: not linked</div>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-        <label style="font-size:12px;display:flex;align-items:center;gap:5px;"><input type="checkbox" id="obsAutoWriteCheckbox" checked> auto-update on Copy</label>
-        <button class="btn btn-ghost" id="obsLinkBtn" style="font-size:12px;padding:7px 12px;">🔗 Link a text file</button>
-      </div>
+    <div style="font-family:'Space Mono',monospace;font-size:11px;color:#8a8375;margin-bottom:8px;">🎥 OBS text files</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+      <div style="font-size:12.5px;font-family:'Space Mono',monospace;color:#6b6558;" id="obsStatusText1">[1] not linked</div>
+      <button class="btn btn-ghost" id="obsLinkBtn1" style="font-size:12px;padding:7px 12px;">🔗 Link file [1]</button>
     </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+      <div style="font-size:12.5px;font-family:'Space Mono',monospace;color:#6b6558;" id="obsStatusText2">[2] not linked</div>
+      <button class="btn btn-ghost" id="obsLinkBtn2" style="font-size:12px;padding:7px 12px;">🔗 Link file [2]</button>
+    </div>
+    <div class="field-hint" style="margin-top:8px;">e.g. link [1] for shirts, [2] for pants — pick which one below, then Copy message writes to it too.</div>
     <div class="field-hint" id="obsUnsupportedNote" style="display:none;margin-top:6px;">This needs Chrome or Edge — not supported in this browser.</div>
+  </div>
+
+  <div class="field" style="margin-top:12px;">
+    <label>Send Copy message to</label>
+    <div style="display:flex;gap:16px;font-size:13.5px;">
+      <label style="display:flex;align-items:center;gap:5px;"><input type="radio" name="obsSendTarget" value="1" checked> [1]</label>
+      <label style="display:flex;align-items:center;gap:5px;"><input type="radio" name="obsSendTarget" value="2"> [2]</label>
+      <label style="display:flex;align-items:center;gap:5px;"><input type="radio" name="obsSendTarget" value="none"> Don't send</label>
+    </div>
   </div>
 
   <details class="note" style="margin-top:26px;">
@@ -366,55 +378,67 @@ function copyTextToClipboard(text, btn){
   }
 }
 
-/* ============ OBS text-file link (File System Access API — Chrome/Edge only) ============
+/* ============ OBS text-file links (File System Access API — Chrome/Edge only) ============
    Lets the page write the copy-ready message straight into a file on disk that
    OBS's Text (GDI+) source reads from, so it updates live without any manual
-   copy/paste into a separate editor. Permission is granted once via the
-   native file picker; after that, writes to the same handle don't re-prompt
-   for the rest of this browser session. */
-let obsFileHandle = null;
+   copy/paste into a separate editor. Two independent slots — e.g. [1] for
+   shirts, [2] for pants — each linked once via the native file picker; after
+   that, writes to the same handle don't re-prompt for the rest of this
+   browser session. Which slot (if any) gets written is chosen via the
+   "Send Copy message to" selector near the Copy button. */
+const obsHandles = {1: null, 2: null};
 function obsSupported(){
   return typeof window.showSaveFilePicker === 'function';
 }
-function obsSetStatus(text){
-  document.getElementById('obsStatusText').textContent = text;
+function obsSetStatus(slot, text){
+  document.getElementById(`obsStatusText${slot}`).textContent = text;
 }
-async function obsLinkFile(){
+async function obsLinkFile(slot){
   if(!obsSupported()){
     document.getElementById('obsUnsupportedNote').style.display = '';
     return;
   }
   try{
-    obsFileHandle = await window.showSaveFilePicker({
-      suggestedName: 'vhm_live_message.txt',
+    const handle = await window.showSaveFilePicker({
+      suggestedName: `vhm_live_message_${slot}.txt`,
       types: [{description: 'Text file', accept: {'text/plain': ['.txt']}}]
     });
-    obsSetStatus(`🎥 OBS text file: linked → ${obsFileHandle.name}`);
+    obsHandles[slot] = handle;
+    obsSetStatus(slot, `[${slot}] linked → ${handle.name}`);
   }catch(e){
     // AbortError = user cancelled the picker, not a real failure
     if(e && e.name !== 'AbortError'){
-      console.error('OBS file link failed:', e);
-      obsSetStatus('🎥 OBS text file: link failed — try again');
+      console.error(`OBS file [${slot}] link failed:`, e);
+      obsSetStatus(slot, `[${slot}] link failed — try again`);
     }
   }
 }
 async function obsWriteMessage(text){
-  if(!obsFileHandle || !document.getElementById('obsAutoWriteCheckbox').checked) return;
+  const targetEl = document.querySelector('input[name="obsSendTarget"]:checked');
+  const target = targetEl ? targetEl.value : 'none';
+  if(target === 'none') return;
+  const handle = obsHandles[target];
+  if(!handle){
+    obsSetStatus(target, `[${target}] not linked — click "Link file [${target}]" first`);
+    return;
+  }
   try{
-    const writable = await obsFileHandle.createWritable();
+    const writable = await handle.createWritable();
     await writable.write(text);
     await writable.close();
-    obsSetStatus(`🎥 OBS text file: updated → ${obsFileHandle.name} (${new Date().toLocaleTimeString()})`);
+    obsSetStatus(target, `[${target}] updated → ${handle.name} (${new Date().toLocaleTimeString()})`);
   }catch(e){
-    console.error('OBS file write failed:', e);
-    obsSetStatus('🎥 OBS text file: write failed — click "Link a text file" to relink');
-    obsFileHandle = null;
+    console.error(`OBS file [${target}] write failed:`, e);
+    obsSetStatus(target, `[${target}] write failed — click "Link file [${target}]" to relink`);
+    obsHandles[target] = null;
   }
 }
-document.getElementById('obsLinkBtn').addEventListener('click', obsLinkFile);
+document.getElementById('obsLinkBtn1').addEventListener('click', ()=>obsLinkFile(1));
+document.getElementById('obsLinkBtn2').addEventListener('click', ()=>obsLinkFile(2));
 if(!obsSupported()){
   document.getElementById('obsUnsupportedNote').style.display = '';
-  document.getElementById('obsLinkBtn').disabled = true;
+  document.getElementById('obsLinkBtn1').disabled = true;
+  document.getElementById('obsLinkBtn2').disabled = true;
 }
 
 const SIZE_ORDER = ['XS','S','M','L','XL','2XL','3XL','4XL','5XL'];
@@ -466,7 +490,7 @@ function buildLiveMessage(code, colorsArr, weightsMap, options){
   options = options || {};
   const lines = [];
   if(options.garmentType) lines.push(options.garmentType);
-  if(options.price) lines.push(`តម្លៃ :${options.price}`);
+  if(options.price) lines.push(`តម្លៃ :${options.price.replace(/\$+\s*$/,'').trim()}$`);
   lines.push(`កូដ : ${code}`);
   colorsArr.forEach(c => { lines.push(`${c.color}: ${c.sizes.join(' ')}`); });
   if(options.showWeight !== false){
