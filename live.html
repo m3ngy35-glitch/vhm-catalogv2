@@ -138,13 +138,14 @@
 
   <div class="field">
     <label>Garment type</label>
-    <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13.5px;">
-      <label style="display:flex;align-items:center;gap:5px;"><input type="radio" name="liveGarmentType" value="អាវលើខ្លួន"> អាវលើខ្លួន</label>
-      <label style="display:flex;align-items:center;gap:5px;"><input type="radio" name="liveGarmentType" value="ខោលើខ្លួន"> ខោលើខ្លួន</label>
-      <label style="display:flex;align-items:center;gap:5px;"><input type="radio" name="liveGarmentType" value="អាវលើដៃ"> អាវលើដៃ</label>
-      <label style="display:flex;align-items:center;gap:5px;"><input type="radio" name="liveGarmentType" value="ខោលើដៃ"> ខោលើដៃ</label>
-      <label style="display:flex;align-items:center;gap:5px;color:#8a8375;"><input type="radio" name="liveGarmentType" value="" checked> none</label>
-    </div>
+    <input type="text" id="liveGarmentType" list="liveGarmentTypeList" placeholder="e.g. អាវលើខ្លួន, ឬ type anything for accessories">
+    <datalist id="liveGarmentTypeList">
+      <option value="អាវលើខ្លួន">
+      <option value="ខោលើខ្លួន">
+      <option value="អាវលើដៃ">
+      <option value="ខោលើដៃ">
+    </datalist>
+    <div class="field-hint">Pick a suggestion or type anything — accessories don't have to match the presets.</div>
   </div>
 
   <div class="field">
@@ -175,6 +176,16 @@
     <button class="btn btn-ghost" id="liveCopyBtn">Copy message</button>
     <button class="btn btn-ghost" id="liveClearBtn">Clear form</button>
   </div>
+
+  <div class="field" style="margin-top:12px;">
+    <label>Send Copy message to</label>
+    <div style="display:flex;gap:16px;font-size:13.5px;">
+      <label style="display:flex;align-items:center;gap:5px;"><input type="radio" name="obsSendTarget" value="1" checked> [1]</label>
+      <label style="display:flex;align-items:center;gap:5px;"><input type="radio" name="obsSendTarget" value="2"> [2]</label>
+      <label style="display:flex;align-items:center;gap:5px;"><input type="radio" name="obsSendTarget" value="none"> Don't send</label>
+    </div>
+  </div>
+
   <div class="form-error" id="liveFormError"></div>
   <div id="liveSaveStatus" style="font-size:12.5px;margin-top:8px;font-family:'Space Mono',monospace;"></div>
 
@@ -188,17 +199,8 @@
       <div style="font-size:12.5px;font-family:'Space Mono',monospace;color:#6b6558;" id="obsStatusText2">[2] not linked</div>
       <button class="btn btn-ghost" id="obsLinkBtn2" style="font-size:12px;padding:7px 12px;">🔗 Link file [2]</button>
     </div>
-    <div class="field-hint" style="margin-top:8px;">e.g. link [1] for shirts, [2] for pants — pick which one below, then Copy message writes to it too.</div>
+    <div class="field-hint" style="margin-top:8px;">e.g. link [1] for shirts, [2] for pants — pick which one above, then Copy message writes to it too.</div>
     <div class="field-hint" id="obsUnsupportedNote" style="display:none;margin-top:6px;">This needs Chrome or Edge — not supported in this browser.</div>
-  </div>
-
-  <div class="field" style="margin-top:12px;">
-    <label>Send Copy message to</label>
-    <div style="display:flex;gap:16px;font-size:13.5px;">
-      <label style="display:flex;align-items:center;gap:5px;"><input type="radio" name="obsSendTarget" value="1" checked> [1]</label>
-      <label style="display:flex;align-items:center;gap:5px;"><input type="radio" name="obsSendTarget" value="2"> [2]</label>
-      <label style="display:flex;align-items:center;gap:5px;"><input type="radio" name="obsSendTarget" value="none"> Don't send</label>
-    </div>
   </div>
 
   <details class="note" style="margin-top:26px;">
@@ -472,11 +474,18 @@ function parseLiveColorsText(raw){
     line = line.trim();
     if(!line) return;
     const idx = line.indexOf(':');
-    if(idx === -1) return;
-    const color = line.slice(0, idx).trim();
-    const rawSizes = line.slice(idx+1).trim().split(/\s+/).filter(Boolean).map(s=>s.toUpperCase());
-    const sizes = Array.from(new Set(rawSizes)).sort((a,b)=>sizeSortKey(a)-sizeSortKey(b));
-    if(!color || !sizes.length) return;
+    let color, sizes;
+    if(idx === -1){
+      // No colon at all — accessories often have no size concept, just a
+      // color/name line on its own (e.g. "កន្សែង" for a scarf).
+      color = line;
+      sizes = [];
+    } else {
+      color = line.slice(0, idx).trim();
+      const rawSizes = line.slice(idx+1).trim().split(/\s+/).filter(Boolean).map(s=>s.toUpperCase());
+      sizes = Array.from(new Set(rawSizes)).sort((a,b)=>sizeSortKey(a)-sizeSortKey(b));
+    }
+    if(!color) return;
     out.push({color, sizes});
   });
   return out;
@@ -492,10 +501,11 @@ function buildLiveMessage(code, colorsArr, weightsMap, options){
   if(options.garmentType) lines.push(options.garmentType);
   if(options.price) lines.push(`តម្លៃ :${options.price.replace(/\$+\s*$/,'').trim()}$`);
   lines.push(`កូដ : ${code}`);
-  colorsArr.forEach(c => { lines.push(`${c.color}: ${c.sizes.join(' ')}`); });
-  if(options.showWeight !== false){
+  colorsArr.forEach(c => { lines.push(c.sizes.length ? `${c.color}: ${c.sizes.join(' ')}` : c.color); });
+  const allSizes = liveAllSizes(colorsArr);
+  if(options.showWeight !== false && allSizes.length){
     lines.push('គីឡូ');
-    liveAllSizes(colorsArr).forEach(s => {
+    allSizes.forEach(s => {
       lines.push(`${s}: ${liveWeightRangeDisplay(weightsMap[s])}`);
     });
   }
@@ -547,7 +557,7 @@ function liveColorsArrFromStockEntry(entry){
   return arr;
 }
 function liveColorsArrToText(colorsArr){
-  return colorsArr.map(c => `${c.color}:${c.sizes.join(' ')}`).join('\n');
+  return colorsArr.map(c => c.sizes.length ? `${c.color}:${c.sizes.join(' ')}` : c.color).join('\n');
 }
 
 /* ============ Flexible message-format parser ============
@@ -693,19 +703,16 @@ function liveGetFormState(){
   return {code, colorsArr};
 }
 function liveGetMessageOptions(){
-  const garmentEl = document.querySelector('input[name="liveGarmentType"]:checked');
   const weightEl = document.querySelector('input[name="liveShowWeight"]:checked');
   return {
-    garmentType: garmentEl ? garmentEl.value : '',
+    garmentType: document.getElementById('liveGarmentType').value.trim(),
     price: document.getElementById('livePrice').value.trim(),
     showWeight: weightEl ? weightEl.value !== 'no' : true
   };
 }
 function liveSetMessageOptions(options){
   options = options || {};
-  const garmentEl = document.querySelector(`input[name="liveGarmentType"][value="${(options.garmentType||'').replace(/"/g,'')}"]`)
-    || document.querySelector('input[name="liveGarmentType"][value=""]');
-  if(garmentEl) garmentEl.checked = true;
+  document.getElementById('liveGarmentType').value = options.garmentType || '';
   document.getElementById('livePrice').value = options.price || '';
   const weightEl = document.querySelector(`input[name="liveShowWeight"][value="${options.showWeight === false ? 'no' : 'yes'}"]`);
   if(weightEl) weightEl.checked = true;
@@ -791,6 +798,11 @@ function liveApplyImportedCode(code, codesMap){
   // fresh stock check would silently wipe out weight already saved for it.
   const savedEntry = liveLogEntriesCache.find(en => (en.code||'').toUpperCase() === code.toUpperCase());
   liveRenderWeightInputs(colorsArr, savedEntry ? savedEntry.weights : null);
+  // Price suggestion: pulled straight from the same parsed stock data the
+  // original Copy message/Stock Check function already reads price from
+  // (entry.price) — kept exactly as-is, just also surfaced here. A saved
+  // price for this code (if you've already confirmed one) always wins.
+  document.getElementById('livePrice').value = (savedEntry && savedEntry.price) || entry.price || '';
 }
 document.getElementById('importParseBtn').addEventListener('click', ()=>{
   const raw = document.getElementById('importBox').value;
