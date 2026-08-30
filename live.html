@@ -84,6 +84,42 @@
   select{font-family:'Archivo',sans-serif;font-size:13px;padding:6px 10px;border:1.5px solid var(--line);border-radius:2px;background:var(--card);color:var(--ink);}
 
   .suggest-list button{display:block;width:100%;text-align:left;font-size:12.5px;padding:8px 10px;margin-top:4px;}
+
+  /* Pill-style toggle for radio groups — bigger tap target and clearer at a
+     glance than a native browser radio dot + small text, especially useful
+     when the window is narrow/portrait. */
+  .toggle-group{display:flex;gap:8px;flex-wrap:wrap;}
+  .toggle-option{
+    display:inline-flex;align-items:center;gap:7px;
+    padding:11px 18px;border:1.5px solid var(--line);border-radius:22px;
+    font-size:14.5px;font-weight:600;cursor:pointer;background:var(--card);color:var(--ink);
+    transition:background .15s,border-color .15s,color .15s;
+    min-height:44px;
+  }
+  .toggle-option input[type=radio]{width:17px;height:17px;accent-color:var(--olive);cursor:pointer;flex-shrink:0;}
+  .toggle-option:has(input:checked){background:var(--olive);border-color:var(--olive);color:var(--paper);}
+
+  /* Narrow / portrait windows (phones, or a browser tab resized tall and
+     thin next to OBS) — everything gets noticeably bigger and easier to
+     tap/read rather than just reflowing at the same tiny sizes. */
+  @media (max-width: 640px){
+    body{font-size:15.5px;}
+    main{padding:18px 14px 100px;}
+    h1.section-title{font-size:30px;}
+    h2.section-title{font-size:20px;}
+    .section-sub{font-size:13.5px;}
+    .field label{font-size:13px;}
+    .field-hint{font-size:12.5px;}
+    .field input[type=text]{font-size:16px;padding:12px 13px;}
+    .stock-paste{font-size:14px;padding:14px 42px 14px 14px;}
+    .btn{font-size:14.5px;padding:13px 18px;min-height:46px;}
+    .toggle-option{font-size:15.5px;padding:13px 20px;min-height:48px;}
+    .fcard input{font-size:14.5px;padding:11px 12px;}
+    .fcard b{font-size:16.5px;}
+    .stock-code{font-size:27px;}
+    .conn-banner{font-size:13.5px;padding:12px 15px;}
+    .suggest-list button{font-size:14px;padding:11px 13px;}
+  }
 </style>
 </head>
 <body>
@@ -155,9 +191,9 @@
 
   <div class="field">
     <label>Show weight recommendation in message?</label>
-    <div style="display:flex;gap:16px;font-size:13.5px;">
-      <label style="display:flex;align-items:center;gap:5px;"><input type="radio" name="liveShowWeight" value="yes" checked> Yes</label>
-      <label style="display:flex;align-items:center;gap:5px;"><input type="radio" name="liveShowWeight" value="no"> No</label>
+    <div class="toggle-group">
+      <label class="toggle-option"><input type="radio" name="liveShowWeight" value="yes" checked> Yes</label>
+      <label class="toggle-option"><input type="radio" name="liveShowWeight" value="no"> No</label>
     </div>
   </div>
 
@@ -179,10 +215,10 @@
 
   <div class="field" style="margin-top:12px;">
     <label>Send Copy message to</label>
-    <div style="display:flex;gap:16px;font-size:13.5px;">
-      <label style="display:flex;align-items:center;gap:5px;"><input type="radio" name="obsSendTarget" value="1" checked> [1]</label>
-      <label style="display:flex;align-items:center;gap:5px;"><input type="radio" name="obsSendTarget" value="2"> [2]</label>
-      <label style="display:flex;align-items:center;gap:5px;"><input type="radio" name="obsSendTarget" value="none"> Don't send</label>
+    <div class="toggle-group">
+      <label class="toggle-option"><input type="radio" name="obsSendTarget" value="1" checked> [1]</label>
+      <label class="toggle-option"><input type="radio" name="obsSendTarget" value="2"> [2]</label>
+      <label class="toggle-option"><input type="radio" name="obsSendTarget" value="none"> Don't send</label>
     </div>
   </div>
 
