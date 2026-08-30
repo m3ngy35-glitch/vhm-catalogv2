@@ -221,7 +221,15 @@
   </div>
 
   <div class="field">
-    <textarea class="stock-paste" id="liveColorsBox" style="min-height:110px;" placeholder="ខ្មៅ:M L XL 2XL 3XL 4XL&#10;ស្លែ:M L XL 2XL 3XL 4XL&#10;ប៊ិច:M L XL 2XL 3XL 4XL"></textarea>
+    <label>Final message (auto-updates — edit freely, your edits are what gets copied/sent)</label>
+    <textarea class="stock-paste" id="liveFinalMessageBox" style="min-height:160px;"></textarea>
+  </div>
+
+  <div class="field">
+    <button type="button" class="btn btn-ghost" id="liveToggleColorsBtn" style="font-size:12.5px;padding:7px 12px;">✏️ Edit colors &amp; sizes manually</button>
+    <div id="liveColorsWrap" style="display:none;margin-top:10px;">
+      <textarea class="stock-paste" id="liveColorsBox" style="min-height:110px;" placeholder="ខ្មៅ:M L XL 2XL 3XL 4XL&#10;ស្លែ:M L XL 2XL 3XL 4XL&#10;ប៊ិច:M L XL 2XL 3XL 4XL"></textarea>
+    </div>
   </div>
 
   <div id="liveWeightInputs" class="fabric-grid" style="margin-bottom:14px;"></div>
@@ -761,9 +769,37 @@ function liveRefreshWeightInputs(){
   const {colorsArr} = liveGetFormState();
   const existing = liveCollectWeights();
   liveRenderWeightInputs(colorsArr, existing);
+  liveRegenerateFinalMessage();
 }
 document.getElementById('liveCode').addEventListener('blur', liveRefreshWeightInputs);
 document.getElementById('liveColorsBox').addEventListener('blur', liveRefreshWeightInputs);
+
+// Rebuilds the "Final message" preview from the current form state. Called
+// whenever a source field changes — code, colors/sizes, weights, garment
+// type, price, or the weight-display toggle. Hand edits made directly in
+// the final-message box are what actually get copied/sent; they only get
+// overwritten by this regeneration if the person touches one of the source
+// fields again afterward (that's the tradeoff of "live preview").
+function liveRegenerateFinalMessage(){
+  const {code, colorsArr} = liveGetFormState();
+  if(!code && !colorsArr.length) return;
+  const weights = liveCollectWeights();
+  const msg = buildLiveMessage(code, colorsArr, weights, liveGetMessageOptions());
+  document.getElementById('liveFinalMessageBox').value = msg;
+}
+document.getElementById('livePrice').addEventListener('input', liveRegenerateFinalMessage);
+document.getElementById('liveGarmentType').addEventListener('input', liveRegenerateFinalMessage);
+document.querySelectorAll('input[name="liveShowWeight"]').forEach(el=>{
+  el.addEventListener('change', liveRegenerateFinalMessage);
+});
+document.getElementById('liveToggleColorsBtn').addEventListener('click', ()=>{
+  const wrap = document.getElementById('liveColorsWrap');
+  wrap.style.display = wrap.style.display === 'none' ? '' : 'none';
+});
+document.getElementById('liveWeightInputs').addEventListener('focusout', (e)=>{
+  if(e.target.classList.contains('live-weight-input')) liveRegenerateFinalMessage();
+});
+
 
 /* ---- Product code search: catalog (read-only) + saved live logs ---- */
 function liveSearchCodes(query){
@@ -843,6 +879,7 @@ function liveApplyImportedCode(code, codesMap){
   // (entry.price) — kept exactly as-is, just also surfaced here. A saved
   // price for this code (if you've already confirmed one) always wins.
   document.getElementById('livePrice').value = (savedEntry && savedEntry.price) || entry.price || '';
+  liveRegenerateFinalMessage();
 }
 document.getElementById('importParseBtn').addEventListener('click', ()=>{
   const raw = document.getElementById('importBox').value;
@@ -905,15 +942,15 @@ document.getElementById('importClearX').addEventListener('click', ()=>{
 document.getElementById('liveCopyBtn').addEventListener('click', ()=>{
   const {code, colorsArr} = liveGetFormState();
   const errBox = document.getElementById('liveFormError');
-  if(!code || !colorsArr.length){
+  const finalBox = document.getElementById('liveFinalMessageBox');
+  if(!code && !colorsArr.length && !finalBox.value.trim()){
     errBox.textContent = 'Enter a code and at least one color:sizes line first.';
     errBox.classList.add('show');
     return;
   }
   errBox.classList.remove('show');
-  liveRefreshWeightInputs();
-  const weights = liveCollectWeights();
-  const msg = buildLiveMessage(code, colorsArr, weights, liveGetMessageOptions());
+  if(!finalBox.value.trim()) liveRegenerateFinalMessage();
+  const msg = finalBox.value;
   copyTextToClipboard(msg, document.getElementById('liveCopyBtn'));
   obsWriteMessage(msg);
 });
@@ -921,6 +958,7 @@ document.getElementById('liveClearBtn').addEventListener('click', ()=>{
   document.getElementById('liveCode').value = '';
   document.getElementById('liveColorsBox').value = '';
   document.getElementById('liveWeightInputs').innerHTML = '';
+  document.getElementById('liveFinalMessageBox').value = '';
   document.getElementById('liveFormError').classList.remove('show');
   document.getElementById('liveSaveStatus').textContent = '';
   liveSetMessageOptions({});
@@ -978,6 +1016,7 @@ function liveLoadIntoForm(entry){
   document.getElementById('liveColorsBox').value = entry.colorsText || entry.colors.map(c=>`${c.color}:${c.sizes.join(' ')}`).join('\n');
   liveRenderWeightInputs(entry.colors, entry.weights);
   liveSetMessageOptions({garmentType: entry.garmentType, price: entry.price, showWeight: entry.showWeight});
+  liveRegenerateFinalMessage();
   window.scrollTo({top:0, behavior:'smooth'});
 }
 let liveLogSearchTerm = '';
