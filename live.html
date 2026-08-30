@@ -140,7 +140,6 @@
 
 <main>
   <h1 class="section-title">Live</h1>
-  <div class="section-sub">// log a code's colors, sizes &amp; weight guide for live-selling — get a ready-to-send message</div>
 
   <div id="connBanner" class="conn-banner checking">
     <span id="connBannerText">Checking connection…</span>
@@ -164,7 +163,7 @@
           <option value="David">David</option>
         </select>
       </div>
-      <div class="stock-paste-wrap">
+      <div class="stock-paste-wrap" style="display:none;">
         <textarea class="stock-paste" id="importBox" placeholder="Tap 'Load from laptop', or paste rows manually — e.g. E202 អាវ សរ L 6.20 1 0 / 1"></textarea>
         <button type="button" class="stock-paste-clear" id="importClearX" title="Clear">×</button>
       </div>
@@ -177,9 +176,24 @@
   </details>
 
   <div class="field">
-    <label>Product code</label>
-    <input type="text" id="liveCode" placeholder="e.g. E90" autocomplete="off">
-    <div id="liveCodeSuggestions" class="suggest-list"></div>
+    <label>Send Copy message to</label>
+    <div class="toggle-group">
+      <label class="toggle-option"><input type="radio" name="obsSendTarget" value="1" checked> [1]</label>
+      <label class="toggle-option"><input type="radio" name="obsSendTarget" value="2"> [2]</label>
+      <label class="toggle-option"><input type="radio" name="obsSendTarget" value="none"> Don't send</label>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:12px;flex-wrap:wrap;">
+    <div class="field" style="flex:1;min-width:140px;">
+      <label>Product code</label>
+      <input type="text" id="liveCode" placeholder="e.g. E90" autocomplete="off">
+      <div id="liveCodeSuggestions" class="suggest-list"></div>
+    </div>
+    <div class="field" style="flex:1;min-width:120px;">
+      <label>Price (តម្លៃ)</label>
+      <input type="text" id="livePrice" placeholder="e.g. 7.20">
+    </div>
   </div>
 
   <div class="field">
@@ -195,11 +209,6 @@
   </div>
 
   <div class="field">
-    <label>Price (តម្លៃ)</label>
-    <input type="text" id="livePrice" placeholder="e.g. 7.20">
-  </div>
-
-  <div class="field">
     <label>Show weight recommendation in message?</label>
     <div class="toggle-group">
       <label class="toggle-option"><input type="radio" name="liveShowWeight" value="yes" checked> Yes</label>
@@ -208,28 +217,15 @@
   </div>
 
   <div class="field">
-    <label>Colors + sizes (one color per line)</label>
     <textarea class="stock-paste" id="liveColorsBox" style="min-height:110px;" placeholder="ខ្មៅ:M L XL 2XL 3XL 4XL&#10;ស្លែ:M L XL 2XL 3XL 4XL&#10;ប៊ិច:M L XL 2XL 3XL 4XL"></textarea>
-    <div class="field-hint">Format: color: sizes separated by spaces — one color per line.</div>
   </div>
 
-  <h2 class="section-title" style="font-size:18px;margin-top:16px;">Weight recommendation (kg)</h2>
-  <div class="field-hint" style="margin-bottom:8px;">Write what your team recommends per size. Saved once, reused automatically for this code from then on.</div>
-  <div id="liveWeightInputs" class="fabric-grid" style="margin-bottom:14px;"><div class="stock-empty">Type a code and at least one color:sizes line above — weight fields appear here.</div></div>
+  <div id="liveWeightInputs" class="fabric-grid" style="margin-bottom:14px;"></div>
 
   <div class="stock-actions">
     <button class="btn btn-primary" id="liveSaveBtn">💾 Save log</button>
     <button class="btn btn-ghost" id="liveCopyBtn">Copy message</button>
     <button class="btn btn-ghost" id="liveClearBtn">Clear form</button>
-  </div>
-
-  <div class="field" style="margin-top:12px;">
-    <label>Send Copy message to</label>
-    <div class="toggle-group">
-      <label class="toggle-option"><input type="radio" name="obsSendTarget" value="1" checked> [1]</label>
-      <label class="toggle-option"><input type="radio" name="obsSendTarget" value="2"> [2]</label>
-      <label class="toggle-option"><input type="radio" name="obsSendTarget" value="none"> Don't send</label>
-    </div>
   </div>
 
   <div class="form-error" id="liveFormError"></div>
@@ -725,7 +721,7 @@ function liveRenderWeightInputs(colorsArr, prefillWeights){
   const wrap = document.getElementById('liveWeightInputs');
   const sizes = liveAllSizes(colorsArr);
   if(!sizes.length){
-    wrap.innerHTML = '<div class="stock-empty">Type a code and at least one color:sizes line above — weight fields appear here.</div>';
+    wrap.innerHTML = '';
     return;
   }
   wrap.innerHTML = sizes.map(s=>{
@@ -926,7 +922,7 @@ document.getElementById('liveCopyBtn').addEventListener('click', ()=>{
 document.getElementById('liveClearBtn').addEventListener('click', ()=>{
   document.getElementById('liveCode').value = '';
   document.getElementById('liveColorsBox').value = '';
-  document.getElementById('liveWeightInputs').innerHTML = '<div class="stock-empty">Type a code and at least one color:sizes line above — weight fields appear here.</div>';
+  document.getElementById('liveWeightInputs').innerHTML = '';
   document.getElementById('liveFormError').classList.remove('show');
   document.getElementById('liveSaveStatus').textContent = '';
   liveSetMessageOptions({});
