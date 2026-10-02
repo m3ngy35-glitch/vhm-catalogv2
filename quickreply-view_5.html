@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>VHM Quick Reply — Phone</title>
+<style>
+  :root{
+    --accent:#2f6fed;
+    --accent-bg:#eef4ff;
+    --ok:#1a7f37;
+    --border:#e2e6ee;
+  }
+  *{box-sizing:border-box;}
+  html, body{height:100%;}
+  body{
+    margin:0;background:#f4f5f7;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#222;
+  }
+  .wrap{max-width:430px;margin:0 auto;min-height:100vh;background:#fff;display:flex;flex-direction:column;}
+  header{padding:12px 16px 8px;border-bottom:1px solid var(--border);}
+  header h1{margin:0;font-size:16px;}
+  header p{margin:2px 0 0;font-size:11px;color:#888;}
+
+  main{flex:1;padding:14px 16px 24px;}
+
+  .name-row{display:flex;align-items:center;gap:8px;margin-bottom:14px;}
+  .name-row label{font-size:12px;color:#777;white-space:nowrap;}
+  .name-row select{flex:1;font-size:15px;padding:9px 10px;border:1px solid #cfd8e8;border-radius:8px;background:#fff;color:#222;}
+
+  .status-line{font-size:12px;color:#888;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;}
+  .status-line .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#ccc;margin-right:5px;}
+  .status-line .dot.live{background:var(--ok);}
+
+  .empty-state{text-align:center;color:#999;font-size:13.5px;margin-top:60px;line-height:1.7;}
+
+  .msg-box{
+    background:var(--accent-bg);border:1px solid #cfe0ff;border-radius:12px;padding:16px 16px;
+    font-size:18px;line-height:1.55;white-space:pre-wrap;letter-spacing:.1px;color:#1a2235;
+    display:none;
+  }
+  .msg-box.show{display:block;}
+  .msg-box.flash{animation:flashBg 1s ease;}
+  @keyframes flashBg{
+    0%{background:#ffe9a8;}
+    100%{background:var(--accent-bg);}
+  }
+
+  .copy-btn{
+    width:100%;margin-top:14px;background:var(--accent);color:#fff;border:none;border-radius:10px;
+    padding:16px 10px;font-size:16px;font-weight:700;
+  }
+  .copy-btn.copied{background:var(--ok);}
+  .copy-btn.pulse{animation:pulseBtn 1s ease infinite;}
+  @keyframes pulseBtn{
+    0%{box-shadow:0 0 0 0 rgba(47,111,237,.5);}
+    70%{box-shadow:0 0 0 14px rgba(47,111,237,0);}
+    100%{box-shadow:0 0 0 0 rgba(47,111,237,0);}
+  }
+
+  .messenger-btn{
+    width:100%;margin-top:8px;background:#fff;color:var(--accent);border:1.5px solid var(--accent);border-radius:10px;
+    padding:13px 10px;font-size:14.5px;font-weight:700;text-decoration:none;display:none;text-align:center;
+  }
+
+  .note{font-size:11px;color:#999;margin-top:12px;line-height:1.5;text-align:center;}
+
+  footer{padding:8px 16px;font-size:10.5px;color:#bbb;text-align:center;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>VHM Quick Reply — Phone</h1>
+    <p>Pick your name — new messages from the laptop show up here automatically.</p>
+  </header>
+
+  <main>
+    <div class="name-row">
+      <label for="nameSelect">Name:</label>
+      <select id="nameSelect">
+        <option value="">-- select --</option>
+        <option value="KIN">KIN</option>
+        <option value="JINH">JINH</option>
+        <option value="Yaa">Yaa</option>
+        <option value="Ry">Ry</option>
+        <option value="NITH">NITH</option>
+        <option value="VID">VID</option>
+        <option value="LY">LY</option>
+        <option value="David">David</option>
+      </select>
+    </div>
+
+    <div class="status-line" id="statusLine" style="display:none;">
+      <span><span class="dot" id="statusDot"></span><span id="statusText">Waiting for a message…</span></span>
+      <span id="statusTime"></span>
+    </div>
+
+    <div id="emptyState" class="empty-state">
+      Pick your name above to start watching for messages.
+    </div>
+
+    <div id="msgBox" class="msg-box"></div>
+
+    <button type="button" id="copyBtn" class="copy-btn" style="display:none;">📋 Copy to clipboard</button>
+    <a href="https://www.messenger.com/" target="_blank" rel="noopener" id="messengerBtn" class="messenger-btn">↩️ Open Messenger</a>
+
+    <div class="note">
+      Clipboard updates automatically when possible — on most phones you still need to tap once.
+      This never sends anything into Vrich by itself; always paste it yourself.
+    </div>
+  </main>
+
+  <footer>VHM Club internal tool — reads the real vhm-catalog Firebase project</footer>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDDQp5_gvuRdX0flKQ3gm3zXJM_SXWUJSE",
+  authDomain: "vhm-catalog.firebaseapp.com",
+  projectId: "vhm-catalog",
+  storageBucket: "vhm-catalog.firebasestorage.app",
+  messagingSenderId: "892196724857",
+  appId: "1:892196724857:web:8ed3f5f056284b63aa34a8"
+};
+let __db = null;
+function firestore_(){
+  if (!__db){ firebase.initializeApp(firebaseConfig); __db = firebase.firestore(); }
+  return __db;
+}
+// Same key scheme as quickreply.html's broadcastToPhone() — picking the
+// same name on both pages connects them.
+function quickReplyLiveKey(name){ return 'quickreply_live_' + name.trim().toUpperCase().replace(/[^A-Z0-9]/g,''); }
+
+function getSavedName(){ return (localStorage.getItem('vhm_stock_name') || '').trim(); }
+function setSavedName(v){ localStorage.setItem('vhm_stock_name', v); }
+
+let unsubscribe = null;
+let lastUpdatedAt = null;
+let currentText = '';
+
+function stopWatching(){
+  if(unsubscribe){ unsubscribe(); unsubscribe = null; }
+  document.getElementById('statusLine').style.display = 'none';
+  document.getElementById('msgBox').classList.remove('show');
+  document.getElementById('copyBtn').style.display = 'none';
+  document.getElementById('emptyState').style.display = 'block';
+  document.getElementById('emptyState').textContent = 'Pick your name above to start watching for messages.';
+}
+
+function watchName(name){
+  if(unsubscribe){ unsubscribe(); unsubscribe = null; }
+  lastUpdatedAt = null;
+  currentText = '';
+  const db = firestore_();
+  const statusLine = document.getElementById('statusLine');
+  const statusDot = document.getElementById('statusDot');
+  const statusText = document.getElementById('statusText');
+  const statusTime = document.getElementById('statusTime');
+  const emptyState = document.getElementById('emptyState');
+  const msgBox = document.getElementById('msgBox');
+  const copyBtn = document.getElementById('copyBtn');
+  const messengerBtn = document.getElementById('messengerBtn');
+
+  statusLine.style.display = 'flex';
+  statusDot.className = 'dot';
+  statusText.textContent = 'Waiting for a message…';
+  statusTime.textContent = '';
+  emptyState.style.display = 'block';
+  emptyState.textContent = 'No message yet — once the laptop copies something for ' + name + ', it shows up here.';
+  msgBox.classList.remove('show');
+  copyBtn.style.display = 'none';
+  messengerBtn.style.display = 'none';
+
+  unsubscribe = db.collection('kv').doc(quickReplyLiveKey(name)).onSnapshot((doc)=>{
+    if(!doc.exists) return;
+    const data = doc.data();
+    if(data.data === undefined || data.data === null) return;
+    const updatedAtMs = data.updatedAt && data.updatedAt.toMillis ? data.updatedAt.toMillis() : Date.now();
+    if(lastUpdatedAt !== null && updatedAtMs === lastUpdatedAt) return; // no real change
+    const isFirstLoad = (lastUpdatedAt === null);
+    lastUpdatedAt = updatedAtMs;
+    currentText = String(data.data);
+
+    statusDot.classList.add('live');
+    statusText.textContent = 'Live — connected';
+    statusTime.textContent = new Date(updatedAtMs).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    emptyState.style.display = 'none';
+    msgBox.textContent = currentText;
+    msgBox.classList.add('show');
+    copyBtn.style.display = 'block';
+    messengerBtn.style.display = 'block';
+
+    if(!isFirstLoad){
+      // New message while already watching — flash it so it's obvious,
+      // and vibrate if the phone supports it (most Android Chrome does).
+      msgBox.classList.remove('flash'); void msgBox.offsetWidth; msgBox.classList.add('flash');
+      if(navigator.vibrate) try{ navigator.vibrate(120); }catch(e){}
+    }
+
+    // Best-effort silent copy — phones usually require a tap for clipboard
+    // writes (no user gesture here), so this often silently fails. When it
+    // does, the pulsing Copy button below is the fallback.
+    let copiedSilently = false;
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(currentText).then(()=>{ copiedSilently = true; }).catch(()=>{});
+    }
+    copyBtn.classList.add('pulse');
+  }, (err)=>{
+    statusText.textContent = 'Connection error — retrying…';
+    console.error('quickreply-view watch error', err);
+  });
+}
+
+document.getElementById('copyBtn').addEventListener('click', (e)=>{
+  const btn = e.currentTarget;
+  if(!currentText) return;
+  const done = ()=>{
+    btn.classList.remove('pulse');
+    const old = btn.textContent;
+    btn.textContent = '✓ Copied';
+    btn.classList.add('copied');
+    setTimeout(()=>{ btn.textContent = old; btn.classList.remove('copied'); }, 1800);
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(currentText).then(done).catch(()=>{ fallbackCopy(currentText); done(); });
+  }else{
+    fallbackCopy(currentText);
+    done();
+  }
+});
+function fallbackCopy(text){
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  try{ document.execCommand('copy'); }catch(e){}
+  document.body.removeChild(ta);
+}
+
+// Jumps straight to the Messenger app after copying, instead of hunting for
+// it among open apps/tabs. fb-messenger:// opens the native app on iOS and
+// Android; if nothing opens it (app not installed, or on desktop), falls
+// back to the web version after a short delay.
+// "Open Messenger" is now a plain link (href + target="_blank" in the HTML
+// above) instead of JS-triggered window.open() — mobile browsers only
+// honor the app-vs-tab decision (and reliably avoid blocking it) on a
+// genuine tap on a real link, not a scripted call. No JS needed here.
+
+const sel = document.getElementById('nameSelect');
+const saved = getSavedName();
+if(saved) sel.value = saved;
+if(sel.value) watchName(sel.value); else stopWatching();
+sel.addEventListener('change', ()=>{
+  setSavedName(sel.value);
+  if(sel.value) watchName(sel.value); else stopWatching();
+});
+</script>
+</body>
+</html>
