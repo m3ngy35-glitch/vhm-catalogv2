@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>VHM Quick Reply</title>
+<style>
+  :root{
+    --accent:#2f6fed;
+    --accent-bg:#eef4ff;
+    --ok:#1a7f37;
+    --warn-bg:#fff2cc;
+    --warn-text:#5d4037;
+    --border:#e2e6ee;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;background:#f4f5f7;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#222;
+  }
+  .wrap{max-width:430px;margin:0 auto;min-height:100vh;background:#fff;display:flex;flex-direction:column;}
+  .note{
+    font-size:12px;color:#5d4037;background:#fff8e6;border-bottom:1px solid #ffe8b3;padding:8px 14px;line-height:1.5;
+  }
+  header{padding:14px 16px 10px;border-bottom:1px solid var(--border);}
+  header h1{margin:0;font-size:17px;}
+  header p{margin:4px 0 0;font-size:12px;color:#888;}
+
+  main{flex:1;padding:14px 16px 24px;}
+
+  .name-row{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;}
+  .name-row label{font-size:11.5px;color:#777;}
+  .name-row select{font-size:13px;padding:7px 10px;border:1px solid #cfd8e8;border-radius:7px;background:#fff;color:#222;}
+  .load-row{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;}
+  .load-status{font-size:11.5px;color:#888;}
+
+  .code-picker{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;}
+  .code-picker button{background:#fff;border:1.5px solid var(--accent);color:var(--accent);border-radius:16px;padding:5px 12px;font-size:12.5px;font-weight:600;}
+  .code-picker button.active{background:var(--accent);color:#fff;}
+
+  .search-row{display:flex;gap:8px;margin-bottom:4px;}
+  .search-row input{flex:1;padding:11px 12px;font-size:15px;border:1px solid #cfd8e8;border-radius:8px;}
+  .search-row button{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:0 16px;font-size:14px;font-weight:600;}
+
+  .empty-state{text-align:center;color:#999;font-size:13px;margin-top:40px;line-height:1.6;}
+
+  .avail-card{display:none;margin-top:12px;}
+  .avail-card.show{display:block;}
+  .avail-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;}
+  .avail-head .pname{font-weight:700;font-size:15px;color:#1d4ed8;}
+  .avail-head .pprice{font-size:13px;color:#555;}
+  .hint{font-size:12px;color:#888;margin-bottom:10px;}
+
+  .stale-warn{
+    background:#fde8e8;border:1px solid #f5b5b5;color:#8a2a2a;border-radius:8px;
+    padding:8px 10px;font-size:12px;margin-bottom:10px;line-height:1.5;
+  }
+
+  .color-block{border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:10px;transition:border-color .15s,background .15s;}
+  .color-block.selected{border-color:var(--accent);background:var(--accent-bg);}
+  .color-block-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+  .color-block-head .color-select{width:17px;height:17px;accent-color:var(--accent);cursor:pointer;flex-shrink:0;}
+  .color-block-head .cname{font-weight:600;font-size:14px;}
+
+  .size-row{display:flex;gap:6px;flex-wrap:wrap;}
+  .size-chip{border:1px solid #cfd8e8;border-radius:14px;padding:5px 11px;font-size:12.5px;color:#444;background:#fff;}
+  .size-chip.on{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .size-chip.off{opacity:.45;text-decoration:line-through;}
+
+  .upsell-field{margin-top:14px;}
+  .upsell-field label{font-size:11.5px;color:#777;}
+  .upsell-field input{width:100%;padding:9px 10px;border:1px solid #cfd8e8;border-radius:7px;font-size:13.5px;margin-top:3px;}
+
+  .action-row{display:flex;gap:8px;margin-top:12px;}
+  .action-row button{
+    flex:1;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:12px 6px;font-size:13px;font-weight:600;
+  }
+  .action-row button.copied{background:var(--ok);}
+
+  .reply-box{
+    margin-top:14px;background:var(--accent-bg);border:1px solid #cfe0ff;border-radius:10px;padding:12px 14px;
+    font-size:14px;line-height:1.5;display:none;white-space:pre-wrap;
+  }
+  .reply-box.show{display:block;}
+  .reply-box .upsell{
+    display:inline-block;margin-top:6px;background:var(--warn-bg);color:var(--warn-text);border-radius:5px;padding:3px 8px;font-size:12px;
+  }
+
+  .quick-replies{margin-top:20px;border-top:1px solid var(--border);padding-top:14px;}
+  .qr-title{font-size:12.5px;font-weight:700;color:#555;margin-bottom:10px;}
+  .qr-item{margin-bottom:12px;}
+  .qr-label{font-size:11.5px;color:#777;margin-bottom:6px;}
+  .qr-btn{width:100%;text-align:left;background:#fff;border:1px solid #cfd8e8;border-radius:8px;padding:9px 11px;font-size:13px;color:#222;}
+  .qr-chip-row{display:flex;gap:6px;flex-wrap:wrap;}
+  .qr-size-chip{cursor:pointer;background:#fff;}
+  .qr-inline-row{display:flex;gap:6px;}
+  .qr-inline-row input{flex:1;padding:8px 9px;border:1px solid #cfd8e8;border-radius:7px;font-size:13px;min-width:0;}
+  .qr-inline-row button{background:var(--accent);color:#fff;border:none;border-radius:7px;padding:0 12px;font-size:12.5px;font-weight:600;white-space:nowrap;}
+  .qr-note{font-size:11px;color:#999;margin-top:10px;line-height:1.5;}
+
+  footer{padding:10px 16px 16px;font-size:11px;color:#bbb;text-align:center;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="note">
+    Same catalog and same stock relay as Stock Check in index.html — upload this next to index.html and
+    live.html (same repo/folder) so it shares the live Firebase data. New here: an upsell line you can add
+    before copying.
+  </div>
+
+  <header>
+    <h1>VHM Quick Reply</h1>
+    <p>Load your stock paste → add upsell or pick a quick reply → copy.</p>
+  </header>
+
+  <main>
+    <div class="name-row">
+      <label for="nameSelect">Your name:</label>
+      <select id="nameSelect">
+        <option value="">-- select --</option>
+        <option value="KIN">KIN</option>
+        <option value="JINH">JINH</option>
+        <option value="Yaa">Yaa</option>
+        <option value="Ry">Ry</option>
+        <option value="NITH">NITH</option>
+        <option value="VID">VID</option>
+        <option value="LY">LY</option>
+        <option value="David">David</option>
+      </select>
+    </div>
+    <div class="load-row">
+      <button class="search-row button" id="loadBtn" style="background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 14px;font-size:13px;font-weight:600;">⬇ Load from laptop</button>
+      <span class="load-status" id="loadStatus">No stock loaded yet this session.</span>
+    </div>
+
+    <div id="codePicker" class="code-picker"></div>
+
+    <div id="emptyState" class="empty-state">
+      Load your stock paste above to see<br>what's actually available right now.
+    </div>
+
+    <div id="availCard" class="avail-card">
+      <div class="avail-head">
+        <div id="pName" class="pname"></div>
+        <div id="pPrice" class="pprice"></div>
+      </div>
+
+      <div id="staleWarn" class="stale-warn" style="display:none;">
+        No stock paste loaded for this code — showing catalog info only. Load from laptop (or paste stock
+        text) first to see real current availability.
+      </div>
+
+      <div id="colorBlocks"></div>
+
+      <div class="upsell-field">
+        <label>Upsell line (optional — typed fresh each time, not saved)</label>
+        <input id="upsellInput" type="text" placeholder="e.g. matching khaki pants, code C07, also in stock">
+      </div>
+
+      <div class="action-row">
+        <button id="copyBtn">📋 Copy message</button>
+        <button id="liveCopyBtn">📋 Copy w/ weight guide</button>
+      </div>
+
+      <div id="replyBox" class="reply-box">
+        <div id="pReply"></div>
+      </div>
+
+      <div class="quick-replies">
+        <div class="qr-title">Quick replies — common questions</div>
+
+        <div class="qr-item">
+          <button type="button" class="qr-btn" id="qrHello">👋 Hello? (greeting)</button>
+        </div>
+
+        <div class="qr-item">
+          <button type="button" class="qr-btn" id="qrHowMany">🔢 How many sizes do you have?</button>
+        </div>
+
+        <div class="qr-item">
+          <div class="qr-label">Do you have my size? / Which color has size…?</div>
+          <div class="qr-chip-row" id="qrSizeChips"></div>
+        </div>
+
+        <div class="qr-item">
+          <div class="qr-label">Do you have color… (khaki, navy, etc)?</div>
+          <div class="qr-inline-row">
+            <input id="qrColorInput" type="text" placeholder="type the color">
+            <button type="button" id="qrColorBtn">Check</button>
+          </div>
+        </div>
+
+        <div class="qr-item">
+          <div class="qr-label">If I'm …kg and …cm, which size fits me?</div>
+          <div class="qr-inline-row">
+            <input id="qrKgInput" type="number" placeholder="kg" style="max-width:68px;flex:none;">
+            <input id="qrCmInput" type="number" placeholder="cm (optional)" style="max-width:100px;flex:none;">
+            <button type="button" id="qrFitBtn">Suggest</button>
+          </div>
+        </div>
+
+        <div class="qr-note">Tap any quick reply to copy it — edit the copied text before sending if needed.</div>
+      </div>
+    </div>
+  </main>
+
+  <footer>VHM Club internal tool — reads the real vhm-catalog Firebase project</footer>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script>
+/* ===== Same Firebase project + kv storage pattern as index.html / live.html ===== */
+const firebaseConfig = {
+  apiKey: "AIzaSyDDQp5_gvuRdX0flKQ3gm3zXJM_SXWUJSE",
+  authDomain: "vhm-catalog.firebaseapp.com",
+  projectId: "vhm-catalog",
+  storageBucket: "vhm-catalog.firebasestorage.app",
+  messagingSenderId: "892196724857",
+  appId: "1:892196724857:web:8ed3f5f056284b63aa34a8"
+};
+let __db = null;
+function firestore_(){
+  if (!__db){ firebase.initializeApp(firebaseConfig); __db = firebase.firestore(); }
+  return __db;
+}
+const storage = {
+  async get(key){
+    const db = firestore_();
+    const doc = await db.collection('kv').doc(key).get({source:'server'});
+    if (!doc.exists) return null;
+    const data = doc.data();
+    if (data.data === undefined || data.data === null) return null;
+    return { key, value: JSON.stringify(data.data) };
+  }
+};
+
+/* ===== Same stock-paste parser as index.html's Stock Check ===== */
+const SIZE_ORDER = ['XS','S','M','L','XL','2XL','3XL','4XL','5XL'];
+function sizeSortKey(s){
+  const i = SIZE_ORDER.indexOf(s);
+  if(i !== -1) return i;
+  const n = parseFloat(s);
+  return isNaN(n) ? 999 : 100 + n;
+}
+function parseStockPaste(raw){
+  const recordRe = /([\s\S]+?)\s*(\d+(?:\.\d+)?)\s+(\d+)\s+(\d+)\s*\/\s*(\d+)/g;
+  const codes = new Map();
+  let m;
+  while((m = recordRe.exec(raw)) !== null){
+    let nameBlock = m[1];
+    const lines = nameBlock.split('\n').map(l=>l.trim()).filter(Boolean);
+    let line = lines.length ? lines[lines.length-1] : '';
+    line = line.replace(/^\*+\s*/,'').replace(/!/g,'').trim();
+    if(!line) continue;
+    const parts = line.split(/\s+/);
+    const code = parts.shift();
+    if(!code) continue;
+    const tokens = parts.slice();
+    const size = tokens.length ? tokens.pop() : '';
+    if(tokens.length > 1) tokens.shift();
+    const color = tokens.join(' ');
+    const price = m[2];
+    const remain = parseInt(m[5], 10);
+    if(!codes.has(code)) codes.set(code, {price: price, colorMap: new Map()});
+    const entry = codes.get(code);
+    const colorMap = entry.colorMap;
+    const key = color || '';
+    if(!colorMap.has(key)) colorMap.set(key, []);
+    colorMap.get(key).push({size: size || '—', remain});
+  }
+  return codes;
+}
+function stockNameKey(name){ return 'stock_relay_' + name.trim().toUpperCase().replace(/[^A-Z0-9]/g,''); }
+function liveLogKey(code){ return 'live_log:' + code.trim().toUpperCase().replace(/\//g, '-'); }
+
+const LIVE_DEFAULT_WEIGHTS = { 'M':'50-60','L':'58-68','XL':'65-75','2XL':'75-85','3XL':'85-95','4XL':'90-105' };
+function liveWeightRangeDisplay(rangeStr){
+  if(!rangeStr) return '—';
+  const clean = String(rangeStr).replace(/kg/gi, '').trim();
+  const parts = clean.split('-').map(s=>s.trim()).filter(Boolean);
+  if(parts.length===2) return `${parts[0]}kg-${parts[1]}kg`;
+  if(parts.length===1) return `${parts[0]}kg`;
+  return String(rangeStr).trim();
+}
+function liveAllSizes(colorsArr){
+  const set = new Set();
+  colorsArr.forEach(c => c.sizes.forEach(s => set.add(s)));
+  return Array.from(set).sort((a,b)=>sizeSortKey(a)-sizeSortKey(b));
+}
+function buildLiveMessage(code, colorsArr, weightsMap, upsell){
+  const lines = [code];
+  colorsArr.forEach(c => { lines.push(`${c.color}: ${c.sizes.join(' ')}`); });
+  lines.push('');
+  lines.push('គីឡូ');
+  liveAllSizes(colorsArr).forEach(s => { lines.push(`${s}: ${liveWeightRangeDisplay(weightsMap[s])}`); });
+  if (upsell){ lines.push(''); lines.push('ពាក្យពានិជ័យ: ' + upsell); }
+  return lines.join('\n');
+}
+
+/* ===== Catalog (same source as index.html: kv/vhm-catalog-products) ===== */
+let PRODUCTS = [];
+async function loadCatalog(){
+  try{
+    const res = await storage.get('vhm-catalog-products');
+    if(res && res.value){
+      const parsed = JSON.parse(res.value);
+      if(Array.isArray(parsed)) PRODUCTS = parsed;
+    }
+  }catch(e){ console.error('Could not load catalog', e); }
+}
+function findCatalogProduct(code){
+  const target = code.trim().toUpperCase();
+  return PRODUCTS.find(p => (p.code||'').trim().toUpperCase() === target) || null;
+}
+
+/* ===== Page state ===== */
+let loadedStockCodes = new Map();
+let currentCode = null;
+
+function getStockName(){ return (localStorage.getItem('vhm_stock_name') || '').trim(); }
+function setStockName(v){ localStorage.setItem('vhm_stock_name', v); }
+
+function initNameSelect(){
+  const sel = document.getElementById('nameSelect');
+  const saved = getStockName();
+  if(saved){
+    const match = Array.from(sel.options).find(o => o.value === saved);
+    if(match) sel.value = saved;
+  }
+  sel.addEventListener('change', ()=> setStockName(sel.value));
+}
+
+document.getElementById('loadBtn').addEventListener('click', async ()=>{
+  const btn = document.getElementById('loadBtn');
+  const status = document.getElementById('loadStatus');
+  const sel = document.getElementById('nameSelect');
+  const name = sel.value;
+  if(!name){
+    sel.focus();
+    status.textContent = 'Select your name first.';
+    return;
+  }
+  setStockName(name);
+  const old = btn.textContent;
+  btn.textContent = 'Loading…';
+  btn.disabled = true;
+  try{
+    const res = await storage.get(stockNameKey(name));
+    if(!res || !res.value){
+      status.textContent = 'No stock sent from laptop yet for ' + name + '.';
+    } else {
+      const text = JSON.parse(res.value);
+      loadedStockCodes = parseStockPaste(text);
+      const codeList = Array.from(loadedStockCodes.keys()).join(', ');
+      status.textContent = 'Loaded ' + loadedStockCodes.size + ' code(s): ' + codeList + ' — ' + new Date().toLocaleTimeString();
+      // Show the loaded code's availability right away — no need to type it
+      // into Search when there's only the one (or a first) code just relayed.
+      renderCodePicker();
+      const firstCode = Array.from(loadedStockCodes.keys())[0];
+      if(firstCode) doSearch(firstCode);
+    }
+  }catch(e){
+    console.error(e);
+    status.textContent = 'Error loading — try again.';
+  }
+  btn.disabled = false;
+  btn.textContent = old;
+});
+
+function renderCodePicker(){
+  const wrap = document.getElementById('codePicker');
+  wrap.innerHTML = '';
+  const codes = Array.from(loadedStockCodes.keys());
+  if(codes.length < 2) return; // nothing to switch between
+  codes.forEach(code=>{
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = code;
+    if(code === currentCode) b.classList.add('active');
+    b.addEventListener('click', ()=> doSearch(code));
+    wrap.appendChild(b);
+  });
+}
+
+function doSearch(rawCode){
+  const code = rawCode.trim().toUpperCase();
+  if(!code) return;
+  const catalogProduct = findCatalogProduct(code);
+  const stockEntry = loadedStockCodes.get(code);
+
+  const empty = document.getElementById('emptyState');
+  const card = document.getElementById('availCard');
+
+  if(!catalogProduct && !stockEntry){
+    empty.style.display = 'block';
+    empty.innerHTML = "No match for code <b>" + code + "</b> in the catalog or your loaded stock paste.";
+    card.classList.remove('show');
+    return;
+  }
+
+  currentCode = code;
+  renderCodePicker();
+  empty.style.display = 'none';
+  card.classList.add('show');
+  document.getElementById('upsellInput').value = '';
+  document.getElementById('replyBox').classList.remove('show');
+
+  document.getElementById('pName').textContent = code + (catalogProduct ? ' — ' + (catalogProduct.name || catalogProduct.nameKh || '') : '');
+  document.getElementById('pPrice').textContent = stockEntry ? ('តម្លៃ: ' + stockEntry.price) : (catalogProduct && catalogProduct.price ? '$' + Number(catalogProduct.price).toFixed(2) : '');
+
+  document.getElementById('staleWarn').style.display = stockEntry ? 'none' : 'block';
+
+  const colorBlocks = document.getElementById('colorBlocks');
+  colorBlocks.innerHTML = '';
+  if(stockEntry){
+    stockEntry.colorMap.forEach((sizes, color)=>{
+      const available = sizes.some(s => s.remain > 0);
+      const sorted = sizes.slice().sort((a,b)=>sizeSortKey(a.size)-sizeSortKey(b.size));
+      const block = document.createElement('div');
+      block.className = 'color-block selected';
+      block.dataset.color = color;
+
+      const head = document.createElement('div');
+      head.className = 'color-block-head';
+      head.style.cursor = 'pointer';
+
+      const check = document.createElement('input');
+      check.type = 'checkbox';
+      check.className = 'color-select';
+      check.dataset.color = color;
+      check.checked = available; // pre-select colors that actually have stock
+      check.addEventListener('change', ()=>{
+        block.classList.toggle('selected', check.checked);
+      });
+      head.appendChild(check);
+
+      const name = document.createElement('span');
+      name.className = 'cname';
+      name.textContent = color || '—';
+      head.appendChild(name);
+      block.appendChild(head);
+
+      // Clicking anywhere on the row toggles the checkbox (not just the tiny box itself)
+      head.addEventListener('click', (e)=>{
+        if(e.target === check) return;
+        check.checked = !check.checked;
+        check.dispatchEvent(new Event('change'));
+      });
+
+      const sizeRow = document.createElement('div');
+      sizeRow.className = 'size-row';
+      sorted.forEach(s=>{
+        const chip = document.createElement('span');
+        chip.className = 'size-chip ' + (s.remain > 0 ? 'on' : 'off');
+        chip.textContent = s.size;
+        sizeRow.appendChild(chip);
+      });
+      block.appendChild(sizeRow);
+      colorBlocks.appendChild(block);
+    });
+  }
+
+  renderQuickReplySizeChips(stockEntry);
+}
+
+/* ============ Quick replies — common customer questions ============ */
+function colorsHavingSize(size, stockEntry){
+  const colors = [];
+  if(!stockEntry) return colors;
+  stockEntry.colorMap.forEach((sizeArr, color)=>{
+    if(sizeArr.some(s => s.size === size && s.remain > 0)) colors.push(color || '—');
+  });
+  return colors;
+}
+
+function renderQuickReplySizeChips(stockEntry){
+  const wrap = document.getElementById('qrSizeChips');
+  wrap.innerHTML = '';
+  if(!stockEntry){
+    wrap.innerHTML = '<span class="qr-label" style="margin:0;">Load stock for this code first.</span>';
+    return;
+  }
+  const colorsArr = Array.from(stockEntry.colorMap.entries()).map(([color, sizeArr]) => ({ color, sizes: sizeArr.map(s=>s.size) }));
+  const sizes = liveAllSizes(colorsArr);
+  if(!sizes.length){ wrap.innerHTML = '<span class="qr-label" style="margin:0;">No sizes found for this code.</span>'; return; }
+  sizes.forEach(size=>{
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'size-chip qr-size-chip';
+    chip.textContent = size;
+    chip.addEventListener('click', ()=>{
+      const colors = colorsHavingSize(size, stockEntry);
+      const text = colors.length
+        ? `ទំហំ ${size} មានពណ៌: ${colors.join(', ')}`
+        : `សុំទោស 🙏 ទំហំ ${size} អស់ស្តុកហើយ`;
+      showAndCopy(text, '', chip);
+    });
+    wrap.appendChild(chip);
+  });
+}
+
+async function weightsMapForCurrentCode(sizes){
+  let savedLog = null;
+  try{
+    const res = await storage.get(liveLogKey(currentCode));
+    if(res && res.value) savedLog = JSON.parse(res.value);
+  }catch(e){ /* fall back to defaults */ }
+  const weightsMap = {};
+  sizes.forEach(s=>{
+    weightsMap[s] = (savedLog && savedLog.weights && savedLog.weights[s]) || LIVE_DEFAULT_WEIGHTS[s] || '';
+  });
+  return weightsMap;
+}
+
+// Picks the smallest size whose weight range covers the given kg (falls back
+// to the largest size if the person is heavier than every range on file).
+function suggestSizeForWeight(kg, weightsMap){
+  const ranges = SIZE_ORDER.filter(s => weightsMap[s]).map(s=>{
+    const parts = String(weightsMap[s]).replace(/kg/gi,'').split('-').map(n=>parseFloat(n.trim()));
+    return { size: s, min: parts[0], max: parts.length > 1 ? parts[1] : parts[0] };
+  });
+  if(!ranges.length) return null;
+  const fit = ranges.find(r => kg <= r.max);
+  return fit ? fit.size : ranges[ranges.length - 1].size;
+}
+
+document.getElementById('qrHello').addEventListener('click', (e)=>{
+  showAndCopy('សួស្តី! 👋 មានអ្វីអាចជួយបានដែរ?', '', e.currentTarget);
+});
+
+document.getElementById('qrHowMany').addEventListener('click', (e)=>{
+  const stockEntry = loadedStockCodes.get(currentCode);
+  if(!stockEntry){ flashBtn(e.currentTarget, 'No stock loaded for this code'); return; }
+  const colorsArr = Array.from(stockEntry.colorMap.entries()).map(([color, sizeArr]) => ({ color, sizes: sizeArr.filter(s=>s.remain>0).map(s=>s.size) }));
+  const sizes = liveAllSizes(colorsArr);
+  const text = sizes.length ? `ទំហំដែលមាន: ${sizes.join(', ')}` : 'សុំទោស 🙏 ទំនិញនេះអស់ស្តុកគ្រប់ទំហំហើយ';
+  showAndCopy(text, '', e.currentTarget);
+});
+
+document.getElementById('qrColorBtn').addEventListener('click', (e)=>{
+  const btn = e.currentTarget;
+  const query = document.getElementById('qrColorInput').value.trim();
+  if(!query){ flashBtn(btn, 'Type a color first'); return; }
+  const stockEntry = loadedStockCodes.get(currentCode);
+  let matchColor = null, sizes = [];
+  if(stockEntry){
+    for(const [color, sizeArr] of stockEntry.colorMap.entries()){
+      const c = (color || '').toLowerCase();
+      if(c.includes(query.toLowerCase()) || query.toLowerCase().includes(c)){
+        const avail = sizeArr.filter(s=>s.remain>0).sort((a,b)=>sizeSortKey(a.size)-sizeSortKey(b.size)).map(s=>s.size);
+        if(avail.length){ matchColor = color || '—'; sizes = avail; break; }
+      }
+    }
+  }
+  const text = matchColor
+    ? `${matchColor} មានទំហំ: ${sizes.join(' ')}`
+    : `សុំទោស 🙏 មិនមានពណ៌ "${query}" សម្រាប់ទំនិញនេះទេ`;
+  showAndCopy(text, '', btn);
+});
+
+document.getElementById('qrFitBtn').addEventListener('click', async (e)=>{
+  const btn = e.currentTarget;
+  const kg = parseFloat(document.getElementById('qrKgInput').value);
+  const cm = document.getElementById('qrCmInput').value.trim();
+  if(!kg){ flashBtn(btn, 'Enter kg first'); return; }
+  const stockEntry = loadedStockCodes.get(currentCode);
+  const colorsArr = stockEntry ? Array.from(stockEntry.colorMap.entries()).map(([color, sizeArr]) => ({ color, sizes: sizeArr.map(s=>s.size) })) : [];
+  const knownSizes = colorsArr.length ? liveAllSizes(colorsArr) : Object.keys(LIVE_DEFAULT_WEIGHTS);
+  const old = btn.textContent;
+  btn.textContent = '…';
+  const weightsMap = await weightsMapForCurrentCode(knownSizes);
+  btn.textContent = old;
+  const size = suggestSizeForWeight(kg, weightsMap);
+  if(!size){ flashBtn(btn, 'No weight data for this product'); return; }
+
+  let note;
+  const colors = colorsHavingSize(size, stockEntry);
+  if(colors.length){
+    note = `មានស្តុក ពណ៌: ${colors.join(', ')}`;
+  } else {
+    const ranges = SIZE_ORDER.filter(s => weightsMap[s]);
+    let altSize = null, altColors = [];
+    for(const s of ranges){
+      const cs = colorsHavingSize(s, stockEntry);
+      if(cs.length){ altSize = s; altColors = cs; break; }
+    }
+    note = altSize ? `ទំហំ ${size} អស់ស្តុក — សាកល្បង ${altSize} (${altColors.join(', ')})` : `ទំហំ ${size} អស់ស្តុកបច្ចុប្បន្ន`;
+  }
+  const rangeDisplay = liveWeightRangeDisplay(weightsMap[size]);
+  const cmPart = cm ? `, កម្ពស់ ${cm}cm` : '';
+  const text = `ទម្ងន់ ${kg}kg${cmPart} → សាកល្បងទំហំ ${size} (${rangeDisplay}) — ${note}`;
+  showAndCopy(text, '', btn);
+});
+
+function flashBtn(btn, msg){
+  if(!btn) return;
+  const old = btn.textContent;
+  btn.textContent = msg;
+  setTimeout(()=>{ btn.textContent = old; }, 1800);
+}
+
+function selectedColorsArr(){
+  const stockEntry = loadedStockCodes.get(currentCode);
+  const colorsArr = [];
+  if(!stockEntry) return colorsArr;
+  document.querySelectorAll('#colorBlocks .color-select:checked').forEach(cb=>{
+    const color = cb.dataset.color;
+    const sizes = stockEntry.colorMap.get(color) || [];
+    const available = sizes.filter(s => s.remain > 0).sort((a,b)=>sizeSortKey(a.size)-sizeSortKey(b.size));
+    if(available.length) colorsArr.push({ color: color || '—', sizes: available.map(s=>s.size) });
+  });
+  return colorsArr;
+}
+
+function currentAvailableColorsArr(){
+  const stockEntry = loadedStockCodes.get(currentCode);
+  const colorsArr = [];
+  if(stockEntry){
+    stockEntry.colorMap.forEach((sizes, color)=>{
+      const available = sizes.filter(s => s.remain > 0).sort((a,b)=>sizeSortKey(a.size)-sizeSortKey(b.size));
+      if(available.length) colorsArr.push({ color: color || '—', sizes: available.map(s=>s.size) });
+    });
+  }
+  return colorsArr;
+}
+
+// New format: one line per selected color, sizes with their weight range
+// inline — e.g. "ខ្មៅ: XL (78kg-83kg), 2XL (83kg-87kg)" — instead of a
+// separate colors block plus a separate គីឡូ weight-table section.
+function buildInlineMessage(code, colorsArr, weightsMap, upsell){
+  const lines = [code];
+  colorsArr.forEach(c => {
+    const sizeText = c.sizes.map(s => `${s} (${liveWeightRangeDisplay(weightsMap[s])})`).join(', ');
+    lines.push(`${c.color}: ${sizeText}`);
+  });
+  if(upsell){ lines.push(''); lines.push('ពាក្យពានិជ័យ: ' + upsell); }
+  return lines.join('\n');
+}
+
+document.getElementById('copyBtn').addEventListener('click', (e)=>{
+  const stockEntry = loadedStockCodes.get(currentCode);
+  const upsell = document.getElementById('upsellInput').value.trim();
+  let lines;
+  if(stockEntry){
+    const colorsArr = selectedColorsArr();
+    if(!colorsArr.length){
+      const btn = e.currentTarget;
+      const old = btn.textContent;
+      btn.textContent = 'Select a color first';
+      setTimeout(()=>{ btn.textContent = old; }, 1800);
+      return;
+    }
+    lines = ['📏 ទំហំដែលនៅមានក្នុងស្តុក', currentCode, `តម្លៃ: ${stockEntry.price}`, ''];
+    colorsArr.forEach(c => { lines.push(`${c.color}: ${c.sizes.join(' ')}`); });
+  }else{
+    const catalogProduct = findCatalogProduct(currentCode);
+    lines = [currentCode + (catalogProduct ? ' — ' + (catalogProduct.name||'') : ''), '(no live stock loaded — check Vrich before confirming)'];
+  }
+  let upsellHtml = '';
+  if(upsell){ lines.push(''); lines.push('ពាក្យពានិជ័យ: ' + upsell); upsellHtml = "<div class='upsell'>Upsell included: " + upsell + "</div>"; }
+  showAndCopy(lines.join('\n'), upsellHtml, e.currentTarget);
+});
+
+document.getElementById('liveCopyBtn').addEventListener('click', async (e)=>{
+  const btn = e.currentTarget;
+  const upsell = document.getElementById('upsellInput').value.trim();
+  const colorsArr = selectedColorsArr();
+  if(!colorsArr.length){
+    const old = btn.textContent;
+    btn.textContent = 'Select a color first';
+    setTimeout(()=>{ btn.textContent = old; }, 1800);
+    return;
+  }
+  const old = btn.textContent;
+  btn.textContent = 'Loading…';
+  let savedLog = null;
+  try{
+    const res = await storage.get(liveLogKey(currentCode));
+    if(res && res.value) savedLog = JSON.parse(res.value);
+  }catch(e2){ /* fall back to defaults */ }
+  const weightsMap = {};
+  liveAllSizes(colorsArr).forEach(s=>{
+    weightsMap[s] = (savedLog && savedLog.weights && savedLog.weights[s]) || LIVE_DEFAULT_WEIGHTS[s] || '';
+  });
+  const msg = buildInlineMessage(currentCode, colorsArr, weightsMap, upsell);
+  btn.textContent = old;
+  const upsellHtml = upsell ? "<div class='upsell'>Upsell included: " + upsell + "</div>" : '';
+  showAndCopy(msg, upsellHtml, btn);
+});
+
+function showAndCopy(text, upsellHtml, btn){
+  const box = document.getElementById('replyBox');
+  box.classList.add('show');
+  document.getElementById('pReply').innerHTML = text.replace(/\n/g,'<br>') + (upsellHtml || '');
+  document.getElementById('pReply').dataset.raw = text;
+
+  const doCopiedState = ()=>{
+    if(!btn) return;
+    const old = btn.textContent;
+    btn.textContent = '✓ Copied';
+    btn.classList.add('copied');
+    setTimeout(()=>{ btn.textContent = old; btn.classList.remove('copied'); }, 2000);
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(doCopiedState).catch(()=>{ fallbackCopy(text); doCopiedState(); });
+  }else{
+    fallbackCopy(text);
+    doCopiedState();
+  }
+}
+function fallbackCopy(text){
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  try{ document.execCommand('copy'); }catch(e){}
+  document.body.removeChild(ta);
+}
+
+initNameSelect();
+loadCatalog();
+</script>
+</body>
+</html>
