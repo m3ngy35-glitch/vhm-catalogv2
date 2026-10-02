@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>VHM Quick Reply</title>
+<style>
+  :root{
+    --accent:#2f6fed;
+    --accent-bg:#eef4ff;
+    --ok:#1a7f37;
+    --warn-bg:#fff2cc;
+    --warn-text:#5d4037;
+    --border:#e2e6ee;
+  }
+  *{box-sizing:border-box;}
+  html, body{height:100%;}
+  body{
+    margin:0;background:#f4f5f7;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#222;
+  }
+  .wrap{max-width:430px;margin:0 auto;height:100vh;height:100dvh;background:#fff;display:flex;flex-direction:column;overflow:hidden;}
+  header{flex:0 0 auto;padding:8px 16px 6px;border-bottom:1px solid var(--border);}
+  header h1{margin:0;font-size:15.5px;}
+  header p{margin:2px 0 0;font-size:11px;color:#888;}
+
+  /* Split screen: the load/final-message area is frozen at the top — it's
+     the main info, so it's never clipped or scrollable, it just takes
+     whatever height its content needs. Everything else (colors, quick
+     replies) scrolls on its own in the remaining space below it. */
+  main{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;}
+  .pane-top{flex:0 0 auto;overflow:visible;padding:8px 16px 6px;background:#fff;}
+  .pane-bottom{
+    flex:1 1 auto;min-height:0;overflow-y:auto;padding:8px 16px 14px;
+    border-top:2px solid var(--border);box-shadow:0 -4px 10px rgba(20,30,60,.05);background:#fff;
+  }
+
+  .load-row{display:flex;flex-direction:column;gap:4px;align-items:stretch;margin-bottom:6px;}
+  .load-row-top{display:flex;align-items:center;gap:8px;}
+  .name-inline{display:flex;align-items:center;gap:5px;flex:0 0 auto;}
+  .name-inline label{font-size:11px;color:#777;white-space:nowrap;}
+  .name-inline select{font-size:12.5px;padding:6px 6px;border:1px solid #cfd8e8;border-radius:7px;background:#fff;color:#222;max-width:88px;}
+  .load-row-top button{flex:1;min-width:0;}
+  .load-status{font-size:11.5px;color:#888;text-align:center;}
+
+  .code-picker{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;}
+  .code-picker button{background:#fff;border:1.5px solid var(--accent);color:var(--accent);border-radius:16px;padding:5px 12px;font-size:12.5px;font-weight:600;}
+  .code-picker button.active{background:var(--accent);color:#fff;}
+
+  .empty-state{text-align:center;color:#999;font-size:13px;margin-top:20px;line-height:1.6;}
+
+  .avail-card{display:none;margin-top:6px;}
+  .avail-card.show{display:block;}
+  .avail-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;}
+  .avail-head .pname{font-weight:700;font-size:15px;color:#1d4ed8;}
+  .avail-head .pprice{font-size:13px;color:#555;}
+  .hint{font-size:12px;color:#888;margin-bottom:10px;}
+
+  .stale-warn{
+    background:#fde8e8;border:1px solid #f5b5b5;color:#8a2a2a;border-radius:8px;
+    padding:6px 9px;font-size:12px;margin-bottom:6px;line-height:1.4;
+  }
+
+  .color-block{border:1.5px solid var(--border);border-radius:10px;padding:7px 10px;margin-bottom:6px;}
+  .color-block.soldout{opacity:.55;}
+  .color-block-head{display:flex;align-items:center;gap:8px;margin-bottom:5px;}
+  .color-block-head .cname{font-weight:600;font-size:14px;}
+
+  .size-row{display:flex;gap:6px;flex-wrap:wrap;}
+  .size-chip{border:1px solid #cfd8e8;border-radius:14px;padding:5px 11px;font-size:12.5px;color:#444;background:#fff;}
+  .size-chip.on{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .size-chip.off{opacity:.45;text-decoration:line-through;}
+
+  .upsell-field{margin-top:8px;}
+  .upsell-field label{font-size:11.5px;color:#777;}
+  .upsell-field input{width:100%;padding:9px 10px;border:1px solid #cfd8e8;border-radius:7px;font-size:13.5px;margin-top:3px;}
+
+  .reply-box{
+    margin-top:6px;background:var(--accent-bg);border:1px solid #cfe0ff;border-radius:10px;padding:8px 12px;
+    font-size:14.5px;line-height:1.3;display:none;white-space:pre-wrap;letter-spacing:.1px;color:#1a2235;
+  }
+  .reply-box.show{
+    display:block;
+  }
+  .reply-box .upsell{
+    display:inline-block;margin-top:8px;background:var(--warn-bg);color:var(--warn-text);border-radius:5px;padding:4px 9px;font-size:13px;
+  }
+  .reply-box-copy{
+    width:100%;margin-top:6px;background:#fff;color:var(--accent);border:1.5px solid var(--accent);border-radius:8px;
+    padding:8px 6px;font-size:13px;font-weight:600;
+  }
+  .reply-box-copy.copied{background:var(--ok);color:#fff;border-color:var(--ok);}
+
+  .quick-replies{margin-top:10px;border-top:1px solid var(--border);padding-top:8px;}
+  .qr-title{font-size:12.5px;font-weight:700;color:#555;margin-bottom:6px;}
+  .qr-item{margin-bottom:6px;border:1px solid var(--border);border-radius:10px;padding:8px 10px;background:#fafbfd;}
+  .qr-label{font-size:12px;color:#555;font-weight:600;margin-bottom:5px;}
+  .qr-btn{width:100%;text-align:left;background:#fff;border:1px solid #cfd8e8;border-radius:8px;padding:9px 11px;font-size:13px;color:#222;}
+  .qr-chip-row{display:flex;gap:6px;flex-wrap:wrap;}
+  .qr-size-chip{cursor:pointer;background:#fff;}
+  .qr-note{font-size:11px;color:#999;margin-top:6px;line-height:1.4;}
+
+  .qr-fit-fields{display:flex;flex-direction:column;gap:6px;margin-bottom:6px;}
+  .qr-fit-field{width:100%;}
+  .qr-fit-field label{display:block;font-size:11.5px;color:#777;margin-bottom:4px;}
+  .qr-fit-field input{width:100%;padding:10px 10px;border:1px solid #cfd8e8;border-radius:7px;font-size:15px;}
+  .qr-fit-hint{font-size:11px;color:#999;margin-bottom:6px;line-height:1.4;}
+  .qr-fit-btn{width:100%;background:var(--accent);color:#fff;border:none;border-radius:7px;padding:10px 12px;font-size:13.5px;font-weight:600;}
+  .qr-fit-adjust{display:flex;align-items:center;gap:8px;margin-top:6px;}
+  .qr-fit-adjust-btn{
+    flex:1;background:#fff;color:var(--accent);border:1.5px solid var(--accent);border-radius:7px;padding:9px 6px;font-size:13px;font-weight:700;
+  }
+  .qr-fit-adjust-btn:disabled{opacity:.4;border-color:#cfd8e8;color:#999;}
+  .qr-fit-size-label{flex:0 0 56px;text-align:center;font-weight:700;font-size:14px;color:#1d4ed8;}
+
+  .tpl-card{border:1px solid #cfd8e8;border-radius:8px;padding:6px 9px;margin-bottom:5px;background:#fff;}
+  .tpl-text{font-size:13px;line-height:1.4;color:#222;white-space:pre-wrap;margin-bottom:5px;}
+  .tpl-actions{display:flex;gap:6px;}
+  .tpl-actions button{font-size:11.5px;font-weight:600;border-radius:6px;padding:5px 9px;border:1px solid #cfd8e8;background:#fafbfd;color:#444;}
+  .tpl-use{background:var(--accent) !important;color:#fff !important;border-color:var(--accent) !important;flex:1;}
+  .tpl-edit{flex:0 0 auto;}
+  .tpl-delete{flex:0 0 auto;color:#c0392b !important;}
+  .tpl-add-row{display:flex;flex-direction:column;gap:6px;margin-top:4px;}
+  .tpl-add-row textarea{width:100%;min-height:52px;padding:8px 9px;border:1px solid #cfd8e8;border-radius:7px;font-size:13px;font-family:inherit;resize:vertical;}
+  .tpl-add-row .tpl-add-actions{display:flex;gap:6px;}
+  .tpl-add-row .tpl-add-actions button{flex:1;font-size:12.5px;font-weight:600;border-radius:7px;padding:7px 8px;border:none;}
+  .tpl-save-btn{background:var(--accent);color:#fff;}
+  .tpl-cancel-btn{background:#eee;color:#555;}
+  .tpl-add-toggle{width:100%;background:#fff;border:1px dashed #cfd8e8;border-radius:8px;padding:8px;font-size:12.5px;color:#667;font-weight:600;margin-top:2px;}
+
+  .upsell-field.bottom{margin-top:10px;border-top:1px solid var(--border);padding-top:8px;}
+
+  footer{flex:0 0 auto;padding:6px 16px;font-size:10.5px;color:#bbb;text-align:center;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>VHM Quick Reply</h1>
+    <p>Load your stock paste → add upsell or pick a quick reply → copy.</p>
+  </header>
+
+  <main>
+    <div class="pane-top">
+      <div class="load-row">
+        <div class="load-row-top">
+          <div class="name-inline">
+            <label for="nameSelect">Name:</label>
+            <select id="nameSelect">
+              <option value="">-- select --</option>
+              <option value="KIN">KIN</option>
+              <option value="JINH">JINH</option>
+              <option value="Yaa">Yaa</option>
+              <option value="Ry">Ry</option>
+              <option value="NITH">NITH</option>
+              <option value="VID">VID</option>
+              <option value="LY">LY</option>
+              <option value="David">David</option>
+            </select>
+          </div>
+          <button id="loadBtn" style="background:var(--accent);color:#fff;border:none;border-radius:8px;padding:11px 14px;font-size:14px;font-weight:600;">⬇ Load from laptop</button>
+        </div>
+        <span class="load-status" id="loadStatus">No stock loaded yet this session.</span>
+      </div>
+
+      <div id="replyBox" class="reply-box show">
+        <div id="pReply">Load a code above to see the ready-to-copy message here.</div>
+        <button type="button" id="copyReplyBoxBtn" class="reply-box-copy">📋 Copy this</button>
+      </div>
+    </div>
+
+    <div class="pane-bottom">
+    <div id="codePicker" class="code-picker"></div>
+
+    <div id="emptyState" class="empty-state">
+      Load your stock paste above to see<br>what's actually available right now.
+    </div>
+
+    <div id="availCard" class="avail-card">
+      <div class="avail-head">
+        <div id="pName" class="pname"></div>
+        <div id="pPrice" class="pprice"></div>
+      </div>
+
+      <div id="staleWarn" class="stale-warn" style="display:none;">
+        No stock paste loaded for this code — showing catalog info only. Load from laptop (or paste stock
+        text) first to see real current availability.
+      </div>
+
+      <div id="weightWarn" class="stale-warn" style="display:none;">
+        ⚠️ No weight log saved for this code — the kg shown next to sizes (and the kg/cm size suggestion below) is a generic default, not this item's real weight. Don't recommend a size off it without checking.
+      </div>
+
+      <div id="colorBlocks"></div>
+
+      <div class="quick-replies">
+        <div class="qr-title">Quick replies — common questions</div>
+
+        <div class="qr-item">
+          <div class="qr-label">Greeting templates</div>
+          <div id="tplList"></div>
+          <button type="button" class="tpl-add-toggle" id="tplAddToggle">+ Add a new template</button>
+          <div class="tpl-add-row" id="tplAddRow" style="display:none;">
+            <textarea id="tplAddText" placeholder="Type the greeting/template text…"></textarea>
+            <div class="tpl-add-actions">
+              <button type="button" class="tpl-save-btn" id="tplSaveBtn">Save template</button>
+              <button type="button" class="tpl-cancel-btn" id="tplCancelBtn">Cancel</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="qr-item">
+          <button type="button" class="qr-btn" id="qrHowMany">🔢 How many sizes do you have?</button>
+        </div>
+
+        <div class="qr-item">
+          <div class="qr-label">Do you have my size? / Which color has size…?</div>
+          <div class="qr-chip-row" id="qrSizeChips"></div>
+        </div>
+
+        <div class="qr-item">
+          <div class="qr-label">Do you have color… (tap a color — blue = in stock, dimmed = sold out)</div>
+          <div class="qr-chip-row" id="qrColorChips"></div>
+        </div>
+
+        <div class="qr-item">
+          <div class="qr-label">If I'm …kg and …cm, which size fits me?</div>
+          <div class="qr-fit-fields">
+            <div class="qr-fit-field">
+              <label for="qrKgInput">Weight (kg)</label>
+              <input id="qrKgInput" type="number" inputmode="numeric" placeholder="e.g. 70">
+            </div>
+            <div class="qr-fit-field">
+              <label for="qrCmInput">Height (cm) — optional</label>
+              <input id="qrCmInput" type="number" inputmode="numeric" placeholder="e.g. 170">
+            </div>
+          </div>
+          <div class="qr-fit-hint">Size is suggested from weight only (we don't track height data) — cm is just added to the reply as a note.</div>
+          <button type="button" id="qrFitBtn" class="qr-fit-btn">Suggest a size</button>
+          <div id="qrFitAdjust" class="qr-fit-adjust" style="display:none;">
+            <button type="button" id="qrFitDown" class="qr-fit-adjust-btn">− size</button>
+            <span id="qrFitSizeLabel" class="qr-fit-size-label"></span>
+            <button type="button" id="qrFitUp" class="qr-fit-adjust-btn">+ size</button>
+          </div>
+        </div>
+
+        <div class="qr-item">
+          <div class="qr-label">Weight info — tap a size for its kg range</div>
+          <div class="qr-chip-row" id="qrWeightInfoChips"></div>
+          <button type="button" class="qr-btn" id="qrWeightInfoAll" style="margin-top:8px;">📏 Show all sizes' weight (គីឡូ table)</button>
+        </div>
+
+        <div class="qr-note">Tap any quick reply to copy it — edit the copied text before sending if needed.</div>
+      </div>
+
+      <div class="upsell-field bottom">
+        <label>Upsell line (optional — typed fresh each time, not saved yet)</label>
+        <input id="upsellInput" type="text" placeholder="e.g. matching khaki pants, code C07, also in stock">
+      </div>
+    </div>
+    </div>
+  </main>
+
+  <footer>VHM Club internal tool — reads the real vhm-catalog Firebase project</footer>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script>
+/* ===== Same Firebase project + kv storage pattern as index.html / live.html ===== */
+const firebaseConfig = {
+  apiKey: "AIzaSyDDQp5_gvuRdX0flKQ3gm3zXJM_SXWUJSE",
+  authDomain: "vhm-catalog.firebaseapp.com",
+  projectId: "vhm-catalog",
+  storageBucket: "vhm-catalog.firebasestorage.app",
+  messagingSenderId: "892196724857",
+  appId: "1:892196724857:web:8ed3f5f056284b63aa34a8"
+};
+let __db = null;
+function firestore_(){
+  if (!__db){ firebase.initializeApp(firebaseConfig); __db = firebase.firestore(); }
+  return __db;
+}
+const storage = {
+  async get(key){
+    const db = firestore_();
+    const doc = await db.collection('kv').doc(key).get({source:'server'});
+    if (!doc.exists) return null;
+    const data = doc.data();
+    if (data.data === undefined || data.data === null) return null;
+    return { key, value: JSON.stringify(data.data) };
+  },
+  // Used to push the currently-copied reply to a staff member's phone
+  // companion page (quickreply-view.html) — see broadcastToPhone() below.
+  async set(key, value){
+    const db = firestore_();
+    await db.collection('kv').doc(key).set({
+      data: value,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    return { key, value };
+  }
+};
+// Same key scheme on both this tool and quickreply-view.html, so picking
+// the same name in both places connects them.
+function quickReplyLiveKey(name){ return 'quickreply_live_' + name.trim().toUpperCase().replace(/[^A-Z0-9]/g,''); }
+
+/* ===== Same stock-paste parser as index.html's Stock Check ===== */
+const SIZE_ORDER = ['XS','S','M','L','XL','2XL','3XL','4XL','5XL'];
+function sizeSortKey(s){
+  const i = SIZE_ORDER.indexOf(s);
+  if(i !== -1) return i;
+  const n = parseFloat(s);
+  return isNaN(n) ? 999 : 100 + n;
+}
+function parseStockPaste(raw){
+  const recordRe = /([\s\S]+?)\s*(\d+(?:\.\d+)?)\s+(\d+)\s+(\d+)\s*\/\s*(\d+)/g;
+  const codes = new Map();
+  let m;
+  while((m = recordRe.exec(raw)) !== null){
+    let nameBlock = m[1];
+    const lines = nameBlock.split('\n').map(l=>l.trim()).filter(Boolean);
+    let line = lines.length ? lines[lines.length-1] : '';
+    line = line.replace(/^\*+\s*/,'').replace(/!/g,'').trim();
+    if(!line) continue;
+    const parts = line.split(/\s+/);
+    const code = parts.shift();
+    if(!code) continue;
+    const tokens = parts.slice();
+    const size = tokens.length ? tokens.pop() : '';
+    if(tokens.length > 1) tokens.shift();
+    const color = tokens.join(' ');
+    const price = m[2];
+    const remain = parseInt(m[5], 10);
+    if(!codes.has(code)) codes.set(code, {price: price, colorMap: new Map()});
+    const entry = codes.get(code);
+    const colorMap = entry.colorMap;
+    const key = color || '';
+    if(!colorMap.has(key)) colorMap.set(key, []);
+    colorMap.get(key).push({size: size || '—', remain});
+  }
+  return codes;
+}
+function stockNameKey(name){ return 'stock_relay_' + name.trim().toUpperCase().replace(/[^A-Z0-9]/g,''); }
+function liveLogKey(code){ return 'live_log:' + code.trim().toUpperCase().replace(/\//g, '-'); }
+
+const LIVE_DEFAULT_WEIGHTS = { 'M':'50-60','L':'58-68','XL':'65-75','2XL':'75-85','3XL':'85-95','4XL':'90-105' };
+function liveWeightRangeDisplay(rangeStr){
+  if(!rangeStr) return '—';
+  const clean = String(rangeStr).replace(/kg/gi, '').trim();
+  const parts = clean.split('-').map(s=>s.trim()).filter(Boolean);
+  if(parts.length===2) return `${parts[0]}kg-${parts[1]}kg`;
+  if(parts.length===1) return `${parts[0]}kg`;
+  return String(rangeStr).trim();
+}
+function liveAllSizes(colorsArr){
+  const set = new Set();
+  colorsArr.forEach(c => c.sizes.forEach(s => set.add(s)));
+  return Array.from(set).sort((a,b)=>sizeSortKey(a)-sizeSortKey(b));
+}
+function buildLiveMessage(code, colorsArr, weightsMap, upsell){
+  const lines = [code];
+  colorsArr.forEach(c => { lines.push(`${c.color}: ${c.sizes.join(' ')}`); });
+  lines.push('');
+  lines.push('គីឡូ');
+  liveAllSizes(colorsArr).forEach(s => { lines.push(`${s}: ${liveWeightRangeDisplay(weightsMap[s])}`); });
+  if (upsell){ lines.push(''); lines.push('ពាក្យពានិជ័យ: ' + upsell); }
+  return lines.join('\n');
+}
+
+/* ===== Catalog (same source as index.html: kv/vhm-catalog-products) ===== */
+let PRODUCTS = [];
+async function loadCatalog(){
+  try{
+    const res = await storage.get('vhm-catalog-products');
+    if(res && res.value){
+      const parsed = JSON.parse(res.value);
+      if(Array.isArray(parsed)) PRODUCTS = parsed;
+    }
+  }catch(e){ console.error('Could not load catalog', e); }
+}
+function findCatalogProduct(code){
+  const target = code.trim().toUpperCase();
+  return PRODUCTS.find(p => (p.code||'').trim().toUpperCase() === target) || null;
+}
+
+/* ===== Page state ===== */
+let loadedStockCodes = new Map();
+let currentCode = null;
+let currentHasSavedWeightLog = false;
+let fitState = null; // last kg/cm size suggestion, so +/- can nudge it without retyping
+let lastWeightInfo = null; // weightsMap/sizes for the "Show all sizes' weight" button
+
+function getStockName(){ return (localStorage.getItem('vhm_stock_name') || '').trim(); }
+function setStockName(v){ localStorage.setItem('vhm_stock_name', v); }
+
+function initNameSelect(){
+  const sel = document.getElementById('nameSelect');
+  const saved = getStockName();
+  if(saved){
+    const match = Array.from(sel.options).find(o => o.value === saved);
+    if(match) sel.value = saved;
+  }
+  sel.addEventListener('change', ()=> setStockName(sel.value));
+}
+
+document.getElementById('loadBtn').addEventListener('click', async ()=>{
+  const btn = document.getElementById('loadBtn');
+  const status = document.getElementById('loadStatus');
+  const sel = document.getElementById('nameSelect');
+  const name = sel.value;
+  if(!name){
+    sel.focus();
+    status.textContent = 'Select your name first.';
+    return;
+  }
+  setStockName(name);
+  const old = btn.textContent;
+  btn.textContent = 'Loading…';
+  btn.disabled = true;
+  try{
+    const res = await storage.get(stockNameKey(name));
+    if(!res || !res.value){
+      status.textContent = 'No stock sent from laptop yet for ' + name + '.';
+    } else {
+      const text = JSON.parse(res.value);
+      loadedStockCodes = parseStockPaste(text);
+      const codeList = Array.from(loadedStockCodes.keys()).join(', ');
+      status.textContent = 'Loaded ' + loadedStockCodes.size + ' code(s): ' + codeList + ' — ' + new Date().toLocaleTimeString();
+      // Show the loaded code's availability right away — no need to type it
+      // into Search when there's only the one (or a first) code just relayed.
+      renderCodePicker();
+      const firstCode = Array.from(loadedStockCodes.keys())[0];
+      if(firstCode) doSearch(firstCode);
+    }
+  }catch(e){
+    console.error(e);
+    status.textContent = 'Error loading — try again.';
+  }
+  btn.disabled = false;
+  btn.textContent = old;
+});
+
+function renderCodePicker(){
+  const wrap = document.getElementById('codePicker');
+  wrap.innerHTML = '';
+  const codes = Array.from(loadedStockCodes.keys());
+  if(codes.length < 2) return; // nothing to switch between
+  codes.forEach(code=>{
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = code;
+    if(code === currentCode) b.classList.add('active');
+    b.addEventListener('click', ()=> doSearch(code));
+    wrap.appendChild(b);
+  });
+}
+
+async function doSearch(rawCode){
+  const code = rawCode.trim().toUpperCase();
+  if(!code) return;
+  const catalogProduct = findCatalogProduct(code);
+  const stockEntry = loadedStockCodes.get(code);
+
+  const empty = document.getElementById('emptyState');
+  const card = document.getElementById('availCard');
+
+  if(!catalogProduct && !stockEntry){
+    empty.style.display = 'block';
+    empty.innerHTML = "No match for code <b>" + code + "</b> in the catalog or your loaded stock paste.";
+    card.classList.remove('show');
+    return;
+  }
+
+  currentCode = code;
+  renderCodePicker();
+  empty.style.display = 'none';
+  card.classList.add('show');
+  document.getElementById('upsellInput').value = '';
+  fitState = null;
+  renderFitAdjustUI();
+
+  document.getElementById('pName').textContent = code + (catalogProduct ? ' — ' + (catalogProduct.name || catalogProduct.nameKh || '') : '');
+  document.getElementById('pPrice').textContent = stockEntry ? ('តម្លៃ: ' + stockEntry.price) : (catalogProduct && catalogProduct.price ? '$' + Number(catalogProduct.price).toFixed(2) : '');
+
+  document.getElementById('staleWarn').style.display = stockEntry ? 'none' : 'block';
+
+  // Weight data for every size this code has (used so XL/L/S/M etc. can show
+  // their kg range right next to them wherever a size is listed) — fetched
+  // once per search and reused for the color blocks, the quick-reply size
+  // chips, and the no-weight-log warning below.
+  let weightsMap = {};
+  let hasSavedWeightLog = false;
+  if(stockEntry){
+    const allColorsArr = Array.from(stockEntry.colorMap.entries()).map(([color, sizeArr]) => ({ color, sizes: sizeArr.map(s=>s.size) }));
+    const allSizes = liveAllSizes(allColorsArr);
+    const result = await weightsMapForCurrentCode(allSizes, code);
+    weightsMap = result.weightsMap;
+    hasSavedWeightLog = result.hasSavedLog;
+  }
+  currentHasSavedWeightLog = hasSavedWeightLog;
+  const weightWarn = document.getElementById('weightWarn');
+  weightWarn.style.display = (stockEntry && !hasSavedWeightLog) ? 'block' : 'none';
+
+  // A search can be superseded by a faster one (switching codes quickly) —
+  // bail out if this result is no longer for the code currently on screen.
+  if(currentCode !== code) return;
+
+  // Read-only availability display — just shows every color this code has
+  // and which sizes are in stock (blue) vs sold out (dimmed). No selection
+  // here; "Copy message" and "Weight info" below use all in-stock colors.
+  const colorBlocks = document.getElementById('colorBlocks');
+  colorBlocks.innerHTML = '';
+  if(stockEntry){
+    stockEntry.colorMap.forEach((sizes, color)=>{
+      const available = sizes.some(s => s.remain > 0);
+      const sorted = sizes.slice().sort((a,b)=>sizeSortKey(a.size)-sizeSortKey(b.size));
+      const block = document.createElement('div');
+      block.className = 'color-block' + (available ? '' : ' soldout');
+      block.dataset.color = color;
+
+      const head = document.createElement('div');
+      head.className = 'color-block-head';
+
+      const name = document.createElement('span');
+      name.className = 'cname';
+      name.textContent = color || '—';
+      head.appendChild(name);
+      block.appendChild(head);
+
+      const sizeRow = document.createElement('div');
+      sizeRow.className = 'size-row';
+      sorted.forEach(s=>{
+        const chip = document.createElement('span');
+        chip.className = 'size-chip ' + (s.remain > 0 ? 'on' : 'off');
+        chip.textContent = sizeChipLabel(s.size, weightsMap);
+        sizeRow.appendChild(chip);
+      });
+      block.appendChild(sizeRow);
+      colorBlocks.appendChild(block);
+    });
+  }
+
+  renderQuickReplySizeChips(stockEntry, weightsMap);
+  renderQuickReplyColorChips(stockEntry);
+  renderWeightInfoChips(stockEntry, weightsMap, hasSavedWeightLog);
+  renderDefaultReply(stockEntry);
+}
+
+// The box at the top is now always visible — this fills it with the plain
+// colors/sizes availability message as soon as a code loads, so staff just
+// hit "Copy this" straight away instead of clicking a separate "Copy
+// message" button first (one less click, no mouse travel down the page).
+function renderDefaultReply(stockEntry){
+  if(!stockEntry){
+    const catalogProduct = findCatalogProduct(currentCode);
+    const lines = [currentCode + (catalogProduct ? ' — ' + (catalogProduct.name||'') : ''), '(no live stock loaded — check Vrich before confirming)'];
+    setReplyBoxContent(lines.join('\n'), '');
+    return;
+  }
+  const colorsArr = currentAvailableColorsArr();
+  const lines = ['📏 ទំហំដែលនៅមានក្នុងស្តុក', currentCode, `តម្លៃ: ${stockEntry.price}`];
+  if(colorsArr.length){
+    colorsArr.forEach(c => { lines.push(`${c.color}: ${c.sizes.join(' ')}`); });
+  } else {
+    lines.push('សុំទោស 🙏 អស់ស្តុកទាំងអស់ហើយ');
+  }
+  setReplyBoxContent(lines.join('\n'), '');
+}
+
+// Appends the kg range to a size label wherever one is shown, e.g. "XL (65-75kg)" —
+// so staff always see the reference weight next to the size, not just inside
+// the final copied message. Falls back to the bare size when no weight is on file.
+function sizeChipLabel(size, weightsMap){
+  const w = weightsMap && weightsMap[size];
+  return w ? `${size} (${liveWeightRangeDisplay(w)})` : size;
+}
+
+/* ============ Quick replies — common customer questions ============ */
+function colorsHavingSize(size, stockEntry){
+  const colors = [];
+  if(!stockEntry) return colors;
+  stockEntry.colorMap.forEach((sizeArr, color)=>{
+    if(sizeArr.some(s => s.size === size && s.remain > 0)) colors.push(color || '—');
+  });
+  return colors;
+}
+
+function renderQuickReplySizeChips(stockEntry, weightsMap){
+  const wrap = document.getElementById('qrSizeChips');
+  wrap.innerHTML = '';
+  if(!stockEntry){
+    wrap.innerHTML = '<span class="qr-label" style="margin:0;">Load stock for this code first.</span>';
+    return;
+  }
+  const colorsArr = Array.from(stockEntry.colorMap.entries()).map(([color, sizeArr]) => ({ color, sizes: sizeArr.map(s=>s.size) }));
+  const sizes = liveAllSizes(colorsArr);
+  if(!sizes.length){ wrap.innerHTML = '<span class="qr-label" style="margin:0;">No sizes found for this code.</span>'; return; }
+  sizes.forEach(size=>{
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'size-chip qr-size-chip';
+    chip.dataset.size = size;
+    chip.textContent = sizeChipLabel(size, weightsMap);
+    chip.addEventListener('click', ()=>{
+      const colors = colorsHavingSize(size, stockEntry);
+      const text = colors.length
+        ? `ទំហំ ${size} មានពណ៌: ${colors.join(', ')}`
+        : `សុំទោស 🙏 ទំហំ ${size} អស់ស្តុកហើយ`;
+      showAndCopy(text, '', chip);
+    });
+    wrap.appendChild(chip);
+  });
+}
+
+// Tappable color chips — pulled live from the loaded code's own stock data
+// (never typed/searched). Blue/"on" = this color still has stock somewhere;
+// dimmed/"off" = every size in that color is sold out. Tapping a chip
+// generates the matching customer reply and copies it, same pattern as the
+// size chips above.
+function renderQuickReplyColorChips(stockEntry){
+  const wrap = document.getElementById('qrColorChips');
+  wrap.innerHTML = '';
+  if(!stockEntry){
+    wrap.innerHTML = '<span class="qr-label" style="margin:0;">Load stock for this code first.</span>';
+    return;
+  }
+  if(!stockEntry.colorMap.size){ wrap.innerHTML = '<span class="qr-label" style="margin:0;">No colors found for this code.</span>'; return; }
+  stockEntry.colorMap.forEach((sizeArr, color)=>{
+    const label = color || '—';
+    const avail = sizeArr.filter(s=>s.remain>0).sort((a,b)=>sizeSortKey(a.size)-sizeSortKey(b.size)).map(s=>s.size);
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'size-chip qr-size-chip ' + (avail.length ? 'on' : 'off');
+    chip.dataset.color = color;
+    chip.textContent = label;
+    chip.addEventListener('click', ()=>{
+      const text = avail.length
+        ? `${label} មានទំហំ: ${avail.join(' ')}`
+        : `សុំទោស 🙏 ពណ៌ ${label} អស់ស្តុកហើយ`;
+      showAndCopy(text, '', chip);
+    });
+    wrap.appendChild(chip);
+  });
+}
+
+// Returns { weightsMap, hasSavedLog }. hasSavedLog is true only when this
+// code has an actual saved weight log (from the Live Log tool) — when it's
+// false, every value in weightsMap fell back to the generic default table,
+// which is NOT verified for this specific item.
+async function weightsMapForCurrentCode(sizes, code){
+  let savedLog = null;
+  try{
+    const res = await storage.get(liveLogKey(code || currentCode));
+    if(res && res.value) savedLog = JSON.parse(res.value);
+  }catch(e){ /* fall back to defaults */ }
+  const hasSavedLog = !!(savedLog && savedLog.weights && Object.keys(savedLog.weights).length);
+  const weightsMap = {};
+  sizes.forEach(s=>{
+    weightsMap[s] = (savedLog && savedLog.weights && savedLog.weights[s]) || LIVE_DEFAULT_WEIGHTS[s] || '';
+  });
+  return { weightsMap, hasSavedLog };
+}
+
+// Picks the smallest size whose weight range covers the given kg (falls back
+// to the largest size if the person is heavier than every range on file).
+function suggestSizeForWeight(kg, weightsMap){
+  const ranges = SIZE_ORDER.filter(s => weightsMap[s]).map(s=>{
+    const parts = String(weightsMap[s]).replace(/kg/gi,'').split('-').map(n=>parseFloat(n.trim()));
+    return { size: s, min: parts[0], max: parts.length > 1 ? parts[1] : parts[0] };
+  });
+  if(!ranges.length) return null;
+  const fit = ranges.find(r => kg <= r.max);
+  return fit ? fit.size : ranges[ranges.length - 1].size;
+}
+
+/* ============ Greeting / message templates — saved locally so they're
+   there next time (same per-device pattern as the Live Log tool's "Save new
+   garment type"). Tapping a template puts it straight in the final message
+   box; it does NOT auto-copy — review it, then tap Copy yourself. ============ */
+const TEMPLATE_STORAGE_KEY = 'vhm_quickreply_templates';
+const DEFAULT_TEMPLATES = ['សួស្តី! 👋 មានអ្វីអាចជួយបានដែរ?'];
+function loadTemplates(){
+  try{
+    const raw = localStorage.getItem(TEMPLATE_STORAGE_KEY);
+    if(raw){
+      const parsed = JSON.parse(raw);
+      if(Array.isArray(parsed) && parsed.length) return parsed;
+    }
+  }catch(e){}
+  return DEFAULT_TEMPLATES.slice();
+}
+function saveTemplates(list){
+  try{ localStorage.setItem(TEMPLATE_STORAGE_KEY, JSON.stringify(list)); }catch(e){}
+}
+let templates = loadTemplates();
+
+function renderTemplates(){
+  const wrap = document.getElementById('tplList');
+  wrap.innerHTML = '';
+  templates.forEach((text, idx)=>{
+    const card = document.createElement('div');
+    card.className = 'tpl-card';
+
+    const textEl = document.createElement('div');
+    textEl.className = 'tpl-text';
+    textEl.textContent = text;
+    card.appendChild(textEl);
+
+    const actions = document.createElement('div');
+    actions.className = 'tpl-actions';
+
+    const useBtn = document.createElement('button');
+    useBtn.type = 'button';
+    useBtn.className = 'tpl-use';
+    useBtn.textContent = 'Use → send to message box';
+    useBtn.addEventListener('click', ()=> sendTemplateToReplyBox(text));
+    actions.appendChild(useBtn);
+
+    const editBtn = document.createElement('button');
+    editBtn.type = 'button';
+    editBtn.className = 'tpl-edit';
+    editBtn.textContent = 'Edit';
+    editBtn.addEventListener('click', ()=>{
+      const updated = prompt('Edit template:', text);
+      if(updated === null) return;
+      const trimmed = updated.trim();
+      if(!trimmed) return;
+      templates[idx] = trimmed;
+      saveTemplates(templates);
+      renderTemplates();
+    });
+    actions.appendChild(editBtn);
+
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'tpl-delete';
+    delBtn.textContent = '✕';
+    delBtn.addEventListener('click', ()=>{
+      templates.splice(idx, 1);
+      saveTemplates(templates);
+      renderTemplates();
+    });
+    actions.appendChild(delBtn);
+
+    card.appendChild(actions);
+    wrap.appendChild(card);
+  });
+}
+renderTemplates();
+
+// Puts template text straight into the visible message box (no clipboard
+// write) — a manual "Copy this" button on the box itself finishes the job.
+function sendTemplateToReplyBox(text){
+  const box = document.getElementById('replyBox');
+  box.classList.add('show');
+  document.getElementById('pReply').innerHTML = text.replace(/\n/g,'<br>');
+  document.getElementById('pReply').dataset.raw = text;
+  box.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+document.getElementById('tplAddToggle').addEventListener('click', ()=>{
+  document.getElementById('tplAddRow').style.display = 'flex';
+  document.getElementById('tplAddToggle').style.display = 'none';
+  document.getElementById('tplAddText').focus();
+});
+document.getElementById('tplCancelBtn').addEventListener('click', ()=>{
+  document.getElementById('tplAddText').value = '';
+  document.getElementById('tplAddRow').style.display = 'none';
+  document.getElementById('tplAddToggle').style.display = 'block';
+});
+document.getElementById('tplSaveBtn').addEventListener('click', ()=>{
+  const text = document.getElementById('tplAddText').value.trim();
+  if(!text) return;
+  templates.push(text);
+  saveTemplates(templates);
+  renderTemplates();
+  document.getElementById('tplAddText').value = '';
+  document.getElementById('tplAddRow').style.display = 'none';
+  document.getElementById('tplAddToggle').style.display = 'block';
+});
+
+document.getElementById('copyReplyBoxBtn').addEventListener('click', (e)=>{
+  const text = document.getElementById('pReply').dataset.raw || '';
+  if(!text) return;
+  showAndCopy(text, '', e.currentTarget);
+});
+
+document.getElementById('qrHowMany').addEventListener('click', (e)=>{
+  const stockEntry = loadedStockCodes.get(currentCode);
+  if(!stockEntry){ flashBtn(e.currentTarget, 'No stock loaded for this code'); return; }
+  const colorsArr = Array.from(stockEntry.colorMap.entries()).map(([color, sizeArr]) => ({ color, sizes: sizeArr.filter(s=>s.remain>0).map(s=>s.size) }));
+  const sizes = liveAllSizes(colorsArr);
+  const text = sizes.length ? `ទំហំដែលមាន: ${sizes.join(', ')}` : 'សុំទោស 🙏 ទំនិញនេះអស់ស្តុកគ្រប់ទំហំហើយ';
+  showAndCopy(text, '', e.currentTarget);
+});
+
+// Only reachable now via the chat-scan bookmarklet's "color" trigger — the
+// color blocks above already let staff see/select colors directly, so the
+// old manual "Do you have color...?" button (same job, just typed) was removed.
+function checkColorAvailability(query){
+  if(!query) return;
+  const stockEntry = loadedStockCodes.get(currentCode);
+  let matchColor = null, sizes = [];
+  if(stockEntry){
+    for(const [color, sizeArr] of stockEntry.colorMap.entries()){
+      const c = (color || '').toLowerCase();
+      if(c.includes(query.toLowerCase()) || query.toLowerCase().includes(c)){
+        const avail = sizeArr.filter(s=>s.remain>0).sort((a,b)=>sizeSortKey(a.size)-sizeSortKey(b.size)).map(s=>s.size);
+        if(avail.length){ matchColor = color || '—'; sizes = avail; break; }
+      }
+    }
+  }
+  const text = matchColor
+    ? `${matchColor} មានទំហំ: ${sizes.join(' ')}`
+    : `សុំទោស 🙏 មិនមានពណ៌ "${query}" សម្រាប់ទំនិញនេះទេ`;
+  showAndCopy(text, '', null);
+}
+
+// Builds the kg/cm fit reply text for whichever size fitState currently
+// points at — used by the main "Suggest a size" button and by the +/-
+// nudge buttons so staff can bump the suggestion up or down one size
+// (customer says "I like it looser/tighter") without retyping kg/cm.
+function buildFitText(state){
+  const { weightsMap, stockEntry, hasSavedLog, kg, cm, sizes, idx } = state;
+  const size = sizes[idx];
+  let note;
+  const colors = colorsHavingSize(size, stockEntry);
+  if(colors.length){
+    note = `មានស្តុក ពណ៌: ${colors.join(', ')}`;
+  } else {
+    let altSize = null, altColors = [];
+    for(const s of sizes){
+      const cs = colorsHavingSize(s, stockEntry);
+      if(cs.length){ altSize = s; altColors = cs; break; }
+    }
+    note = altSize ? `ទំហំ ${size} អស់ស្តុក — សាកល្បង ${altSize} (${altColors.join(', ')})` : `ទំហំ ${size} អស់ស្តុកបច្ចុប្បន្ន`;
+  }
+  const rangeDisplay = liveWeightRangeDisplay(weightsMap[size]);
+  const cmPart = cm ? `, កម្ពស់ ${cm}cm` : '';
+  const verifyNote = hasSavedLog ? '' : ' ⚠️ (generic estimate, not verified for this code — confirm before telling the customer)';
+  return `ទម្ងន់ ${kg}kg${cmPart} → សាកល្បងទំហំ ${size} (${rangeDisplay}) — ${note}${verifyNote}`;
+}
+
+function renderFitAdjustUI(){
+  const wrap = document.getElementById('qrFitAdjust');
+  if(!fitState){ wrap.style.display = 'none'; return; }
+  wrap.style.display = 'flex';
+  document.getElementById('qrFitSizeLabel').textContent = fitState.sizes[fitState.idx];
+  document.getElementById('qrFitDown').disabled = fitState.idx <= 0;
+  document.getElementById('qrFitUp').disabled = fitState.idx >= fitState.sizes.length - 1;
+}
+
+document.getElementById('qrFitBtn').addEventListener('click', async (e)=>{
+  const btn = e.currentTarget;
+  const kg = parseFloat(document.getElementById('qrKgInput').value);
+  const cm = document.getElementById('qrCmInput').value.trim();
+  if(!kg){ flashBtn(btn, 'Enter kg first'); return; }
+  const stockEntry = loadedStockCodes.get(currentCode);
+  const colorsArr = stockEntry ? Array.from(stockEntry.colorMap.entries()).map(([color, sizeArr]) => ({ color, sizes: sizeArr.map(s=>s.size) })) : [];
+  const knownSizes = colorsArr.length ? liveAllSizes(colorsArr) : Object.keys(LIVE_DEFAULT_WEIGHTS);
+  const old = btn.textContent;
+  btn.textContent = '…';
+  const result = await weightsMapForCurrentCode(knownSizes, currentCode);
+  const weightsMap = result.weightsMap;
+  btn.textContent = old;
+  const size = suggestSizeForWeight(kg, weightsMap);
+  if(!size){ flashBtn(btn, 'No weight data for this product'); fitState = null; renderFitAdjustUI(); return; }
+
+  const sizes = SIZE_ORDER.filter(s => weightsMap[s]);
+  const idx = Math.max(0, sizes.indexOf(size));
+  fitState = { weightsMap, stockEntry, hasSavedLog: result.hasSavedLog, kg, cm, sizes, idx };
+  renderFitAdjustUI();
+  showAndCopy(buildFitText(fitState), '', btn);
+});
+
+document.getElementById('qrFitUp').addEventListener('click', (e)=>{
+  if(!fitState) return;
+  fitState.idx = Math.min(fitState.idx + 1, fitState.sizes.length - 1);
+  renderFitAdjustUI();
+  showAndCopy(buildFitText(fitState), '', e.currentTarget);
+});
+document.getElementById('qrFitDown').addEventListener('click', (e)=>{
+  if(!fitState) return;
+  fitState.idx = Math.max(fitState.idx - 1, 0);
+  renderFitAdjustUI();
+  showAndCopy(buildFitText(fitState), '', e.currentTarget);
+});
+
+function flashBtn(btn, msg){
+  if(!btn) return;
+  const old = btn.textContent;
+  btn.textContent = msg;
+  setTimeout(()=>{ btn.textContent = old; }, 1800);
+}
+
+function currentAvailableColorsArr(){
+  const stockEntry = loadedStockCodes.get(currentCode);
+  const colorsArr = [];
+  if(stockEntry){
+    stockEntry.colorMap.forEach((sizes, color)=>{
+      const available = sizes.filter(s => s.remain > 0).sort((a,b)=>sizeSortKey(a.size)-sizeSortKey(b.size));
+      if(available.length) colorsArr.push({ color: color || '—', sizes: available.map(s=>s.size) });
+    });
+  }
+  return colorsArr;
+}
+
+// Splits a raw weight-range string like "70-80" into its min/max pieces,
+// for the "XL គីឡូ 70 ដល់ 80kg បង" phrasing.
+function weightRangeParts(rangeStr){
+  if(!rangeStr) return null;
+  const clean = String(rangeStr).replace(/kg/gi, '').trim();
+  const parts = clean.split('-').map(s=>s.trim()).filter(Boolean);
+  if(parts.length===2) return { min: parts[0], max: parts[1] };
+  if(parts.length===1) return { min: parts[0], max: parts[0] };
+  return null;
+}
+
+// Weight info — tap a size to get just that size's kg range, e.g.
+// "XL គីឡូ 70 ដល់ 80kg បង", instead of the full colors+sizes dump.
+function renderWeightInfoChips(stockEntry, weightsMap, hasSavedLog){
+  const wrap = document.getElementById('qrWeightInfoChips');
+  wrap.innerHTML = '';
+  lastWeightInfo = null;
+  if(!stockEntry){
+    wrap.innerHTML = '<span class="qr-label" style="margin:0;">Load stock for this code first.</span>';
+    return;
+  }
+  const sizes = Object.keys(weightsMap).sort((a,b)=>sizeSortKey(a)-sizeSortKey(b));
+  if(!sizes.length){ wrap.innerHTML = '<span class="qr-label" style="margin:0;">No weight data for this code.</span>'; return; }
+  lastWeightInfo = { weightsMap, hasSavedLog, sizes };
+  sizes.forEach(size=>{
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'size-chip qr-size-chip';
+    chip.dataset.size = size;
+    chip.textContent = size;
+    chip.addEventListener('click', ()=>{
+      const range = weightRangeParts(weightsMap[size]);
+      const verifyNote = hasSavedLog ? '' : '\n⚠️ (generic estimate, not verified for this code — confirm before telling the customer)';
+      const text = range
+        ? `${size} គីឡូ ${range.min} ដល់ ${range.max}kg បង${verifyNote}`
+        : `គ្មានទិន្នន័យទម្ងន់សម្រាប់ទំហំ ${size}`;
+      showAndCopy(text, '', chip);
+    });
+    wrap.appendChild(chip);
+  });
+}
+
+// "Show all sizes' weight" — same គីឡូ table format as the Live Log tool's
+// Kg guide, listing every size this code has with its kg range in one go.
+document.getElementById('qrWeightInfoAll').addEventListener('click', (e)=>{
+  const btn = e.currentTarget;
+  if(!lastWeightInfo || !lastWeightInfo.sizes.length){ flashBtn(btn, 'No weight data for this code'); return; }
+  const { weightsMap, hasSavedLog, sizes } = lastWeightInfo;
+  const lines = ['គីឡូ'];
+  sizes.forEach(s => { lines.push(`${s}: ${liveWeightRangeDisplay(weightsMap[s])}`); });
+  const verifyNote = hasSavedLog ? '' : '\n⚠️ (generic estimate, not verified for this code — confirm before telling the customer)';
+  showAndCopy(lines.join('\n') + verifyNote, '', btn);
+});
+
+// Fills the always-visible box at the top without copying anything — used
+// to auto-populate the default message when a code loads.
+function setReplyBoxContent(text, upsellHtml){
+  const box = document.getElementById('replyBox');
+  box.classList.add('show');
+  document.getElementById('pReply').innerHTML = text.replace(/\n/g,'<br>') + (upsellHtml || '');
+  document.getElementById('pReply').dataset.raw = text;
+}
+
+function showAndCopy(text, upsellHtml, btn){
+  setReplyBoxContent(text, upsellHtml);
+  broadcastToPhone(text);
+
+  const doCopiedState = ()=>{
+    if(!btn) return;
+    const old = btn.textContent;
+    btn.textContent = '✓ Copied';
+    btn.classList.add('copied');
+    setTimeout(()=>{ btn.textContent = old; btn.classList.remove('copied'); }, 2000);
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(doCopiedState).catch(()=>{ fallbackCopy(text); doCopiedState(); });
+  }else{
+    fallbackCopy(text);
+    doCopiedState();
+  }
+}
+function fallbackCopy(text){
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  try{ document.execCommand('copy'); }catch(e){}
+  document.body.removeChild(ta);
+}
+
+// Pushes the reply we just generated/copied to the matching staff member's
+// phone companion page (quickreply-view.html, opened with the same name
+// picked in "Your name" above). Best-effort — if it fails, nothing on this
+// screen changes, so it never blocks the normal copy-paste flow.
+function broadcastToPhone(text){
+  const name = getStockName();
+  if(!name) return;
+  storage.set(quickReplyLiveKey(name), text).catch(()=>{});
+}
+
+/* ============ Remote trigger — the "scan chat" bookmarklet opens/focuses
+   this window and tells it which quick reply to fire, either via a URL hash
+   (#action=...) on first open, or via postMessage once this window is
+   already open and just being reused. ============ */
+function applyQuickReplyAction(params){
+  try{
+    const action = params.get('action');
+    if(!action) return;
+    if(action === 'hello'){
+      if(templates.length) showAndCopy(templates[0], '', null);
+    }else if(action === 'howmany'){
+      document.getElementById('qrHowMany').click();
+    }else if(action === 'size'){
+      const size = (params.get('size') || '').toUpperCase();
+      const chip = Array.from(document.querySelectorAll('.qr-size-chip')).find(c => (c.dataset.size || '').toUpperCase() === size);
+      if(chip) chip.click();
+    }else if(action === 'color'){
+      const q = (params.get('q') || '').toLowerCase();
+      const chip = Array.from(document.querySelectorAll('#qrColorChips .qr-size-chip')).find(c=>{
+        const c2 = (c.dataset.color || '').toLowerCase();
+        return c2 && (c2.includes(q) || q.includes(c2));
+      });
+      if(chip) chip.click();
+      else checkColorAvailability(q);
+    }else if(action === 'fit'){
+      document.getElementById('qrKgInput').value = params.get('kg') || '';
+      document.getElementById('qrCmInput').value = params.get('cm') || '';
+      document.getElementById('qrFitBtn').click();
+    }
+  }catch(e){ console.error('Quick reply remote trigger failed', e); }
+}
+if(location.hash){
+  // give Load-from-laptop's auto-display a moment to finish first
+  setTimeout(()=> applyQuickReplyAction(new URLSearchParams(location.hash.slice(1))), 400);
+}
+window.addEventListener('message', (e)=>{
+  if(!e.data || e.data.source !== 'vhmQuickReplyTrigger') return;
+  applyQuickReplyAction(new URLSearchParams(e.data.query || ''));
+});
+
+initNameSelect();
+loadCatalog();
+</script>
+</body>
+</html>
