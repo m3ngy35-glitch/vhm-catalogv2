@@ -67,6 +67,26 @@
 
   .note{font-size:11px;color:#999;margin-top:12px;line-height:1.5;text-align:center;}
 
+  .upsell-box{display:none;margin-top:18px;border-top:2px solid var(--border);padding-top:14px;}
+  .upsell-box.show{display:block;}
+  .upsell-box.flash{animation:flashUpsellBg 1s ease;}
+  @keyframes flashUpsellBg{
+    0%{background:#ffe9a8;}
+    100%{background:transparent;}
+  }
+  .upsell-title{font-size:13px;font-weight:700;color:#555;margin-bottom:8px;}
+  .upsell-image{display:none;width:100%;border-radius:10px;margin-bottom:10px;border:1px solid var(--border);}
+  .upsell-image.show{display:block;}
+  .upsell-text{
+    display:none;background:#fff7e0;border:1px solid #f3dfa0;border-radius:10px;padding:12px 14px;
+    font-size:15px;line-height:1.5;white-space:pre-wrap;color:#5d4a1a;margin-bottom:8px;
+  }
+  .upsell-text.show{display:block;}
+  .upsell-copy-btn{display:none;}
+  .upsell-copy-btn.show{display:block;}
+  .upsell-image-note{display:none;font-size:11px;color:#999;margin-top:6px;line-height:1.5;text-align:center;}
+  .upsell-image-note.show{display:block;}
+
   footer{padding:8px 16px;font-size:10.5px;color:#bbb;text-align:center;}
 </style>
 </head>
@@ -112,6 +132,15 @@
       Clipboard updates automatically when possible — on most phones you still need to tap once.
       This never sends anything into Vrich by itself; always paste it yourself.
     </div>
+
+    <div id="upsellBox" class="upsell-box">
+      <div class="upsell-title">📢 Upsell from the team</div>
+      <img id="upsellImage" class="upsell-image">
+      <div id="upsellText" class="upsell-text"></div>
+      <button type="button" id="upsellCopyImageBtn" class="copy-btn upsell-copy-btn">🖼️ Copy image to clipboard</button>
+      <button type="button" id="upsellCopyTextBtn" class="copy-btn upsell-copy-btn">📋 Copy text</button>
+      <div id="upsellImageNote" class="upsell-image-note"></div>
+    </div>
   </main>
 
   <footer>VHM Club internal tool — reads the real vhm-catalog Firebase project</footer>
@@ -137,8 +166,12 @@ function firestore_(){
 // same name on both pages connects them.
 function quickReplyLiveKey(name){ return 'quickreply_live_' + name.trim().toUpperCase().replace(/[^A-Z0-9]/g,''); }
 
-function getSavedName(){ return (localStorage.getItem('vhm_stock_name') || '').trim(); }
-function setSavedName(v){ localStorage.setItem('vhm_stock_name', v); }
+// Uses its own storage key (not the shared vhm_stock_name one the other
+// tools use) so this page always asks for a name the first time it's
+// opened on a phone, even if that phone already used index.html/live.html/
+// quickreply.html before and had a name saved there.
+function getSavedName(){ return (localStorage.getItem('vhm_quickreply_view_name') || '').trim(); }
+function setSavedName(v){ localStorage.setItem('vhm_quickreply_view_name', v); }
 
 let unsubscribe = null;
 let lastUpdatedAt = null;
@@ -267,6 +300,107 @@ sel.addEventListener('change', ()=>{
   setSavedName(sel.value);
   if(sel.value) watchName(sel.value); else stopWatching();
 });
+
+/* ===== Upsell broadcast — shows whatever the laptop last pushed with the
+   "📢 Push to all phones" button, regardless of which name is selected
+   above. Runs independently of watchName()/stopWatching(). ===== */
+let lastUpsellAt = null;
+let currentUpsellText = '';
+let currentUpsellImage = null;
+
+function watchUpsellBroadcast(){
+  const db = firestore_();
+  db.collection('kv').doc('upsell_broadcast').onSnapshot((doc)=>{
+    if(!doc.exists) return;
+    const data = doc.data();
+    if(!data.data) return;
+    const updatedAtMs = data.updatedAt && data.updatedAt.toMillis ? data.updatedAt.toMillis() : Date.now();
+    if(lastUpsellAt !== null && updatedAtMs === lastUpsellAt) return; // no real change
+    const isFirstLoad = (lastUpsellAt === null);
+    lastUpsellAt = updatedAtMs;
+
+    const payload = data.data;
+    currentUpsellText = String(payload.text || '');
+    currentUpsellImage = payload.image || null;
+    if(!currentUpsellText && !currentUpsellImage) return; // nothing to show
+
+    const box = document.getElementById('upsellBox');
+    const img = document.getElementById('upsellImage');
+    const textEl = document.getElementById('upsellText');
+    const copyImgBtn = document.getElementById('upsellCopyImageBtn');
+    const copyTextBtn = document.getElementById('upsellCopyTextBtn');
+    const note = document.getElementById('upsellImageNote');
+
+    note.classList.remove('show');
+    box.classList.add('show');
+
+    if(currentUpsellImage){ img.src = currentUpsellImage; img.classList.add('show'); copyImgBtn.classList.add('show'); }
+    else { img.classList.remove('show'); copyImgBtn.classList.remove('show'); }
+
+    if(currentUpsellText){ textEl.textContent = currentUpsellText; textEl.classList.add('show'); copyTextBtn.classList.add('show'); }
+    else { textEl.classList.remove('show'); copyTextBtn.classList.remove('show'); }
+
+    if(!isFirstLoad){
+      box.classList.remove('flash'); void box.offsetWidth; box.classList.add('flash');
+      if(navigator.vibrate) try{ navigator.vibrate(120); }catch(e){}
+    }
+  }, (err)=>{
+    console.error('upsell broadcast watch error', err);
+  });
+}
+
+document.getElementById('upsellCopyTextBtn').addEventListener('click', (e)=>{
+  const btn = e.currentTarget;
+  if(!currentUpsellText) return;
+  const done = ()=>{
+    const old = btn.textContent;
+    btn.textContent = '✓ Copied';
+    btn.classList.add('copied');
+    setTimeout(()=>{ btn.textContent = old; btn.classList.remove('copied'); }, 1800);
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(currentUpsellText).then(done).catch(()=>{ fallbackCopy(currentUpsellText); done(); });
+  }else{
+    fallbackCopy(currentUpsellText);
+    done();
+  }
+});
+
+document.getElementById('upsellCopyImageBtn').addEventListener('click', async (e)=>{
+  const btn = e.currentTarget;
+  const note = document.getElementById('upsellImageNote');
+  if(!currentUpsellImage) return;
+  note.classList.remove('show');
+  try{
+    // Re-encode to PNG via canvas before writing — broadest clipboard-paste
+    // support across phone browsers, regardless of how it was stored.
+    const pngBlob = await new Promise((resolve, reject)=>{
+      const img = new Image();
+      img.onload = ()=>{
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+        canvas.getContext('2d').drawImage(img, 0, 0);
+        canvas.toBlob((b)=> b ? resolve(b) : reject(new Error('toBlob failed')), 'image/png');
+      };
+      img.onerror = ()=> reject(new Error('image decode failed'));
+      img.src = currentUpsellImage;
+    });
+    if(!navigator.clipboard || !window.ClipboardItem){
+      throw new Error('Clipboard image API not supported on this browser');
+    }
+    await navigator.clipboard.write([ new ClipboardItem({ 'image/png': pngBlob }) ]);
+    const old = btn.textContent;
+    btn.textContent = '✓ Image copied';
+    btn.classList.add('copied');
+    setTimeout(()=>{ btn.textContent = old; btn.classList.remove('copied'); }, 1800);
+  }catch(err){
+    console.error('copy image failed', err);
+    note.textContent = "Couldn't auto-copy the image on this browser — long-press the picture above and choose Copy or Save instead.";
+    note.classList.add('show');
+  }
+});
+
+watchUpsellBroadcast();
 </script>
 </body>
 </html>

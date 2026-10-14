@@ -138,6 +138,26 @@
 
   .upsell-field.bottom{margin-top:10px;border-top:1px solid var(--border);padding-top:8px;}
 
+  .upsell-broadcast{margin-top:10px;border-top:1px solid var(--border);padding-top:8px;}
+  .upsell-broadcast textarea{
+    width:100%;min-height:52px;padding:9px 10px;border:1px solid #cfd8e8;border-radius:7px;
+    font-size:13.5px;font-family:inherit;resize:vertical;margin-top:3px;
+  }
+  .upsell-image-row{display:flex;align-items:center;gap:8px;margin-top:6px;}
+  .upsell-image-row button{
+    background:#fff;border:1.5px solid var(--accent);color:var(--accent);border-radius:7px;
+    padding:8px 10px;font-size:12.5px;font-weight:600;flex:0 0 auto;
+  }
+  .upsell-image-name{font-size:11.5px;color:#888;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .upsell-image-preview{display:none;max-width:100%;max-height:140px;border-radius:8px;margin-top:8px;border:1px solid var(--border);}
+  .upsell-image-preview.show{display:block;}
+  .upsell-image-clear{background:none !important;border:none !important;color:#c0392b !important;font-size:11.5px !important;padding:0 !important;flex:0 0 auto;text-decoration:underline;}
+  .broadcast-upsell-btn{
+    width:100%;margin-top:8px;background:var(--accent);color:#fff;border:none;border-radius:8px;
+    padding:10px 10px;font-size:13.5px;font-weight:700;
+  }
+  .broadcast-upsell-status{font-size:11.5px;color:#888;text-align:center;margin-top:5px;min-height:14px;}
+
   footer{flex:0 0 auto;padding:6px 16px;font-size:10.5px;color:#bbb;text-align:center;}
 </style>
 </head>
@@ -267,6 +287,20 @@
       <div class="upsell-field bottom">
         <label>Upsell line (optional — typed fresh each time, not saved yet)</label>
         <input id="upsellInput" type="text" placeholder="e.g. matching khaki pants, code C07, also in stock">
+      </div>
+
+      <div class="upsell-broadcast">
+        <div class="qr-title">📢 Upsell broadcast — push to ALL staff phones at once</div>
+        <textarea id="upsellBroadcastText" placeholder="Upsell message everyone should send, e.g. this week's promo…"></textarea>
+        <div class="upsell-image-row">
+          <input type="file" id="upsellImageFile" accept="image/*" style="display:none;">
+          <button type="button" id="upsellImagePickBtn">🖼️ Choose image</button>
+          <span id="upsellImageName" class="upsell-image-name">No image — or paste one with Ctrl+V</span>
+          <button type="button" id="upsellImageClearBtn" class="upsell-image-clear" style="display:none;">remove</button>
+        </div>
+        <img id="upsellImagePreview" class="upsell-image-preview">
+        <button type="button" id="broadcastUpsellBtn" class="broadcast-upsell-btn">📢 Push to all phones</button>
+        <div id="upsellBroadcastStatus" class="broadcast-upsell-status"></div>
       </div>
     </div>
     </div>
@@ -1044,6 +1078,117 @@ function broadcastToPhone(text){
   if(!name) return;
   storage.set(quickReplyLiveKey(name), text).catch(()=>{});
 }
+
+/* ===== Upsell broadcast — push an image + text to every staff phone at
+   once (quickreply-view.html listens on this fixed key regardless of
+   which name is selected there). Images are resized/compressed client-side
+   so the whole thing stays comfortably under Firestore's ~1MB document
+   limit before being written. Never auto-sends anywhere — staff still
+   manually copy + paste it themselves on their end. ===== */
+const UPSELL_BROADCAST_KEY = 'upsell_broadcast';
+let upsellBroadcastImageDataUrl = null;
+
+function compressImageFileOnce(file, maxDim, quality){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      const img = new Image();
+      img.onload = ()=>{
+        let w = img.width, h = img.height;
+        if (w > maxDim || h > maxDim){
+          if (w >= h){ h = Math.round(h * maxDim / w); w = maxDim; }
+          else { w = Math.round(w * maxDim / h); h = maxDim; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = ()=> reject(new Error('Could not read that image'));
+      img.src = reader.result;
+    };
+    reader.onerror = ()=> reject(new Error('Could not read that file'));
+    reader.readAsDataURL(file);
+  });
+}
+async function compressImageToLimit(file, limitBytes){
+  let maxDim = 900, quality = 0.75;
+  for(let i=0; i<6; i++){
+    const dataUrl = await compressImageFileOnce(file, maxDim, quality);
+    const approxBytes = Math.round(dataUrl.length * 0.75);
+    if (approxBytes <= limitBytes) return dataUrl;
+    if (quality > 0.4){ quality -= 0.15; }
+    else { maxDim = Math.round(maxDim * 0.7); quality = 0.6; }
+  }
+  return compressImageFileOnce(file, 300, 0.4); // last-resort small+compressed
+}
+
+async function handleUpsellImageFile(file){
+  const nameEl = document.getElementById('upsellImageName');
+  const preview = document.getElementById('upsellImagePreview');
+  const clearBtn = document.getElementById('upsellImageClearBtn');
+  nameEl.textContent = 'Compressing…';
+  try{
+    const dataUrl = await compressImageToLimit(file, 650000);
+    upsellBroadcastImageDataUrl = dataUrl;
+    preview.src = dataUrl;
+    preview.classList.add('show');
+    nameEl.textContent = file.name || 'Image ready';
+    clearBtn.style.display = 'inline';
+  }catch(e){
+    console.error(e);
+    nameEl.textContent = 'Could not read that image — try another.';
+  }
+}
+document.getElementById('upsellImagePickBtn').addEventListener('click', ()=>{
+  document.getElementById('upsellImageFile').click();
+});
+document.getElementById('upsellImageFile').addEventListener('change', (e)=>{
+  const file = e.target.files && e.target.files[0];
+  if(file) handleUpsellImageFile(file);
+});
+document.getElementById('upsellImageClearBtn').addEventListener('click', ()=>{
+  upsellBroadcastImageDataUrl = null;
+  const preview = document.getElementById('upsellImagePreview');
+  preview.classList.remove('show');
+  preview.src = '';
+  document.getElementById('upsellImageName').textContent = 'No image — or paste one with Ctrl+V';
+  document.getElementById('upsellImageClearBtn').style.display = 'none';
+});
+// Paste an image anywhere on the page (Ctrl+V) to attach it, without needing
+// to open the file picker first.
+document.addEventListener('paste', (e)=>{
+  const items = (e.clipboardData && e.clipboardData.items) || [];
+  for(const item of items){
+    if(item.type && item.type.indexOf('image/') === 0){
+      const file = item.getAsFile();
+      if(file){ handleUpsellImageFile(file); e.preventDefault(); }
+      break;
+    }
+  }
+});
+
+document.getElementById('broadcastUpsellBtn').addEventListener('click', async ()=>{
+  const btn = document.getElementById('broadcastUpsellBtn');
+  const status = document.getElementById('upsellBroadcastStatus');
+  const text = document.getElementById('upsellBroadcastText').value.trim();
+  if(!text && !upsellBroadcastImageDataUrl){
+    status.textContent = 'Add a message or an image first.';
+    return;
+  }
+  const old = btn.textContent;
+  btn.textContent = 'Pushing…';
+  btn.disabled = true;
+  try{
+    await storage.set(UPSELL_BROADCAST_KEY, { text: text, image: upsellBroadcastImageDataUrl || null });
+    status.textContent = '✅ Pushed to all phones — ' + new Date().toLocaleTimeString();
+  }catch(e){
+    console.error(e);
+    status.textContent = '⚠ Could not push — try again.';
+  }
+  btn.disabled = false;
+  btn.textContent = old;
+});
 
 /* ============ Remote trigger — the "scan chat" bookmarklet opens/focuses
    this window and tells it which quick reply to fire, either via a URL hash
