@@ -1,0 +1,2246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#15171c">
+<title>VH MEN Chat Service Workbench</title>
+<style>
+:root{
+  --bg:#f5f5f3; --surface:#fff; --ink:#15171c; --muted:#5b6270; --line:#dfe2e8; --line-strong:#c4c9d4;
+  --accent:#2f6fed; --accent-ink:#fff; --accent-soft:#eaf0ff; --accent-line:#b9ccf8;
+  --ok:#17703a; --ok-bg:#e6f4ea; --ok-line:#9bd0ac;
+  --warn:#7a4f00; --warn-bg:#fff4d6; --warn-line:#ecca72;
+  --bad:#a32525; --bad-bg:#fde8e8; --bad-line:#f0b4b4;
+  --font:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans Khmer","Khmer UI","Leelawadee UI","Khmer OS Battambang",Arial,sans-serif;
+  --sheet-h:96px;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 var(--font);touch-action:manipulation}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;touch-action:manipulation}
+button:disabled{cursor:not-allowed;opacity:.55}
+:focus-visible{outline:3px solid #7aa2ff;outline-offset:2px}
+h1,h2,h3,h4,p{margin:0}
+[hidden]{display:none!important}
+.skip{position:absolute;left:-999px;top:0;background:#000;color:#fff;padding:8px 12px;z-index:200}
+.skip:focus{left:8px;top:8px}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.grow{flex:1 1 auto;min-width:0}
+.stack{display:flex;flex-direction:column;gap:10px}
+.kh{font-family:var(--font);line-height:1.6}
+
+/* ---------- layout ---------- */
+.app{display:grid;grid-template-columns:minmax(0,1fr);min-height:100vh;min-height:100dvh}
+.topbar{background:#fff;border-bottom:1px solid var(--line);padding:8px 14px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;min-width:0}
+.logo{width:34px;height:34px;border-radius:8px;background:var(--ink);color:#fff;display:grid;place-items:center;font-weight:800;font-size:13px;letter-spacing:.5px;flex:none}
+.brand h1{font-size:16px;line-height:1.2}
+.brand p{font-size:12px;color:var(--muted)}
+.top-right{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.staff{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+.staff select{min-height:36px;border:1px solid var(--line-strong);border-radius:8px;padding:4px 8px;background:#fff;color:var(--ink);font-size:14px}
+#statusChips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:12.5px;background:#fff;color:var(--ink);white-space:nowrap}
+.chip.ok{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok)}
+.chip.warn{background:var(--warn-bg);border-color:var(--warn-line);color:var(--warn)}
+.chip.bad{background:var(--bad-bg);border-color:var(--bad-line);color:var(--bad)}
+.chip.accent{background:var(--accent-soft);border-color:var(--accent-line);color:#1f4fb8}
+
+nav#nav{background:#fff;border-bottom:1px solid var(--line);display:flex;gap:4px;padding:6px 10px;overflow-x:auto;scrollbar-width:none}
+nav#nav::-webkit-scrollbar{display:none}
+nav#nav button{border:0;background:transparent;border-radius:8px;padding:9px 14px;min-height:44px;font-weight:600;color:var(--muted);white-space:nowrap}
+nav#nav button[aria-current="page"]{background:var(--accent-soft);color:#1f4fb8}
+nav#nav button:hover{background:#f0f2f6}
+
+main#main{padding:12px 14px calc(var(--sheet-h) + 18px);min-width:0}
+.searchwrap{position:sticky;top:0;z-index:20;background:var(--bg);padding:2px 0 10px}
+.searchbox{position:relative}
+.searchbox input{width:100%;min-height:48px;border:1.5px solid var(--line-strong);border-radius:12px;padding:10px 14px 10px 40px;font-size:16px;background:#fff}
+.searchbox input:focus{border-color:var(--accent)}
+.searchbox .ico{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
+.results{position:absolute;left:0;right:0;top:calc(100% + 4px);background:#fff;border:1px solid var(--line-strong);border-radius:12px;box-shadow:0 10px 30px rgba(10,20,40,.14);max-height:min(60vh,520px);overflow:auto;z-index:30}
+.res{display:flex;gap:10px;align-items:flex-start;width:100%;text-align:left;border:0;background:#fff;padding:10px 12px;min-height:48px;border-bottom:1px solid var(--line)}
+.res:last-child{border-bottom:0}
+.res:hover,.res[aria-selected="true"]{background:var(--accent-soft)}
+.res .t{font-weight:650}
+.res .s{font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.res-empty{padding:14px;color:var(--muted)}
+.badge{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;border-radius:6px;padding:2px 7px;background:#eef0f4;color:#3b4252;flex:none;margin-top:2px}
+.badge.product{background:#e9eefc;color:#1f4fb8}
+.badge.stock{background:var(--ok-bg);color:var(--ok)}
+.badge.qa{background:#f3e9fb;color:#6b2f9a}
+.badge.template{background:#fdeedd;color:#8a4b00}
+.badge.category{background:#eef0f4;color:#3b4252}
+.badge.inactive{background:#eee;color:#666}
+.badge.warn{background:var(--warn-bg);color:var(--warn)}
+
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px}
+.card h2,.card h3{font-size:15px;margin-bottom:8px}
+.sec-title{font-size:18px;font-weight:700;margin:4px 0 10px}
+.banner{border-radius:10px;padding:8px 12px;font-size:14px;margin:8px 0;border:1px solid var(--line);background:#fff}
+.banner.warn{background:var(--warn-bg);border-color:var(--warn-line);color:var(--warn)}
+.banner.bad{background:var(--bad-bg);border-color:var(--bad-line);color:var(--bad)}
+.banner.ok{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok)}
+.banner.info{background:var(--accent-soft);border-color:var(--accent-line);color:#1f3f8a}
+.banner ul{margin:4px 0 0 18px;padding:0}
+.empty{padding:22px 10px;text-align:center;color:var(--muted)}
+
+/* ---------- buttons / fields ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px;padding:7px 14px;border-radius:9px;border:1px solid var(--line-strong);background:#fff;font-weight:600;text-decoration:none;color:var(--ink)}
+.btn:hover{background:#f3f5f9}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{background:#2560d4}
+.btn.danger{color:var(--bad);border-color:var(--bad-line)}
+.btn.sm{min-height:40px;padding:3px 10px;font-size:13px;border-radius:8px}
+.btn.big{min-height:52px;font-size:17px;border-radius:12px}
+.btn.copied{background:var(--ok)!important;border-color:var(--ok)!important;color:#fff!important}
+.btn.amber{background:var(--warn-bg)!important;border-color:var(--warn-line)!important;color:var(--warn)!important}
+.btn.link{border:0;background:none;color:#1f4fb8;text-decoration:underline;min-height:0;padding:2px 4px}
+label.fld{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);font-weight:600}
+.fld input,.fld select,.fld textarea,input.in,select.in,textarea.in{border:1px solid var(--line-strong);border-radius:8px;padding:8px 10px;background:#fff;color:var(--ink);font-size:15px;min-height:40px;width:100%}
+.fld textarea,textarea.in{min-height:84px;resize:vertical}
+.check{display:flex;gap:8px;align-items:center;font-size:14px}
+.check input{width:20px;height:20px}
+
+/* ---------- product / stock ---------- */
+.codes{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
+.codebtn{border:1.5px solid var(--accent);background:#fff;color:var(--accent);border-radius:999px;padding:6px 14px;min-height:36px;font-weight:700}
+.codebtn[aria-pressed="true"]{background:var(--accent);color:#fff}
+.phead{display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap}
+.pname{font-size:18px;font-weight:750}
+.pprice{font-size:15px;color:#333}
+.cblock{border:1.5px solid var(--line);border-radius:10px;padding:8px 10px;margin-top:8px}
+.cblock.soldout{background:#fafafa}
+.cname{font-weight:700;margin-bottom:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.sizes{display:flex;gap:6px;flex-wrap:wrap}
+.sz{display:inline-flex;align-items:center;gap:6px;border-radius:8px;padding:5px 10px;border:1.5px solid;font-weight:650;font-size:14px}
+.sz.on{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok)}
+.sz.off{background:#f0f0f0;border-color:#cfcfcf;color:#6b6b6b}
+.sz.off .n{text-decoration:line-through}
+.sz small{font-weight:600;text-decoration:none;font-size:12px}
+.sz .est{color:var(--warn);font-weight:700}
+.qchip{border:1.5px solid var(--accent-line);background:#fff;color:#1f4fb8;border-radius:10px;padding:6px 12px;min-height:40px;font-weight:650}
+.qchip:hover{background:var(--accent-soft)}
+.qchip.off{color:#6b6b6b;border-color:#cfcfcf;text-decoration:line-through}
+.qgroup{border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:8px;background:#fcfcfd}
+.qgroup>h4{font-size:13px;color:var(--muted);margin-bottom:6px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.fitrow{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0}
+.fitrow .fld{flex:1 1 120px}
+
+/* ---------- lists ---------- */
+.item{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:#fff;margin-bottom:8px}
+.item h3{font-size:15px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px}
+.item .txt{white-space:pre-wrap;font-size:14.5px;color:#222;margin:4px 0 8px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.item.inactive{background:#f7f7f7;opacity:.85}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px}
+.toolbar .fld{flex:1 1 160px}
+details.acc{border:1px solid var(--line);border-radius:10px;background:#fff;margin-bottom:8px}
+details.acc>summary{padding:10px 12px;font-weight:700;cursor:pointer;min-height:44px;display:flex;align-items:center}
+details.acc>div{padding:2px 12px 12px}
+table.t{border-collapse:collapse;width:100%;font-size:14px}
+table.t th,table.t td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+.tablewrap{overflow-x:auto}
+
+/* ---------- composer ---------- */
+.composer{background:#fff;display:flex;flex-direction:column;min-height:0;min-width:0}
+.cmp-head{padding:10px 14px 6px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line)}
+.cmp-head h2{font-size:15px}
+.cmp-head .src{font-size:12.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.cmp-toggle{display:none}
+.cmp-peek{display:none}
+.cmp-body{padding:10px 14px;overflow:auto;flex:1;min-height:0}
+.cmp-text{width:100%;min-height:170px;resize:vertical;font-size:16px;line-height:1.55;padding:10px 12px;border:1.5px solid var(--line-strong);border-radius:10px;background:#fff}
+.cmp-text:focus{border-color:var(--accent)}
+.cmp-text.flash,.cmp-peek.flash{animation:flash 1.1s ease}
+@keyframes flash{0%{background:#ffe9a8}100%{background:#fff}}
+.cmp-actions{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.cmp-sub{margin-top:10px;border-top:1px solid var(--line);padding-top:8px}
+.cmp-sub h3{font-size:13px;color:var(--muted);margin-bottom:6px}
+.preview{white-space:pre-wrap;border:1px dashed var(--line-strong);border-radius:10px;padding:8px 10px;background:#fafafa;font-size:15px}
+.preview mark{background:#ffd9d9;color:var(--bad);border-radius:4px;padding:0 3px;font-weight:700}
+.cmp-foot{padding:10px 14px calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:#fff}
+.cmp-foot .row{flex-wrap:nowrap}
+.cmp-foot .btn.big{flex:1 1 auto}
+.cmp-status{font-size:13px;min-height:18px;margin-top:6px}
+.cmp-status.ok{color:var(--ok)}.cmp-status.bad{color:var(--bad)}
+.edited{font-size:12px;font-weight:700;color:var(--warn);background:var(--warn-bg);border-radius:6px;padding:1px 7px}
+.ext{font-size:12.5px;color:var(--muted);margin-top:8px}
+.ext a{color:#1f4fb8}
+
+/* ---------- dialog / toast ---------- */
+dialog{border:0;border-radius:14px;padding:0;width:min(640px,96vw);max-height:92dvh;box-shadow:0 24px 70px rgba(10,20,40,.35);color:var(--ink)}
+dialog.wide{width:min(900px,96vw)}
+dialog::backdrop{background:rgba(10,14,25,.5)}
+dialog[open]{display:flex;flex-direction:column}
+.dlg-head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line)}
+.dlg-head h2{font-size:17px}
+.dlg-body{padding:14px 16px;overflow:auto;flex:1;min-height:0}
+.dlg-foot{display:flex;gap:8px;justify-content:flex-end;padding:10px 16px;border-top:1px solid var(--line);flex-wrap:wrap}
+#toasts{position:fixed;top:10px;right:10px;left:10px;z-index:300;display:flex;flex-direction:column;gap:6px;align-items:flex-end;pointer-events:none}
+.toast{pointer-events:auto;max-width:min(460px,100%);background:#1d2230;color:#fff;border-radius:10px;padding:10px 14px;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+.toast.warn{background:#6b4800}.toast.error{background:#8b1f1f}.toast.ok{background:#14562f}
+.form{display:flex;flex-direction:column;gap:12px}
+.form .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.bcast-img{max-width:100%;max-height:200px;border-radius:10px;border:1px solid var(--line);margin-top:8px;display:block}
+
+/* ---------- breakpoints ---------- */
+@media (min-width:860px){
+  .app{height:100vh;height:100dvh;grid-template-columns:minmax(0,1fr) 360px;grid-template-rows:auto auto minmax(0,1fr)}
+  .topbar,nav#nav{grid-column:1/-1}
+  main#main{grid-column:1;grid-row:3;overflow:auto;padding-bottom:24px}
+  .composer{grid-column:2;grid-row:3;border-left:1px solid var(--line);position:static}
+}
+@media (min-width:1100px){
+  .app{grid-template-columns:200px minmax(0,1fr) 420px;grid-template-rows:auto minmax(0,1fr)}
+  nav#nav{grid-column:1;grid-row:2;flex-direction:column;border-bottom:0;border-right:1px solid var(--line);padding:10px;overflow:auto}
+  nav#nav button{text-align:left}
+  main#main{grid-column:2;grid-row:2}
+  .composer{grid-column:3;grid-row:2}
+  .twocol{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;align-items:start}
+}
+@media (max-width:859px){
+  .composer{position:fixed;left:0;right:0;bottom:0;z-index:60;border:1px solid var(--line-strong);border-bottom:0;border-radius:16px 16px 0 0;box-shadow:0 -8px 28px rgba(10,20,40,.16);max-height:var(--vvh,85vh)}
+  .composer:not(.open) .cmp-body{display:none}
+  .composer:not(.open) .cmp-peek{display:-webkit-box}
+  .cmp-toggle{display:inline-flex}
+  .cmp-peek{padding:6px 14px;font-size:14px;color:#222;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-wrap}
+  .composer.open{height:min(var(--vvh,85vh),640px)}
+  .btn,.qchip,.codebtn,nav#nav button,.res{min-height:44px}
+  .btn.sm{min-height:44px}
+  .topbar{padding:8px 12px}
+  .brand h1{font-size:15px}
+  .form .two{grid-template-columns:1fr}
+}
+@media (pointer:coarse){.btn.sm{min-height:44px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+#staffSelect,#cmpTplSelect,#cmpGreet,#cmpReset,#cmpClear,#btnSettings{min-height:40px}
+@media (max-width:899px),(pointer:coarse){#staffSelect,#cmpTplSelect,#cmpGreet,#cmpReset,#cmpClear,#btnSettings,.btn.sm{min-height:44px}}
+
+/* ---------- stock relay bar (every tab) + split-screen / narrow layout ---------- */
+nav#nav button .s{display:none}
+.brand h1 .s{display:none}
+.chip-stock{display:none}
+.searchwrap{display:flex;flex-direction:column;gap:6px}
+.stockbar{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;background:#fff;border:1px solid var(--line-strong);border-left:4px solid #c4c9d4;border-radius:10px;padding:5px 6px 5px 10px;min-width:0}
+.stockbar.ok{border-left-color:var(--ok);background:#f4fbf6}
+.stockbar.warn{border-left-color:#d79a00;background:#fffaf0}
+.stockbar.busy{border-left-color:var(--accent)}
+.sb-main{flex:1 1 0;min-width:0;display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 6px;font-size:13px}
+.sb-label{font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted)}
+.sb-text{overflow-wrap:anywhere}
+.sb-who{color:var(--muted);font-size:12px}
+.stockbar .btn{flex:none}
+.sb-msg{flex:1 1 100%;font-size:12.5px;color:var(--bad);overflow-wrap:anywhere}
+.sb-msg.warn{color:var(--warn)}
+.item,.card,.pname,.res,.cname,.sz,.qchip,.codebtn,.toast,.banner,.cmp-peek,.cmp-src{overflow-wrap:anywhere}
+.btn,.qchip{max-width:100%}
+.btn{text-align:center}
+
+@media (max-width:859px){
+  nav#nav{display:flex;overflow:visible;padding:4px 6px;gap:2px}
+  nav#nav button{flex:1 1 0;min-width:0;padding:6px 2px;font-size:13px;white-space:normal;line-height:1.2}
+  nav#nav button .l{display:none}
+  nav#nav button .s{display:inline}
+  .brand h1 .l{display:none}
+  .brand h1 .s{display:inline}
+  .brand p{display:none}
+  #btnSettings,.staff>span{display:none}
+  .topbar{flex-wrap:nowrap;padding:6px 10px;gap:8px}
+  .top-right{flex:1 1 auto;justify-content:flex-end;min-width:0;flex-wrap:wrap}
+  #statusChips{flex:0 1 auto;min-width:0}
+  .chip{white-space:normal;font-size:11.5px;padding:2px 8px;line-height:1.3;max-width:100%}
+  .logo{width:28px;height:28px;font-size:11px}
+  .staff select{max-width:42vw}
+  main#main{padding:8px 10px calc(var(--sheet-h) + 18px)}
+  .sec-title{font-size:16px;margin:2px 0 8px}
+  .card{padding:10px 10px}
+  .pname{font-size:16px}
+}
+@media (max-width:540px){
+  .topbar{flex-wrap:wrap}
+  nav#nav{flex-wrap:wrap}
+  nav#nav button{flex:1 1 30%;min-height:40px}
+  .top-right{flex:1 1 100%;justify-content:space-between}
+  .staff select{max-width:none}
+  .cmp-foot .row{flex-wrap:wrap}
+  .cmp-foot .btn.big{flex:1 1 100%}
+  .cmp-foot .btn:not(.big){flex:1 1 100%}
+  .toolbar .fld{flex:1 1 100%}
+  .row .btn{max-width:100%}
+  .dlg-foot .btn{flex:1 1 auto}
+  .fitrow .fld{flex:1 1 100%}
+}
+@media (max-width:380px){
+  body{font-size:14.5px}
+  .btn.sm{padding:3px 8px}
+  .stockbar{padding-left:8px}
+}
+.chip .s{display:none}
+@media (max-width:540px){
+  .chip .l{display:none}
+  .chip .s{display:inline}
+  .topbar{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 8px;align-items:center}
+  .top-right{display:contents}
+  .brand{grid-column:1}
+  .staff{grid-column:2;grid-row:1}
+  #statusChips{grid-column:1/-1;grid-row:2;gap:4px}
+  nav#nav button{min-height:44px;flex:1 1 30%}
+  .cmp-foot .row{flex-wrap:nowrap}
+  .cmp-foot .btn.big{flex:1 1 auto;min-width:0;font-size:16px}
+  .cmp-foot .btn:not(.big){flex:0 0 auto;padding:7px 10px;font-size:14px}
+  .cmp-peek{-webkit-line-clamp:1!important}
+  .cmp-head{padding:6px 12px 4px}
+  .cmp-foot{padding:8px 12px calc(8px + env(safe-area-inset-bottom))}
+  .stockbar .btn.sm{padding:3px 8px}
+}
+/* toasts at the bottom so they never cover the stock bar / search / nav */
+#toasts{top:auto;bottom:12px;left:12px;right:auto;align-items:flex-start;max-width:calc(100vw - 24px)}
+@media (max-width:859px){#toasts{bottom:calc(var(--sheet-h) + 14px);right:12px;align-items:center}}
+@media (max-width:859px){.btn.link{min-height:44px;padding:8px 10px}}
+@media (max-width:859px){.composer:not(.open) .cmp-status{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:12.5px;margin-top:4px}}
+
+/* ---------- minimal UI ---------- */
+.sec-title{display:none}
+#btnSettings{display:none!important}
+.stockbar.warn{background:#fff;border-left-color:#c4c9d4}
+.sb-msg{color:var(--bad)}
+.card{padding:8px 10px}
+details.acc>summary{min-height:40px}
+.cmp-sub{margin-top:6px;padding-top:6px}
+
+/* ---------- clipboard load + code list ---------- */
+.sb-btns{display:flex;gap:6px;flex:none}
+.codelist{display:flex;flex-direction:column;gap:4px;margin:0 0 8px}
+.codeitem{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px;text-align:left;width:100%;border:1.5px solid var(--line);background:#fff;border-radius:10px;padding:7px 10px;min-height:44px}
+.codeitem.on{border-color:var(--accent);background:var(--accent-soft)}
+.codeitem b{font-size:15px;color:#1f4fb8}
+.codeitem .cn{font-weight:600;overflow-wrap:anywhere}
+.codeitem .cs{flex:1 1 100%;font-size:13px;color:var(--muted);overflow-wrap:anywhere}
+@media (max-width:380px){.sb-bl{display:none}#clipLoad{min-width:44px;padding:3px 8px}}
+.cmp-links{display:flex;gap:6px;margin-top:6px}
+.cmp-links .btn{flex:1 1 0;min-width:0}
+#statusChips:empty{display:none}
+@media (max-width:540px){nav#nav{gap:0;padding:2px 6px}nav#nav button{min-height:44px}.topbar{row-gap:0}}
+.prodchip{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--accent-soft);border:1px solid var(--accent-line);border-radius:10px;padding:4px 6px 4px 12px;margin-bottom:8px}
+.prodchip b{flex:1 1 0;min-width:0;overflow-wrap:anywhere}
+
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="app" id="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo" aria-hidden="true">VH</div>
+      <div>
+        <h1><span class="l">VH MEN Quick Reply</span><span class="s">VH MEN</span></h1>
+      </div>
+    </div>
+    <div class="top-right">
+      <label class="staff"><span>Staff</span>
+        <select id="staffSelect" aria-label="Selected staff member"></select>
+      </label>
+      <div id="statusChips" role="status" aria-live="polite"></div>
+      <button type="button" class="btn sm" id="btnSettings">Settings</button>
+    </div>
+  </header>
+
+  <nav id="nav" aria-label="Sections">
+    <button type="button" data-sec="quick"><span class="l">Replies</span><span class="s">Replies</span></button>
+    <button type="button" data-sec="qa"><span class="l">Q&amp;A</span><span class="s">Q&amp;A</span></button>
+    <button type="button" data-sec="templates"><span class="l">Templates</span><span class="s">Templates</span></button>
+    <button type="button" data-sec="broadcasts"><span class="l">Broadcast</span><span class="s">Broadcast</span></button>
+    <button type="button" data-sec="settings"><span class="l">Settings</span><span class="s">Settings</span></button>
+  </nav>
+
+  <main id="main" tabindex="-1">
+    <div class="searchwrap">
+      <div class="searchbox">
+        <span class="ico" aria-hidden="true">⌕</span>
+        <input id="search" type="search" autocomplete="off" spellcheck="false"
+          role="combobox" aria-expanded="false" aria-controls="results" aria-autocomplete="list"
+          placeholder="Search code, question or template"
+          aria-label="Universal search">
+        <div id="results" class="results" role="listbox" hidden></div>
+      </div>
+    </div>
+    <section id="sec-quick" aria-label="Quick replies" hidden></section>
+    <section id="sec-qa" aria-label="Q&amp;A library" hidden></section>
+    <section id="sec-templates" aria-label="Templates" hidden></section>
+    <section id="sec-broadcasts" aria-label="Team broadcasts" hidden></section>
+    <section id="sec-settings" aria-label="Settings" hidden></section>
+  </main>
+
+  <aside id="composer" class="composer" aria-label="Reply composer">
+    <div class="cmp-head">
+      <h2>Reply</h2>
+      <span class="edited" id="cmpEdited" hidden>edited</span>
+      <span class="src" id="cmpSrc">Nothing prepared yet</span>
+      <button type="button" class="btn sm cmp-toggle" id="cmpToggle" aria-expanded="false" aria-controls="cmpBody">Edit ▲</button>
+    </div>
+    <div class="cmp-peek kh" id="cmpPeek"></div>
+    <div class="cmp-body" id="cmpBody">
+      <label class="sr" for="cmpText" style="position:absolute;left:-999px">Reply text (editable)</label>
+      <textarea id="cmpText" class="cmp-text kh" placeholder="Reply"></textarea>
+      <div id="cmpWarn" aria-live="polite"></div>
+      <div class="cmp-actions">
+        <select id="cmpTplSelect" class="in" style="width:auto;min-height:36px;flex:1 1 150px" aria-label="Insert a template"></select>
+        <button type="button" class="btn sm" id="cmpGreet">+ Greeting</button>
+        <button type="button" class="btn sm" id="cmpReset">Reset editing</button>
+        <button type="button" class="btn sm" id="cmpClear">Clear</button>
+      </div>
+      <div class="cmp-sub" id="cmpFillWrap" hidden>
+        <h3>Fill in</h3>
+        <div id="cmpFill" class="stack"></div>
+      </div>
+      <details class="cmp-sub"><summary class="small" style="cursor:pointer;min-height:36px">Upsell</summary>
+        <div class="row" style="flex-wrap:nowrap">
+          <input id="cmpUpsell" class="in grow" type="text" placeholder="Upsell line" aria-label="Upsell line">
+          <button type="button" class="btn sm" id="cmpUpsellAdd">Add</button>
+        </div>
+      </details>
+      <div class="cmp-sub">
+        <div class="preview kh" id="cmpPreview" hidden></div>
+      </div>
+    </div>
+    <div class="cmp-foot">
+      <div class="row">
+        <button type="button" class="btn primary big" id="cmpCopy">Copy reply</button>
+      </div>
+      <div class="cmp-links"><a class="btn sm" href="fb-messenger://" id="msgApp">↩ Messenger app</a><a class="btn sm" href="https://www.messenger.com/" target="_blank" rel="noopener" id="msgWeb">messenger.com</a></div>
+      <div class="cmp-status" id="cmpStatus" role="status" aria-live="polite"></div>
+    </div>
+  </aside>
+</div>
+<dialog id="dlg" aria-labelledby="dlgTitle"></dialog>
+<div id="toasts" aria-live="polite"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script>
+'use strict';
+/* =====================================================================
+   VH MEN Chat Service Workbench  —  standalone copy-and-paste assistant.
+   No Messenger / Meta integration. Same Firebase project + Firestore `kv`
+   collection as the catalog tools (index.html / live.html).
+   ===================================================================== */
+
+/* ===== Firebase (unchanged project config — public client config, NOT a secret) ===== */
+const firebaseConfig = {
+  apiKey: "AIzaSyDDQp5_gvuRdX0flKQ3gm3zXJM_SXWUJSE",
+  authDomain: "vhm-catalog.firebaseapp.com",
+  projectId: "vhm-catalog",
+  storageBucket: "vhm-catalog.firebasestorage.app",
+  messagingSenderId: "892196724857",
+  appId: "1:892196724857:web:8ed3f5f056284b63aa34a8"
+};
+let __db = null;
+function firestore_(){
+  if (!__db){ firebase.initializeApp(firebaseConfig); __db = firebase.firestore(); }
+  return __db;
+}
+
+/* ===== Connection state — only what we can actually verify from real operations ===== */
+const conn = { state:'unknown', okAt:null, err:'' };   // unknown | ok | cache | error | offline
+function fbErrorText(e){
+  const code = e && e.code ? String(e.code) : '';
+  if (code.includes('permission-denied')) return 'Firebase refused access (check Firestore security rules)';
+  if (code.includes('unavailable') || (navigator.onLine === false)) return 'Cannot reach Firebase (offline?)';
+  return (e && e.message) ? e.message : String(e || 'Unknown error');
+}
+function setConn(state, err){
+  conn.state = state;
+  if (state === 'ok') conn.okAt = Date.now();
+  conn.err = err ? fbErrorText(err) : '';
+  if (typeof renderStatus === 'function') renderStatus();
+}
+const storage = {
+  async getDoc(key){
+    try{
+      const doc = await firestore_().collection('kv').doc(key).get({source:'server'});
+      setConn('ok');
+      if (!doc.exists) return null;
+      const d = doc.data();
+      if (d.data === undefined || d.data === null) return null;
+      return { key, data:d.data, updatedAtMs: (d.updatedAt && d.updatedAt.toMillis) ? d.updatedAt.toMillis() : null };
+    }catch(e){ setConn(navigator.onLine === false ? 'offline' : 'error', e); throw e; }
+  },
+  async get(key){
+    const r = await storage.getDoc(key);
+    return r ? { key, value: JSON.stringify(r.data) } : null;
+  },
+  async set(key, value){
+    try{
+      await firestore_().collection('kv').doc(key).set({
+        data: value,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      setConn('ok');
+      return { key, value };
+    }catch(e){ setConn(navigator.onLine === false ? 'offline' : 'error', e); throw e; }
+  }
+};
+
+/* ===== Key helpers — identical key schemes to the previous version ===== */
+function nameToken(n){ return String(n||'').trim().toUpperCase().replace(/[^A-Z0-9]/g,''); }
+function quickReplyLiveKey(name){ return 'quickreply_live_' + nameToken(name); }
+const CONFIG_KEY = 'quickreply_config_v1';            // NEW shared config document
+const UPSELL_BROADCAST_KEY = 'upsell_broadcast';      // unchanged key
+
+/* ===== Small utilities ===== */
+const $ = id => document.getElementById(id);
+const clone = o => JSON.parse(JSON.stringify(o));
+function normalizeText(s){ return String(s == null ? '' : s).normalize('NFC').toLowerCase().replace(/\s+/g,' ').trim(); }
+function normCode(s){ return String(s == null ? '' : s).toUpperCase().replace(/\s+/g,''); }
+function uid(prefix){ return prefix + '_' + Math.random().toString(36).slice(2,8) + Date.now().toString(36).slice(-4); }
+function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+function lsGetJSON(k){ try{ const r = lsGet(k); return r ? JSON.parse(r) : null; }catch(e){ return null; } }
+function fmtTime(ms){ return new Date(ms).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); }
+function fmtDateTime(ms){ return ms ? new Date(ms).toLocaleString([], {dateStyle:'medium', timeStyle:'short'}) : '—'; }
+function fmtAge(ms){
+  const m = Math.max(0, Math.round((Date.now() - ms) / 60000));
+  if (m < 1) return 'just now';
+  if (m < 60) return m + ' min ago';
+  const h = Math.floor(m / 60), r = m % 60;
+  return h + ' h' + (r ? ' ' + r + ' min' : '') + ' ago';
+}
+function h(tag, props, ...kids){
+  const el = document.createElement(tag);
+  if (props) for (const [k,v] of Object.entries(props)){
+    if (v === false || v == null) continue;
+    if (k === 'class') el.className = v;
+    else if (k === 'dataset') Object.assign(el.dataset, v);
+    else if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2), v);
+    else if (k === 'text') el.textContent = v;
+    else if (k === 'value' || k === 'checked' || k === 'disabled' || k === 'hidden' || k === 'selected') el[k] = v;
+    else el.setAttribute(k, v === true ? '' : v);
+  }
+  for (const kid of kids.flat(Infinity)){
+    if (kid == null || kid === false) continue;
+    el.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+  }
+  return el;
+}
+let toastTimer = 0;
+function toast(msg, kind, ms){
+  const box = $('toasts');
+  const t = h('div', {class:'toast ' + (kind||'')}, msg);
+  box.append(t);
+  setTimeout(()=> t.remove(), ms || (kind === 'error' ? 7000 : 3800));
+}
+
+/* ===== Dialog helper (native <dialog>: focus trap + Esc) ===== */
+const dlg = $('dlg');
+function openDialog({title, body, actions = [], wide = false}){
+  dlg.innerHTML = '';
+  const head = h('div', {class:'dlg-head'},
+    h('h2', {id:'dlgTitle'}, title),
+    h('button', {type:'button', class:'btn sm', 'aria-label':'Close dialog', onclick:()=> closeDialog()}, '✕'));
+  const foot = h('div', {class:'dlg-foot'}, actions.map(a => h('button', {
+    type:'button', class:'btn ' + (a.kind || ''),
+    onclick: async (ev)=>{
+      const btn = ev.currentTarget;
+      if (btn.disabled) return;
+      btn.disabled = true;
+      let keep;
+      try{ keep = await a.onClick(); }catch(e){ console.error(e); toast('Something went wrong: ' + (e.message||e), 'error'); keep = false; }
+      if (keep !== false) closeDialog(); else btn.disabled = false;
+    }
+  }, a.label)));
+  dlg.append(head, h('div', {class:'dlg-body'}, body), foot);
+  dlg.classList.toggle('wide', !!wide);
+  if (!dlg.open) dlg.showModal();
+}
+function closeDialog(){ if (dlg.open) dlg.close(); }
+dlg.addEventListener('close', ()=>{ dlg.innerHTML = ''; });
+
+/* ===== Clipboard ===== */
+function fallbackCopy(text){
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.setAttribute('readonly', '');
+  ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;font-size:16px';
+  document.body.appendChild(ta);
+  ta.focus(); ta.select();
+  try{ ta.setSelectionRange(0, text.length); }catch(e){}
+  let ok = false;
+  try{ ok = document.execCommand('copy'); }catch(e){ ok = false; }
+  document.body.removeChild(ta);
+  return ok;
+}
+async function copyText(text){
+  try{
+    if (navigator.clipboard && navigator.clipboard.writeText){ await navigator.clipboard.writeText(text); return true; }
+  }catch(e){ /* fall through to legacy copy */ }
+  return fallbackCopy(text);
+}
+async function imageDataUrlToPngBlob(dataUrl){
+  return new Promise((resolve, reject)=>{
+    const img = new Image();
+    img.onload = ()=>{
+      const c = document.createElement('canvas');
+      c.width = img.naturalWidth; c.height = img.naturalHeight;
+      c.getContext('2d').drawImage(img, 0, 0);
+      c.toBlob(b => b ? resolve(b) : reject(new Error('Could not convert the image')), 'image/png');
+    };
+    img.onerror = ()=> reject(new Error('Could not decode the image'));
+    img.src = dataUrl;
+  });
+}
+async function copyImage(dataUrl){
+  if (!navigator.clipboard || !window.ClipboardItem) throw new Error('This browser cannot copy images to the clipboard');
+  const png = await imageDataUrlToPngBlob(dataUrl);
+  await navigator.clipboard.write([ new ClipboardItem({ 'image/png': png }) ]);
+}
+function download(filename, content, mime){
+  const blob = new Blob([content], {type: mime || 'application/octet-stream'});
+  const url = URL.createObjectURL(blob);
+  const a = h('a', {href:url, download:filename});
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(()=> URL.revokeObjectURL(url), 2000);
+}
+function dateStamp(){ const d = new Date(); const p = n => String(n).padStart(2,'0'); return d.getFullYear() + p(d.getMonth()+1) + p(d.getDate()) + '-' + p(d.getHours()) + p(d.getMinutes()); }
+
+/* ===== Device-local preferences (never shared) ===== */
+const PREF_KEY = 'vhm_qr_prefs';
+const prefs = Object.assign({ autoCopy:false, phoneOnCopy:true, lang:'', workflowId:'', section:'quick' }, lsGetJSON(PREF_KEY) || {});
+function savePrefs(){ lsSet(PREF_KEY, JSON.stringify(prefs)); }
+// Staff selection keeps the SAME localStorage key as before (shared with other VHM tools on this device).
+function getStaffName(){ return (lsGet('vhm_stock_name') || '').trim(); }
+function setStaffName(v){ lsSet('vhm_stock_name', v); }
+let adminMode = false;
+try{ adminMode = sessionStorage.getItem('vhm_qr_admin') === '1'; }catch(e){}
+function setAdminMode(on){ adminMode = !!on; try{ sessionStorage.setItem('vhm_qr_admin', on ? '1' : '0'); }catch(e){} }
+
+/* =====================================================================
+   Shared configuration (Q&A library, categories, templates, workflows,
+   shared settings). Stored in ONE document: kv/quickreply_config_v1
+   { data:{ schemaVersion, rev, categories, entries, templates, workflows, settings }, updatedAt }
+   Device-local preferences are kept separately in localStorage.
+   ===================================================================== */
+const DEFAULT_STAFF = ['KIN','JINH','Yaa','Ry','NITH','VID','LY','David'];
+
+function defaultConfig(){
+  const T = 0;
+  const cats = [
+    {id:'cat_availability', name:'Product availability', productSpecific:true},
+    {id:'cat_sizes',        name:'Sizes and fit', productSpecific:true},
+    {id:'cat_colors',       name:'Colors and measurements', productSpecific:true},
+    {id:'cat_price',        name:'Price and promotions', productSpecific:false},
+    {id:'cat_payment',      name:'Payment', productSpecific:false},
+    {id:'cat_delivery',     name:'Delivery and shipping fees', productSpecific:false},
+    {id:'cat_confirm',      name:'Order confirmation', productSpecific:false},
+    {id:'cat_status',       name:'Order status', productSpecific:false},
+    {id:'cat_returns',      name:'Returns, exchanges and after-sales', productSpecific:false},
+    {id:'cat_materials',    name:'Product materials and care', productSpecific:false},
+    {id:'cat_greetings',    name:'Greetings and general inquiries', productSpecific:false}
+  ];
+  const NOTE = 'STARTER SAMPLE — admin should review the wording before relying on it.';
+  const E = (id, cat, title, phr, kw, km, en, note, extra) => Object.assign({
+    id, categoryId:cat, title, phrasings:phr, keywords:kw, answers:{km, en}, note:note||NOTE,
+    active:true, priority:0, insertMode:'replace', expiresOn:'', eligibleCodes:[], createdAt:T, updatedAt:T
+  }, extra||{});
+  const entries = [
+    E('qa_hold_stock','cat_availability','Is this still in stock? (holding reply)',
+      ['do you still have this','is it available','នៅមានទេ'], ['stock','available','hold'],
+      'សូមរង់ចាំបន្តិច ខ្ញុំពិនិត្យស្តុកជូនបង 🙏', 'One moment please, I will check the stock for you 🙏',
+      NOTE + ' Holding message only — it does not state availability.'),
+    E('qa_size_fit','cat_sizes','Which size fits me?',
+      ['what size should I take','I am 70kg what size','ខ្ញុំទម្ងន់ ... ត្រូវយកទំហំអ្វី'], ['size','fit','weight','kg'],
+      'សូមបងប្រាប់ទម្ងន់ (kg) ដើម្បីជួយណែនាំទំហំ ។', 'Please tell us your weight (kg) and we will suggest a size.',
+      NOTE + ' When a product is open, use the weight/fit quick action in Quick Replies — it uses that product\'s weight guide.'),
+    E('qa_price','cat_price','How much is this?',
+      ['price','how much','តម្លៃប៉ុន្មាន'], ['price','cost'],
+      '{product_code} តម្លៃ {price}', '{product_code} price: {price}',
+      NOTE + ' {price} is flagged for manual entry until you fill it.'),
+    E('qa_payment','cat_payment','Payment methods',
+      ['how can I pay','payment','បង់ប្រាក់យ៉ាងម៉េច'], ['payment','pay','bank','cod'],
+      '{payment_info}', '{payment_info}',
+      'Admin: type the real payment wording in Settings → Verified values → payment_info. Until then this answer is flagged as incomplete.'),
+    E('qa_delivery_fee','cat_delivery','Delivery fee',
+      ['delivery fee','shipping cost','ថ្លៃដឹក'], ['delivery','shipping','fee'],
+      'ថ្លៃដឹកជញ្ជូន {delivery_fee}', 'Delivery fee: {delivery_fee}',
+      'Admin: set delivery_fee in Settings → Verified values. Until then the field is flagged for manual entry — nothing is guessed.'),
+    E('qa_confirm','cat_confirm','Confirm an order (ask for details)',
+      ['I want to order','how to order','confirm order','កម្ម៉ង់'], ['order','confirm','address','phone'],
+      'សូមបងផ្ញើ ឈ្មោះ លេខទូរស័ព្ទ និងអាសយដ្ឋាន ដើម្បីបញ្ជាក់ការកម្ម៉ង់ ។',
+      'Please send your name, phone number and address to confirm the order.'),
+    E('qa_returns','cat_returns','Return / exchange policy',
+      ['can I exchange','return policy','ប្តូរទំហំបានទេ'], ['return','exchange','refund','policy'],
+      '{return_policy}', '{return_policy}',
+      'Admin: type the real policy in Settings → Verified values → return_policy. Until then this answer is flagged as incomplete.'),
+    E('qa_anything_else','cat_greetings','Anything else I can help with?',
+      ['anything else'], ['closing','general'],
+      'មានអ្វីផ្សេងទៀតដែលអាចជួយបានទេបង? 🙏', 'Is there anything else I can help you with? 🙏'),
+    E('qa_thanks','cat_greetings','Thank you / closing',
+      ['thanks','thank you','អរគុណ'], ['thanks','closing'],
+      'សូមអរគុណបង 🙏', 'Thank you 🙏')
+  ];
+  const templates = [
+    {id:'tpl_greeting', name:'Greeting', kind:'greeting', text:'សួស្តី! 👋 មានអ្វីអាចជួយបានដែរ?', active:true, createdAt:T, updatedAt:T}
+  ];
+  const workflows = [
+    {id:'wf_live', name:'Live-sale questions', categoryIds:['cat_availability','cat_sizes','cat_colors'], templateIds:[], lang:'',
+      rules:{greeting:false, productActions:true}, escalation:''},
+    {id:'wf_general', name:'General customer inquiries', categoryIds:['cat_greetings','cat_payment','cat_delivery','cat_price','cat_materials'], templateIds:['tpl_greeting'], lang:'',
+      rules:{greeting:true, productActions:false}, escalation:''},
+    {id:'wf_promo', name:'Promotions and upselling', categoryIds:['cat_price'], templateIds:[], lang:'',
+      rules:{greeting:false, productActions:false}, escalation:''},
+    {id:'wf_orders', name:'Order and after-sales inquiries', categoryIds:['cat_confirm','cat_status','cat_returns','cat_delivery'], templateIds:[], lang:'',
+      rules:{greeting:true, productActions:false}, escalation:'If the customer disputes an order or asks for something not covered here, hand over to a supervisor.'}
+  ];
+  return {
+    schemaVersion:1, rev:0, categories:cats, entries, templates, workflows,
+    settings:{
+      staff: DEFAULT_STAFF.slice(),
+      defaultLang:'km',
+      languages:[{code:'km', label:'ខ្មែរ (Khmer)'},{code:'en', label:'English'}],
+      freshMinutes:120,
+      defaultGreetingId:'tpl_greeting',
+      defaultUpsell:'',
+      values:{ delivery_fee:'', return_policy:'', payment_info:'' },
+      valuesUpdatedAt:0
+    }
+  };
+}
+
+const asArr = v => Array.isArray(v) ? v : [];
+const str = v => (v == null ? '' : String(v));
+function normEntry(e){
+  const answers = {};
+  if (e.answers && typeof e.answers === 'object') for (const [k,v] of Object.entries(e.answers)) answers[String(k)] = str(v);
+  return {
+    id:str(e.id), title:str(e.title).trim(), categoryId:str(e.categoryId),
+    phrasings:asArr(e.phrasings).map(str).filter(s=>s.trim()), keywords:asArr(e.keywords).map(str).filter(s=>s.trim()),
+    answers, note:str(e.note), active:e.active !== false, priority:Number(e.priority)||0,
+    insertMode:e.insertMode === 'append' ? 'append' : 'replace',
+    expiresOn:/^\d{4}-\d{2}-\d{2}$/.test(str(e.expiresOn)) ? e.expiresOn : '',
+    eligibleCodes:asArr(e.eligibleCodes).map(s=>normCode(s)).filter(Boolean),
+    createdAt:Number(e.createdAt)||0, updatedAt:Number(e.updatedAt)||0
+  };
+}
+function normalizeConfig(raw){
+  const d = defaultConfig();
+  if (!raw || typeof raw !== 'object') return d;
+  const out = { schemaVersion:1, rev:Number(raw.rev)||0 };
+  out.categories = Array.isArray(raw.categories)
+    ? raw.categories.filter(c=>c && c.id && c.name).map(c=>({id:str(c.id), name:str(c.name), productSpecific:!!c.productSpecific}))
+    : d.categories;
+  out.entries = Array.isArray(raw.entries) ? raw.entries.filter(e=>e && e.id && str(e.title).trim()).map(normEntry) : d.entries;
+  out.templates = Array.isArray(raw.templates)
+    ? raw.templates.filter(t=>t && t.id && str(t.text).trim()).map(t=>({id:str(t.id), name:str(t.name)||'Template', kind:str(t.kind)||'general', text:str(t.text), active:t.active !== false, createdAt:Number(t.createdAt)||0, updatedAt:Number(t.updatedAt)||0}))
+    : d.templates;
+  out.workflows = Array.isArray(raw.workflows)
+    ? raw.workflows.filter(w=>w && w.id && w.name).map(w=>({id:str(w.id), name:str(w.name), categoryIds:asArr(w.categoryIds).map(str), templateIds:asArr(w.templateIds).map(str), lang:str(w.lang),
+        rules:{greeting:!!(w.rules && w.rules.greeting), productActions:!(w.rules && w.rules.productActions === false)}, escalation:str(w.escalation)}))
+    : d.workflows;
+  const s = raw.settings && typeof raw.settings === 'object' ? raw.settings : {};
+  const langs = Array.isArray(s.languages) ? s.languages.filter(l=>l && l.code).map(l=>({code:str(l.code), label:str(l.label)||str(l.code)})) : [];
+  out.settings = {
+    staff: Array.isArray(s.staff) && s.staff.length ? s.staff.map(str).filter(Boolean) : d.settings.staff,
+    defaultLang: str(s.defaultLang) || 'km',
+    languages: langs.length ? langs : d.settings.languages,
+    freshMinutes: Math.max(1, Number(s.freshMinutes) || d.settings.freshMinutes),
+    defaultGreetingId: s.defaultGreetingId != null ? str(s.defaultGreetingId) : d.settings.defaultGreetingId,
+    defaultUpsell: str(s.defaultUpsell),
+    values: (s.values && typeof s.values === 'object') ? Object.fromEntries(Object.entries(s.values).map(([k,v])=>[k, str(v)])) : d.settings.values,
+    valuesUpdatedAt: Number(s.valuesUpdatedAt) || 0
+  };
+  return out;
+}
+
+let cfg = defaultConfig();
+let cfgSource = 'defaults';         // 'defaults' = built-in starter, not yet published | 'shared' = loaded from Firestore
+const cfgMeta = { loaded:false, error:null, fromCache:false };
+let cfgUnsub = null;
+
+function subscribeConfig(){
+  if (cfgUnsub){ cfgUnsub(); cfgUnsub = null; }      // never leave an obsolete listener behind
+  try{
+    cfgUnsub = firestore_().collection('kv').doc(CONFIG_KEY).onSnapshot({includeMetadataChanges:true}, snap=>{
+      cfgMeta.fromCache = !!snap.metadata.fromCache;
+      cfgMeta.error = null;
+      let changed = false;
+      if (snap.exists && snap.data() && snap.data().data){
+        const next = normalizeConfig(snap.data().data);
+        changed = (next.rev !== cfg.rev) || cfgSource !== 'shared';
+        cfg = next; cfgSource = 'shared';
+      } else if (!snap.metadata.fromCache){
+        changed = cfgSource !== 'defaults';
+        cfg = defaultConfig(); cfgSource = 'defaults';
+      }
+      cfgMeta.loaded = true;
+      setConn(snap.metadata.fromCache ? 'cache' : 'ok');
+      onConfigChanged(changed);
+    }, err=>{
+      cfgMeta.error = err; cfgMeta.loaded = true;
+      setConn(navigator.onLine === false ? 'offline' : 'error', err);
+      onConfigChanged(true);
+    });
+  }catch(e){ cfgMeta.error = e; cfgMeta.loaded = true; setConn('error', e); }
+}
+async function reloadConfig(){
+  try{
+    const r = await storage.getDoc(CONFIG_KEY);
+    if (r){ cfg = normalizeConfig(r.data); cfgSource = 'shared'; } else { cfg = defaultConfig(); cfgSource = 'defaults'; }
+    onConfigChanged(true);
+  }catch(e){ toast('Could not reload settings: ' + fbErrorText(e), 'error'); }
+}
+
+let cfgSaving = false;
+/* Optimistic-concurrency write: refuses to overwrite a newer version saved by someone else. */
+async function mutateConfig(fn){
+  if (cfgSaving){ toast('Still saving the previous change — try again in a moment.', 'warn'); return false; }
+  const next = clone(cfg);
+  fn(next);
+  next.settings.languages = next.settings.languages.length ? next.settings.languages : defaultConfig().settings.languages;
+  const size = new Blob([JSON.stringify(next)]).size;
+  if (size > 900000){ toast('The shared library is too large to save (' + Math.round(size/1024) + ' KB, limit ≈ 900 KB). Remove or shorten entries first.', 'error'); return false; }
+  cfgSaving = true;
+  try{
+    const ref = firestore_().collection('kv').doc(CONFIG_KEY);
+    const baseRev = cfg.rev || 0;
+    await firestore_().runTransaction(async tx=>{
+      const snap = await tx.get(ref);
+      const curRev = (snap.exists && snap.data() && snap.data().data) ? (Number(snap.data().data.rev) || 0) : 0;
+      if (curRev !== baseRev){ const err = new Error('conflict'); err.code = 'app/conflict'; throw err; }
+      next.rev = curRev + 1;
+      tx.set(ref, { data: next, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+    });
+    setConn('ok');
+    cfg = next; cfgSource = 'shared';
+    onConfigChanged(true);
+    return true;
+  }catch(e){
+    if (e && e.code === 'app/conflict'){
+      toast('Someone else changed the shared settings. The latest version was loaded — please repeat your change.', 'warn', 8000);
+      await reloadConfig();
+    } else {
+      setConn(navigator.onLine === false ? 'offline' : 'error', e);
+      toast('Could not save: ' + fbErrorText(e), 'error');
+    }
+    return false;
+  }finally{ cfgSaving = false; }
+}
+
+/* ===== Config accessors ===== */
+const catById = id => cfg.categories.find(c => c.id === id) || null;
+const wfById = id => cfg.workflows.find(w => w.id === id) || null;
+function activeWorkflow(){ return wfById(prefs.workflowId) || cfg.workflows[0] || null; }
+function langList(){ return cfg.settings.languages; }
+function currentLang(){
+  const wf = activeWorkflow();
+  const codes = langList().map(l => l.code);
+  if (prefs.lang && codes.includes(prefs.lang)) return prefs.lang;
+  if (wf && wf.lang && codes.includes(wf.lang)) return wf.lang;
+  return codes.includes(cfg.settings.defaultLang) ? cfg.settings.defaultLang : (codes[0] || 'km');
+}
+function isExpired(entry){
+  if (!entry.expiresOn) return false;
+  const end = new Date(entry.expiresOn + 'T23:59:59').getTime();
+  return Date.now() > end;
+}
+function entryAnswer(entry){
+  const want = currentLang();
+  let a = entry.answers[want], used = want;
+  if (!a || !a.trim()){
+    const order = [cfg.settings.defaultLang, 'km', 'en'].concat(Object.keys(entry.answers));
+    for (const l of order){ if (entry.answers[l] && entry.answers[l].trim()){ a = entry.answers[l]; used = l; break; } }
+  }
+  return { text: a || '', lang: used, fallback: used !== want };
+}
+function langLabel(code){ const l = langList().find(x => x.code === code); return l ? l.label : code; }
+
+/* =====================================================================
+   Product catalog lookup and Quick Replies (saved answers)
+   ===================================================================== */
+let PRODUCTS = [];
+const catalogState = { status:'loading', at:null, err:'' };
+async function loadCatalog(){
+  catalogState.status = 'loading'; renderStatus();
+  try{
+    const res = await storage.get('vhm-catalog-products');
+    let ok = false;
+    if (res && res.value){
+      const parsed = JSON.parse(res.value);
+      if (Array.isArray(parsed)){ PRODUCTS = parsed; ok = true; }
+    }
+    catalogState.status = ok ? 'ok' : 'empty';
+    catalogState.err = '';
+  }catch(e){ console.error('Could not load catalog', e); catalogState.status = 'error'; catalogState.err = fbErrorText(e); }
+  catalogState.at = Date.now();
+  renderStatus(); if (currentSection() === 'quick') renderQuick();
+}
+function findCatalogProduct(code){
+  const t = normCode(code);
+  if (!t) return null;
+  return PRODUCTS.find(p => normCode(p && p.code) === t) || null;
+}
+
+/* ===== Product lookup (catalog only) ===== */
+let currentCode = null;
+let productView = { loading:false, missing:'' };
+function openProduct(raw, opts){
+  const n = normCode(raw);
+  if (!n) return;
+  const cp = findCatalogProduct(n);
+  if (!cp){ currentCode = null; productView = { loading:false, missing:n }; }
+  else { currentCode = cp.code; productView = { loading:false, missing:'' }; }
+  if (!(opts && opts.stay)) showSection('quick'); else renderSection(currentSection());
+  renderQuick(); renderComposer(true);
+}
+/* ===== Quick Replies (saved answers per workflow) ===== */
+function renderQuick(){
+  const root = $('sec-quick');
+  if (!root) return;
+  const wf = activeWorkflow();
+  root.innerHTML = '';
+  const bar = h('div', {class:'toolbar'},
+    h('label', {class:'fld'}, 'Workflow', h('select', {id:'wfSelect', onchange:(e)=>{ prefs.workflowId = e.target.value; savePrefs(); renderQuick(); }},
+      cfg.workflows.map(w => h('option', {value:w.id, selected: wf && w.id === wf.id}, w.name)))),
+    h('label', {class:'fld'}, 'Answer language', h('select', {id:'langSelect', onchange:(e)=>{ prefs.lang = e.target.value; savePrefs(); renderQuickSaved(); }},
+      langList().map(l => h('option', {value:l.code, selected: l.code === currentLang()}, l.label)))));
+  root.append(bar);
+  if (catalogState.status === 'error') root.append(h('div', {class:'banner bad'}, 'Could not load catalog ', h('button', {type:'button', class:'btn link', onclick: loadCatalog}, 'Retry')));
+  if (productView.missing) root.append(h('div', {class:'banner bad', role:'alert'}, 'No match for ', h('b', null, productView.missing)));
+  if (currentCode){
+    const cp = findCatalogProduct(currentCode), nm = cp ? (cp.name || cp.nameKh || '') : '';
+    root.append(h('div', {class:'prodchip'}, h('b', {class:'kh'}, currentCode + (nm ? ' — ' + nm : '')), cp && cp.price ? h('span', null, '$' + Number(cp.price).toFixed(2)) : null,
+      h('button', {type:'button', class:'btn sm', 'aria-label':'Clear product', onclick:()=>{ currentCode = null; productView = {loading:false, missing:''}; renderQuick(); renderComposer(); }}, '✕')));
+  }
+  if (!wf){ root.append(h('div', {class:'empty'}, 'No workflows')); return; }
+  root.append(h('div', {id:'qSaved'}));
+  renderQuickSaved();
+}
+
+function renderQuickSaved(){
+  const wrap = $('qSaved');
+  if (!wrap) return;
+  const wf = activeWorkflow();
+  wrap.innerHTML = '';
+  if (!wf) return;
+  const top = h('div', {class:'card'}, h('h3', null, 'Saved answers — ' + wf.name));
+  if (wf.escalation) top.append(h('div', {class:'banner info'}, '↗ ' + wf.escalation));
+  const greet = cfg.templates.find(t => t.id === cfg.settings.defaultGreetingId && t.active);
+  if (greet) top.append(h('div', {class:'row', style:'margin-bottom:8px'}, h('button', {type:'button', class:'btn sm', onclick:()=> insertBlock(greet.text, {kind:'greeting'})}, '+ Add greeting to reply')));
+  const cats = wf.categoryIds.map(catById).filter(Boolean);
+  let any = false;
+  cats.forEach(c=>{
+    const list = cfg.entries.filter(e => e.categoryId === c.id && e.active).sort((a,b)=> b.priority - a.priority || a.title.localeCompare(b.title));
+    if (!list.length) return;
+    any = true;
+    const det = h('details', {class:'acc', open: cats.length <= 3}, h('summary', null, c.name + ' (' + list.length + ')'));
+    const inner = h('div', null);
+    list.forEach(e => inner.append(entryRow(e, true)));
+    det.append(inner);
+    top.append(det);
+  });
+  const tpls = wf.templateIds.map(id => cfg.templates.find(t => t.id === id && t.active)).filter(Boolean);
+  if (tpls.length){
+    any = true;
+    const det = h('details', {class:'acc', open:true}, h('summary', null, 'Templates (' + tpls.length + ')'));
+    const inner = h('div', null);
+    tpls.forEach(t => inner.append(templateRow(t, true)));
+    det.append(inner); top.append(det);
+  }
+  if (!any) top.append(h('p', {class:'muted'}, 'Nothing assigned'));
+  wrap.append(top);
+}
+
+/* =====================================================================
+   Reply composer — one editable draft. Saved answers/templates are only ever
+   COPIED INTO the draft as plain strings, so editing never changes a master.
+   ===================================================================== */
+const draft = { text:'', base:'', label:'', type:'', meta:{}, ctx:{size:'',color:''}, manual:{}, upsellLine:'', previewOpen:false };
+const PH_RE = /\{([a-z_][a-z0-9_]*)\}/gi;
+
+function draftKeys(){ const s = new Set(); for (const m of draft.text.matchAll(PH_RE)) s.add(m[1].toLowerCase()); return Array.from(s); }
+
+/* Only values that are actually available (and, for price, verified) are substituted. */
+function placeholderValue(key){
+  const k = key.toLowerCase();
+  const man = draft.manual[k];
+  if (man != null && String(man).trim() !== '') return { value:String(man).trim(), src:'manual' };
+  switch (k){
+    case 'customer_name': return null;
+    case 'product_code': return currentCode ? { value:currentCode, src:'product' } : null;
+    case 'product_name': { const cp = findCatalogProduct(currentCode || ''); const n = cp && (cp.name || cp.nameKh); return n ? { value:n, src:'catalog' } : null; }
+    case 'price': return null;
+    case 'size': return draft.ctx.size ? { value:draft.ctx.size, src:'selection' } : null;
+    case 'color': return draft.ctx.color ? { value:draft.ctx.color, src:'selection' } : null;
+  }
+  const v = (cfg.settings.values || {})[k];
+  return (v && String(v).trim()) ? { value:String(v).trim(), src:'settings' } : null;
+}
+function resolveDraft(){
+  const missing = new Set();
+  const text = draft.text.replace(PH_RE, (m, key)=>{ const r = placeholderValue(key); if (r) return r.value; missing.add(key.toLowerCase()); return m; });
+  return { text, missing:Array.from(missing) };
+}
+function currentWarnings(){
+  const w = [];
+  const { missing } = resolveDraft();
+  if (missing.length) w.push({ gate:true, text:'Fill in before sending: ' + missing.map(k => '{' + k + '}').join(', ') + ' — not available or not verified, so nothing was guessed.' });
+  const m = draft.meta || {};
+  (m.notes || []).forEach(n => w.push(n));
+  return w;
+}
+
+/* ---------- rendering ---------- */
+function autosize(){ const t = $('cmpText'); t.style.height = 'auto'; t.style.height = Math.min(Math.max(t.scrollHeight + 4, 170), 420) + 'px'; }
+function syncTextarea(){ $('cmpText').value = draft.text; autosize(); }
+function renderComposer(full){
+  queuePush();
+  const edited = draft.text !== draft.base;
+  $('cmpEdited').hidden = !edited;
+  $('cmpSrc').textContent = draft.label || 'Nothing prepared yet';
+  const { text, missing } = resolveDraft();
+  $('cmpPeek').textContent = text.trim() ? text : 'No reply prepared yet — search, or tap a quick reply.';
+  // warnings
+  const warns = currentWarnings();
+  const wbox = $('cmpWarn'); wbox.innerHTML = '';
+  warns.forEach(x => wbox.append(h('div', {class:'banner ' + (x.gate ? 'warn' : 'info'), role: x.gate ? 'alert' : null}, (x.gate ? '⚠ ' : 'ℹ ') + x.text)));
+  // copy button state
+  const cb = $('cmpCopy');
+  const gated = warns.some(x => x.gate);
+  cb.classList.toggle('amber', gated);
+  if (!cb.classList.contains('copied')) cb.textContent = gated ? 'Copy reply (check ⚠)' : 'Copy reply';
+  // preview
+  const pv = $('cmpPreview');
+  const showPv = draft.previewOpen || missing.length > 0;
+  pv.hidden = !showPv;
+  if (showPv){
+    pv.innerHTML = '';
+    let last = 0;
+    for (const m of text.matchAll(PH_RE)){
+      if (!missing.includes(m[1].toLowerCase())) continue;
+      pv.append(text.slice(last, m.index), h('mark', null, m[0]));
+      last = m.index + m[0].length;
+    }
+    pv.append(text.slice(last));
+    if (!text) pv.textContent = '(empty)';
+  }
+  if (full !== 'light') renderFill();
+}
+function renderFill(){
+  const keys = draftKeys();
+  const wrap = $('cmpFill');
+  const rows = [];
+  keys.forEach(k=>{
+    const r = placeholderValue(k);
+    if (k !== 'customer_name' && r && r.src !== 'manual') return;     // already filled from a verified source
+    const inp = h('input', {class:'in', type:'text', id:'fill_' + k, value: draft.manual[k] || '', 'aria-label':'Value for ' + k,
+      oninput:(e)=>{ draft.manual[k] = e.target.value; renderComposer('light'); }});
+    const rowEl = h('div', null, h('label', {class:'fld', for:'fill_' + k}, '{' + k + '}' + (k === 'customer_name' ? ' (type the customer\'s name)' : ''), inp));
+    if (k === 'price' && !r){
+      const cp = findCatalogProduct(currentCode || '');
+      let hint = null, val = '';
+      if (cp && cp.price){ val = String(cp.price); hint = 'catalog price $' + val; }
+      if (hint) rowEl.append(h('button', {type:'button', class:'btn sm', style:'margin-top:4px', onclick:()=>{ draft.manual.price = val; renderComposer(); }}, 'Use ' + hint));
+    }
+    rows.push(rowEl);
+  });
+  $('cmpFillWrap').hidden = rows.length === 0;
+  wrap.innerHTML = '';
+  rows.forEach(r => wrap.append(r));
+}
+function flashComposer(){
+  [$('cmpText'), $('cmpPeek')].forEach(el=>{ el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); });
+}
+
+/* ---------- draft operations ---------- */
+function greetingTemplates(){ return cfg.templates.filter(t => t.active && t.kind === 'greeting'); }
+function textHasGreeting(text){ const n = normalizeText(text); return greetingTemplates().some(t => n.includes(normalizeText(t.text))); }
+function applyAutoGreeting(text){
+  const wf = activeWorkflow();
+  if (!wf || !wf.rules || !wf.rules.greeting) return text;
+  const g = cfg.templates.find(t => t.id === cfg.settings.defaultGreetingId && t.active);
+  if (!g || textHasGreeting(text)) return text;
+  return g.text + '\n\n' + text;
+}
+function setStatus(msg, kind){ const s = $('cmpStatus'); s.textContent = msg || ''; s.title = msg || ''; s.className = 'cmp-status ' + (kind || ''); }
+function setDraft(text, o){
+  o = o || {};
+  if (o.autoGreeting !== false && o.type !== 'template') text = applyAutoGreeting(text);
+  draft.text = text; draft.base = text;
+  draft.label = o.label || ''; draft.type = o.type || '';
+  draft.meta = o.meta || {};
+  draft.ctx = Object.assign({size:'', color:''}, o.ctx || {});
+  draft.upsellLine = '';
+  syncTextarea(); renderComposer(); flashComposer(); setStatus('');
+  queuePush(0);
+  if (o.copy || prefs.autoCopy) copyReply();
+}
+function addNotes(notes){ if (!notes || !notes.length) return; draft.meta = draft.meta || {}; draft.meta.notes = (draft.meta.notes || []).concat(notes.filter(n => !(draft.meta.notes || []).some(x => x.text === n.text))); }
+/* Append a block, refusing duplicates; greetings always go on top and only once. */
+function insertBlock(text, o){
+  o = o || {};
+  const nt = normalizeText(text);
+  if (!nt) return false;
+  if (o.kind === 'greeting'){
+    if (textHasGreeting(draft.text) || normalizeText(draft.text).includes(nt)){ toast('A greeting is already in this reply.', 'warn'); return false; }
+    draft.text = draft.text.trim() ? text + '\n\n' + draft.text : text;
+  } else {
+    if (normalizeText(draft.text).includes(nt)){ toast('That text is already in the reply.', 'warn'); return false; }
+    draft.text = draft.text.trim() ? draft.text.replace(/\s+$/, '') + '\n\n' + text : text;
+    if (!draft.label) draft.label = o.label || '';
+  }
+  syncTextarea(); renderComposer(); flashComposer();
+  return true;
+}
+function entryNotes(entry, ans){
+  const notes = [];
+  if (isExpired(entry)) notes.push({ gate:true, text:'This answer expired on ' + entry.expiresOn + ' — check the promotion/condition is still valid.' });
+  if (entry.eligibleCodes.length && (!currentCode || !entry.eligibleCodes.includes(normCode(currentCode))))
+    notes.push({ gate:true, text:'This answer applies only to code(s) ' + entry.eligibleCodes.join(', ') + (currentCode ? ' — the open product (' + currentCode + ') is not on the list.' : ' — no product is open.') });
+  const cat = catById(entry.categoryId);
+  if (ans.fallback) notes.push({ gate:false, text:'No ' + langLabel(currentLang()) + ' version saved — showing ' + langLabel(ans.lang) + '.' });
+  return notes;
+}
+function useEntry(entry, mode){
+  const a = entryAnswer(entry);
+  if (!a.text.trim()){ toast('This answer has no text yet.', 'warn'); return; }
+  const notes = entryNotes(entry, a);
+  const m = mode === 'auto' ? entry.insertMode : mode;
+  if (m === 'insert' || m === 'append'){
+    if (draft.text.trim()){ if (insertBlock(a.text, {label:'Q&A · ' + entry.title})) addNotes(notes), renderComposer(); return; }
+  }
+  setDraft(a.text, { label:'Q&A · ' + entry.title, type:'entry', meta:{ entryId:entry.id, notes } });
+}
+function useTemplate(t, mode){
+  if (mode === 'insert' || (mode === 'auto' && draft.text.trim())){
+    insertBlock(t.text, { kind: t.kind === 'greeting' ? 'greeting' : 'block', label:'Template · ' + t.name });
+  } else {
+    setDraft(t.text, { label:'Template · ' + t.name, type:'template', meta:{ notes:[] } });
+  }
+}
+function addUpsell(){
+  const inp = $('cmpUpsell');
+  const line = inp.value.trim();
+  if (!line){ toast('Type an upsell line first.', 'warn'); return; }
+  if (draft.upsellLine && draft.text.includes(draft.upsellLine)) draft.text = draft.text.replace(draft.upsellLine, line);
+  else if (normalizeText(draft.text).includes(normalizeText(line))){ toast('That upsell line is already in the reply.', 'warn'); return; }
+  else draft.text = draft.text.trim() ? draft.text.replace(/\s+$/, '') + '\n\n' + line : line;
+  draft.upsellLine = line;
+  syncTextarea(); renderComposer(); flashComposer();
+}
+
+/* ---------- copy / phone relay ---------- */
+let copyBusy = false;
+async function copyReply(){
+  if (copyBusy) return;
+  const { text } = resolveDraft();
+  if (!text.trim()){ setStatus('Nothing to copy yet.', 'bad'); return; }
+  const gates = currentWarnings().filter(x => x.gate).map(x => x.text);
+  if (gates.length && !confirm(gates.join('\n') + '\n\nCopy anyway?')){ setStatus(''); return; }
+  copyBusy = true;
+  const ok = await copyText(text);
+  copyBusy = false;
+  const btn = $('cmpCopy');
+  if (ok){
+    btn.classList.add('copied'); btn.textContent = '✓ Copied';
+    setTimeout(()=>{ btn.classList.remove('copied'); renderComposer('light'); }, 2000);
+    setStatus('Copied', 'ok');
+    if (getStaffName()) sendToPhone(text);
+  } else {
+    draft.previewOpen = true; renderComposer('light');
+    const pv = $('cmpPreview');
+    try{ const r = document.createRange(); r.selectNodeContents(pv); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }catch(e){}
+    setStatus('The browser blocked clipboard access. The final text is selected in the preview below — press Ctrl+C (or long-press → Copy) to copy it manually.', 'bad');
+    if (!$('composer').classList.contains('open')) setSheet(true);
+  }
+}
+/* Replies go to the staff member's phone page automatically (on select, on edit, on copy). Nothing is sent while
+   the reply still has unfilled {placeholders}. */
+let phoneBusy = false, lastPushed = '', pushTimer = null;
+async function sendToPhone(textArg){
+  const name = getStaffName();
+  if (!name) return;
+  const text = typeof textArg === 'string' ? textArg : resolveDraft().text;
+  if (!text.trim() || phoneBusy) return;
+  const sig = name + '\u0000' + text;
+  if (sig === lastPushed) return;
+  phoneBusy = true;
+  try{
+    await storage.set(quickReplyLiveKey(name), text);
+    lastPushed = sig;
+    if ($('cmpStatus').title) { $('cmpStatus').title = ''; if ($('cmpStatus').className.includes('bad')) setStatus(''); }
+  }catch(e){ setStatus('Could not send to phone', 'bad'); $('cmpStatus').title = fbErrorText(e); }
+  phoneBusy = false;
+}
+function queuePush(delay){
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(()=>{ const r = resolveDraft(); if (r.text.trim() && !r.missing.length) sendToPhone(r.text); }, delay == null ? 600 : delay);
+}
+
+/* ---------- mobile sheet ---------- */
+function setSheet(open){
+  const c = $('composer');
+  c.classList.toggle('open', open);
+  $('cmpToggle').setAttribute('aria-expanded', open ? 'true' : 'false');
+  $('cmpToggle').textContent = open ? 'Close ▼' : 'Edit ▲';
+  if (open) setTimeout(()=> $('cmpText').scrollIntoView({block:'nearest'}), 50);
+}
+function initComposer(){
+  const t = $('cmpText');
+  t.addEventListener('input', ()=>{
+    const before = draftKeys().join(',');
+    draft.text = t.value;
+    if (draft.upsellLine && !draft.text.includes(draft.upsellLine)) draft.upsellLine = '';
+    autosize();
+    renderComposer(draftKeys().join(',') === before ? 'light' : undefined);
+  });
+  t.addEventListener('focus', ()=>{ setTimeout(()=> t.scrollIntoView({block:'center', behavior:'smooth'}), 250); });
+  $('cmpCopy').addEventListener('click', copyReply);
+  $('cmpReset').addEventListener('click', ()=>{ if (draft.text === draft.base){ toast('Nothing to reset — the reply is unedited.'); return; } draft.text = draft.base; syncTextarea(); renderComposer(); toast('Reply reset to the generated version.'); });
+  $('cmpClear').addEventListener('click', ()=>{ draft.text = ''; draft.base = ''; draft.label = ''; draft.meta = {}; draft.ctx = {size:'', color:''}; draft.manual = {}; draft.upsellLine = ''; syncTextarea(); renderComposer(); setStatus(''); });
+  $('cmpGreet').addEventListener('click', ()=>{
+    const g = cfg.templates.find(x => x.id === cfg.settings.defaultGreetingId && x.active) || greetingTemplates()[0];
+    if (!g){ toast('No greeting template is set up (Templates).', 'warn'); return; }
+    insertBlock(g.text, {kind:'greeting'});
+  });
+  $('cmpUpsellAdd').addEventListener('click', addUpsell);
+  $('cmpTplSelect').addEventListener('change', (e)=>{
+    const tpl = cfg.templates.find(x => x.id === e.target.value);
+    e.target.value = '';
+    if (tpl) useTemplate(tpl, 'insert');
+  });
+  $('cmpToggle').addEventListener('click', ()=> setSheet(!$('composer').classList.contains('open')));
+  $('cmpPeek').addEventListener('click', ()=> setSheet(true));
+  // keep page content clear of the bottom sheet, and keep the sheet inside the visible area when the keyboard opens
+  const comp = $('composer');
+  const upd = ()=>{
+    const narrow = matchMedia('(max-width:859px)').matches;
+    document.documentElement.style.setProperty('--sheet-h', narrow ? (comp.offsetHeight + 'px') : '0px');
+    const vv = window.visualViewport;
+    document.documentElement.style.setProperty('--vvh', (vv ? vv.height : innerHeight) + 'px');
+    if (vv && narrow) comp.style.bottom = Math.max(0, innerHeight - vv.height - vv.offsetTop) + 'px'; else comp.style.bottom = '';
+  };
+  if (window.ResizeObserver) new ResizeObserver(upd).observe(comp);
+  if (window.visualViewport){ visualViewport.addEventListener('resize', upd); visualViewport.addEventListener('scroll', upd); }
+  addEventListener('resize', upd); upd();
+  renderTemplateSelect();
+  renderComposer();
+}
+function renderTemplateSelect(){
+  const s = $('cmpTplSelect');
+  s.innerHTML = '';
+  s.append(h('option', {value:''}, '＋ Insert template…'));
+  cfg.templates.filter(t => t.active).forEach(t => s.append(h('option', {value:t.id}, t.name)));
+}
+
+/* =====================================================================
+   Q&A library, templates, editors, category manager
+   ===================================================================== */
+const badge = (txt, cls) => h('span', {class:'badge ' + (cls || '')}, txt);
+const PH_BUILTIN_AUTO = ['product_code','product_name','price','size','color'];
+function placeholderStatus(key){
+  const k = key.toLowerCase();
+  if (k === 'customer_name') return 'typed per chat';
+  if (PH_BUILTIN_AUTO.includes(k)) return 'filled from the open product' + '';
+  const v = (cfg.settings.values || {})[k];
+  return (v && v.trim()) ? 'verified value set in Settings' : 'NO VALUE SET — will be flagged for manual entry';
+}
+function keysIn(text){ const s = new Set(); for (const m of String(text).matchAll(PH_RE)) s.add(m[1].toLowerCase()); return Array.from(s); }
+function markedPreview(text){
+  const out = []; let last = 0;
+  for (const m of String(text).matchAll(PH_RE)){ out.push(text.slice(last, m.index), h('mark', null, m[0])); last = m.index + m[0].length; }
+  out.push(text.slice(last));
+  return out;
+}
+
+/* ---------- entry row (used in the library and in Quick Replies) ---------- */
+function entryRow(e, compact){
+  const cat = catById(e.categoryId);
+  const a = entryAnswer(e);
+  const item = h('div', {class:'item' + (e.active ? '' : ' inactive'), 'data-entry':e.id});
+  item.append(h('h3', null, h('span', null, e.title), !e.active ? badge('inactive', 'inactive') : null, isExpired(e) ? badge('expired', 'warn') : null,
+    e.eligibleCodes.length ? badge('codes: ' + e.eligibleCodes.join(','), '') : null));
+  if (!compact) item.append(h('div', {class:'small muted'}, (cat ? cat.name : '(no category)') + (e.priority ? ' · priority ' + e.priority : '')));
+  item.append(h('div', {class:'txt kh'}, a.text || '(no answer text)'));
+  const row = h('div', {class:'row'},
+    h('button', {type:'button', class:'btn sm primary', disabled:!e.active, onclick:()=> useEntry(e, 'replace')}, 'Use as reply'),
+    h('button', {type:'button', class:'btn sm', disabled:!e.active, onclick:()=> useEntry(e, 'insert')}, 'Insert'),
+    h('button', {type:'button', class:'btn sm', onclick:()=> previewEntry(e)}, 'Preview'));
+  if (!compact && adminMode){
+    row.append(
+      h('button', {type:'button', class:'btn sm', onclick:()=> openEntryEditor(e)}, 'Edit'),
+      h('button', {type:'button', class:'btn sm', onclick:()=> duplicateEntry(e)}, 'Duplicate'),
+      h('button', {type:'button', class:'btn sm', onclick:()=> mutateConfig(c=>{ const x = c.entries.find(y=>y.id===e.id); if (x){ x.active = !x.active; x.updatedAt = Date.now(); } })}, e.active ? 'Disable' : 'Enable'),
+      h('button', {type:'button', class:'btn sm danger', onclick:()=> deleteEntry(e)}, 'Delete'));
+  }
+  item.append(row);
+  return item;
+}
+function previewEntry(e){
+  const body = h('div', {class:'stack'});
+  const cat = catById(e.categoryId);
+  body.append(h('div', {class:'small muted'}, (cat ? cat.name : '(no category)') + ' · ' + (e.active ? 'active' : 'inactive') + (e.expiresOn ? ' · expires ' + e.expiresOn : '')));
+  Object.keys(e.answers).forEach(code=>{
+    if (!e.answers[code].trim()) return;
+    body.append(h('div', null, h('div', {class:'small muted'}, langLabel(code)), h('div', {class:'preview kh'}, markedPreview(e.answers[code]))));
+  });
+  const keys = Array.from(new Set(Object.values(e.answers).flatMap(keysIn)));
+  if (keys.length) body.append(h('div', null, h('div', {class:'small muted'}, 'Placeholders'), h('ul', {style:'margin:4px 0 0 18px;padding:0'}, keys.map(k => h('li', {class:'small'}, '{' + k + '} — ' + placeholderStatus(k))))));
+  if (e.phrasings.length) body.append(h('div', {class:'small'}, h('b', null, 'Customer phrasings: '), e.phrasings.join(' · ')));
+  if (e.keywords.length) body.append(h('div', {class:'small'}, h('b', null, 'Keywords: '), e.keywords.join(', ')));
+  if (e.note) body.append(h('div', {class:'banner info small'}, 'Staff note: ' + e.note));
+  openDialog({ title:e.title, body, actions:[
+    { label:'Close' },
+    { label:'Insert', onClick:()=>{ useEntry(e, 'insert'); } },
+    { label:'Use as reply', kind:'primary', onClick:()=>{ useEntry(e, 'replace'); } }
+  ].map(a => Object.assign({ onClick:()=>{} }, a)) });
+}
+async function duplicateEntry(e){
+  const now = Date.now();
+  const copy = clone(e); copy.id = uid('qa'); copy.title = e.title + ' (copy)'; copy.createdAt = now; copy.updatedAt = now;
+  if (await mutateConfig(c => { c.entries.push(copy); })) toast('Duplicated — edit the copy.', 'ok');
+}
+async function deleteEntry(e){
+  if (!confirm('Delete the answer "' + e.title + '" for everyone? This cannot be undone.\n(Tip: Disable keeps it but hides it from staff.)')) return;
+  if (await mutateConfig(c => { c.entries = c.entries.filter(x => x.id !== e.id); })) toast('Deleted.', 'ok');
+}
+
+/* ---------- Q&A library view ---------- */
+const qaState = { q:'', cat:'', status:'' };
+function qaMatches(e, q){
+  if (!q) return true;
+  const hay = normalizeText([e.title, e.phrasings.join(' '), e.keywords.join(' '), Object.values(e.answers).join(' ')].join(' '));
+  return q.split(' ').every(t => hay.includes(t));
+}
+function renderQA(){
+  const root = $('sec-qa');
+  root.innerHTML = '';
+  root.append(h('h2', {class:'sec-title'}, 'Q&A Library'));
+  const status = qaState.status || (adminMode ? 'all' : 'active');
+  const tb = h('div', {class:'toolbar'},
+    h('label', {class:'fld', style:'flex:2 1 220px'}, 'Filter', h('input', {type:'search', value:qaState.q, placeholder:'Filter answers…', oninput:(e)=>{ qaState.q = e.target.value; renderQAList(); }})),
+    h('label', {class:'fld'}, 'Category', h('select', {onchange:(e)=>{ qaState.cat = e.target.value; renderQAList(); }},
+      h('option', {value:''}, 'All categories'), cfg.categories.map(c => h('option', {value:c.id, selected:qaState.cat === c.id}, c.name)))),
+    adminMode ? h('label', {class:'fld'}, 'Status', h('select', {onchange:(e)=>{ qaState.status = e.target.value; renderQAList(); }},
+      [['all','All'],['active','Active only'],['inactive','Inactive only']].map(([v,l]) => h('option', {value:v, selected:status === v}, l)))) : null);
+  root.append(tb);
+  if (adminMode){
+    root.append(h('div', {class:'row', style:'margin-bottom:10px'},
+      h('button', {type:'button', class:'btn primary', onclick:()=> openEntryEditor(null)}, '+ Add answer'),
+      h('button', {type:'button', class:'btn', onclick: openCategoryManager}, 'Categories…'),
+      h('button', {type:'button', class:'btn', onclick: exportJSON}, 'Export JSON'),
+      h('button', {type:'button', class:'btn', onclick: exportCSV}, 'Export CSV'),
+      h('button', {type:'button', class:'btn', onclick:()=> $('importFile') && $('importFile').click()}, 'Import…')));
+  } else {
+    root.append(h('div', {class:'row', style:'margin-bottom:10px'}, h('button', {type:'button', class:'btn sm', onclick: exportCSV}, 'Export CSV')));
+  }
+  root.append(h('div', {id:'qaList'}));
+  renderQAList();
+}
+function renderQAList(){
+  const box = $('qaList');
+  if (!box) return;
+  const status = qaState.status || (adminMode ? 'all' : 'active');
+  const q = normalizeText(qaState.q);
+  box.innerHTML = '';
+  let total = 0;
+  const cats = cfg.categories.filter(c => !qaState.cat || c.id === qaState.cat);
+  const orphan = cfg.entries.filter(e => !catById(e.categoryId));
+  const groups = cats.map(c => ({ c, list: cfg.entries.filter(e => e.categoryId === c.id) }));
+  if (!qaState.cat && orphan.length) groups.push({ c:{id:'', name:'(no category)'}, list:orphan });
+  groups.forEach(({c, list})=>{
+    list = list.filter(e => qaMatches(e, q) && (status === 'all' || (status === 'active' ? e.active : !e.active)))
+      .sort((a,b)=> b.priority - a.priority || a.title.localeCompare(b.title));
+    if (!list.length) return;
+    total += list.length;
+    const det = h('details', {class:'acc', open:true}, h('summary', null, c.name + ' (' + list.length + ')'));
+    const inner = h('div', null);
+    list.forEach(e => inner.append(entryRow(e, false)));
+    det.append(inner); box.append(det);
+  });
+  if (!total) box.append(h('div', {class:'empty'}, q || qaState.cat ? 'No answers match this filter.' : 'No answers yet.' + (adminMode ? ' Use “+ Add answer”.' : '')));
+}
+
+/* ---------- entry editor ---------- */
+function openEntryEditor(entry){
+  if (!adminMode){ toast('Turn on admin mode in Settings to edit.', 'warn'); return; }
+  const isNew = !entry;
+  const e = entry ? clone(entry) : { id:uid('qa'), title:'', categoryId:(cfg.categories[0] || {}).id || '', phrasings:[], keywords:[], answers:{}, note:'', active:true, priority:0, insertMode:'replace', expiresOn:'', eligibleCodes:[], createdAt:0, updatedAt:0 };
+  const codes = langList().map(l => l.code);
+  Object.keys(e.answers).forEach(c => { if (!codes.includes(c)) codes.push(c); });
+  const f = {
+    title: h('input', {class:'in', type:'text', value:e.title, maxlength:'200'}),
+    cat: h('select', {class:'in'}, cfg.categories.map(c => h('option', {value:c.id, selected:c.id === e.categoryId}, c.name))),
+    phr: h('textarea', {class:'in', placeholder:'One alternative customer phrasing per line'}, e.phrasings.join('\n')),
+    kw: h('textarea', {class:'in', style:'min-height:56px', placeholder:'Keywords, separated by commas or new lines'}, e.keywords.join(', ')),
+    note: h('textarea', {class:'in', style:'min-height:56px', placeholder:'Internal staff note (never copied into a reply)'}, e.note),
+    active: h('input', {type:'checkbox', checked:e.active}),
+    prio: h('input', {class:'in', type:'number', value:String(e.priority)}),
+    mode: h('select', {class:'in'}, [['replace','Use as the reply (replace)'],['append','Insert into the current reply (append)']].map(([v,l]) => h('option', {value:v, selected:e.insertMode === v}, l))),
+    exp: h('input', {class:'in', type:'date', value:e.expiresOn}),
+    codes: h('input', {class:'in', type:'text', value:e.eligibleCodes.join(', '), placeholder:'e.g. C01, C07  (blank = any product)'})
+  };
+  f.ans = {};
+  codes.forEach(c => { f.ans[c] = h('textarea', {class:'in kh', 'data-lang':c, style:'min-height:70px'}, e.answers[c] || ''); });
+  const err = h('div', {class:'banner bad', hidden:true, role:'alert'});
+  const prevLang = h('select', {class:'in', style:'width:auto', 'aria-label':'Preview language'}, codes.map(c => h('option', {value:c}, langLabel(c))));
+  const prevBox = h('div', {class:'preview kh'});
+  const prevInfo = h('ul', {class:'small', style:'margin:6px 0 0 18px;padding:0'});
+  const refresh = ()=>{
+    const t = (f.ans[prevLang.value] || {}).value || '';
+    prevBox.innerHTML = ''; prevBox.append(...markedPreview(t));
+    if (!t.trim()) prevBox.textContent = '(empty)';
+    prevInfo.innerHTML = '';
+    keysIn(t).forEach(k => prevInfo.append(h('li', null, '{' + k + '} — ' + placeholderStatus(k))));
+  };
+  Object.values(f.ans).forEach(t => t.addEventListener('input', refresh));
+  prevLang.addEventListener('change', refresh);
+  const body = h('div', {class:'form'}, err,
+    h('label', {class:'fld'}, 'Question title *', f.title),
+    h('div', {class:'two'}, h('label', {class:'fld'}, 'Category *', f.cat), h('label', {class:'fld'}, 'Priority (higher wins when answers overlap)', f.prio)),
+    h('label', {class:'fld'}, 'Alternative customer phrasings', f.phr),
+    h('label', {class:'fld'}, 'Search keywords', f.kw),
+    codes.map(c => h('label', {class:'fld'}, 'Answer — ' + langLabel(c) + (c === cfg.settings.defaultLang ? ' *' : ''), f.ans[c])),
+    h('p', {class:'small muted'}, 'Placeholders: {customer_name} {product_code} {product_name} {price} {size} {color} {delivery_fee}'),
+    h('div', {class:'two'}, h('label', {class:'fld'}, 'Staff action', f.mode), h('label', {class:'fld'}, 'Expires on (optional)', f.exp)),
+    h('label', {class:'fld'}, 'Only for these product codes (optional)', f.codes),
+    h('label', {class:'fld'}, 'Internal staff note', f.note),
+    h('label', {class:'check'}, f.active, 'Active (visible to staff)'),
+    h('div', {class:'card', style:'margin:0'}, h('div', {class:'row', style:'justify-content:space-between'}, h('h3', {style:'margin:0'}, 'Preview before publishing'), prevLang), prevBox, prevInfo));
+  refresh();
+  const showErr = (m)=>{ err.hidden = false; err.textContent = m; err.scrollIntoView({block:'nearest'}); return false; };
+  openDialog({ title: isNew ? 'Add answer' : 'Edit answer', wide:true, body, actions:[
+    { label:'Cancel', onClick:()=>{} },
+    { label: isNew ? 'Publish new answer' : 'Publish changes', kind:'primary', onClick: async ()=>{
+        const title = f.title.value.trim();
+        if (!title) return showErr('A question title is required.');
+        if (!f.cat.value) return showErr('Choose a category (create one first via Categories…).');
+        const answers = {}; let any = false;
+        Object.entries(f.ans).forEach(([c, t]) => { const v = t.value.replace(/\s+$/,''); if (v.trim()){ answers[c] = v; any = true; } });
+        if (!any) return showErr('Write the answer in at least one language.');
+        const exp = f.exp.value;
+        const dup = cfg.entries.find(x => x.id !== e.id && x.categoryId === f.cat.value && normalizeText(x.title) === normalizeText(title));
+        if (dup && !confirm('Another answer in this category already has the title "' + title + '". Save anyway?')) return false;
+        const now = Date.now();
+        const nu = normEntry(Object.assign({}, e, {
+          title, categoryId:f.cat.value, answers, active:f.active.checked,
+          phrasings:f.phr.value.split('\n').map(s=>s.trim()).filter(Boolean),
+          keywords:f.kw.value.split(/[,\n]/).map(s=>s.trim()).filter(Boolean),
+          note:f.note.value.trim(), priority:Number(f.prio.value)||0, insertMode:f.mode.value, expiresOn:exp,
+          eligibleCodes:f.codes.value.split(/[,\s]+/).map(normCode).filter(Boolean),
+          createdAt: e.createdAt || now, updatedAt: now }));
+        const ok = await mutateConfig(c => { const i = c.entries.findIndex(x => x.id === nu.id); if (i >= 0) c.entries[i] = nu; else c.entries.push(nu); });
+        if (!ok) return false;
+        toast('Published.', 'ok');
+      } }
+  ]});
+}
+
+/* ---------- category manager (staged, saved once) ---------- */
+function openCategoryManager(){
+  if (!adminMode){ toast('Turn on admin mode in Settings to edit.', 'warn'); return; }
+  let list = clone(cfg.categories);
+  const holder = h('div', {class:'stack'});
+  const draw = ()=>{
+    holder.innerHTML = '';
+    list.forEach((c, i)=>{
+      const used = cfg.entries.filter(e => e.categoryId === c.id).length;
+      holder.append(h('div', {class:'item', style:'margin:0'},
+        h('div', {class:'row', style:'flex-wrap:nowrap'},
+          h('input', {class:'in grow', type:'text', value:c.name, 'aria-label':'Category name', oninput:(e)=>{ c.name = e.target.value; }}),
+          h('button', {type:'button', class:'btn sm', disabled:i === 0, 'aria-label':'Move up', onclick:()=>{ [list[i-1], list[i]] = [list[i], list[i-1]]; draw(); }}, '↑'),
+          h('button', {type:'button', class:'btn sm', disabled:i === list.length - 1, 'aria-label':'Move down', onclick:()=>{ [list[i+1], list[i]] = [list[i], list[i+1]]; draw(); }}, '↓'),
+          h('button', {type:'button', class:'btn sm danger', onclick:()=>{ if (used){ toast('“' + c.name + '” still has ' + used + ' answer(s). Move or delete them first.', 'warn'); return; } list.splice(i, 1); draw(); }}, 'Delete')),
+        h('label', {class:'check small', style:'margin-top:6px'}, h('input', {type:'checkbox', checked:!!c.productSpecific, onchange:(e)=>{ c.productSpecific = e.target.checked; }}),
+          'Product-specific'),
+        h('div', {class:'small muted'}, used + ' answer(s)')));
+    });
+  };
+  draw();
+  const body = h('div', {class:'stack'}, holder,
+    h('button', {type:'button', class:'btn', onclick:()=>{ list.push({id:uid('cat'), name:'New category', productSpecific:false}); draw(); }}, '+ Add category'));
+  openDialog({ title:'Categories', body, actions:[
+    { label:'Cancel', onClick:()=>{} },
+    { label:'Save categories', kind:'primary', onClick: async ()=>{
+        if (list.some(c => !c.name.trim())){ toast('Every category needs a name.', 'warn'); return false; }
+        const names = list.map(c => normalizeText(c.name));
+        if (new Set(names).size !== names.length){ toast('Two categories have the same name.', 'warn'); return false; }
+        const ok = await mutateConfig(c => { c.categories = list.map(x => ({id:x.id, name:x.name.trim(), productSpecific:!!x.productSpecific})); });
+        if (!ok) return false;
+        toast('Categories saved.', 'ok');
+      } } ]});
+}
+
+/* ---------- templates ---------- */
+const TPL_KINDS = [['greeting','Greeting'],['general','General'],['promo','Promotion'],['order','Order / after-sales'],['other','Other']];
+function templateRow(t, compact){
+  const item = h('div', {class:'item' + (t.active ? '' : ' inactive')});
+  item.append(h('h3', null, h('span', null, t.name), badge((TPL_KINDS.find(k => k[0] === t.kind) || ['', t.kind])[1], 'template'), !t.active ? badge('inactive', 'inactive') : null));
+  item.append(h('div', {class:'txt kh'}, t.text));
+  const row = h('div', {class:'row'},
+    h('button', {type:'button', class:'btn sm primary', disabled:!t.active, onclick:()=> useTemplate(t, 'replace')}, 'Use as reply'),
+    h('button', {type:'button', class:'btn sm', disabled:!t.active, onclick:()=> useTemplate(t, 'insert')}, 'Insert'));
+  if (!compact && adminMode){
+    row.append(
+      h('button', {type:'button', class:'btn sm', onclick:()=> openTemplateEditor(t)}, 'Edit'),
+      h('button', {type:'button', class:'btn sm', onclick: async ()=>{ const now = Date.now(); const c2 = Object.assign(clone(t), {id:uid('tpl'), name:t.name + ' (copy)', createdAt:now, updatedAt:now}); if (await mutateConfig(c => { c.templates.push(c2); })) toast('Duplicated.', 'ok'); }}, 'Duplicate'),
+      h('button', {type:'button', class:'btn sm', onclick:()=> mutateConfig(c=>{ const x = c.templates.find(y=>y.id===t.id); if (x){ x.active = !x.active; x.updatedAt = Date.now(); } })}, t.active ? 'Disable' : 'Enable'),
+      h('button', {type:'button', class:'btn sm danger', onclick: async ()=>{ if (!confirm('Delete the template "' + t.name + '" for everyone?')) return; if (await mutateConfig(c=>{ c.templates = c.templates.filter(x => x.id !== t.id); c.workflows.forEach(w => { w.templateIds = w.templateIds.filter(id => id !== t.id); }); if (c.settings.defaultGreetingId === t.id) c.settings.defaultGreetingId = ''; })) toast('Deleted.', 'ok'); }}, 'Delete'));
+  }
+  item.append(row);
+  return item;
+}
+function renderTemplates(){
+  const root = $('sec-templates');
+  root.innerHTML = '';
+  root.append(h('h2', {class:'sec-title'}, 'Templates'));
+  if (adminMode){
+    const row = h('div', {class:'row', style:'margin-bottom:10px'}, h('button', {type:'button', class:'btn primary', onclick:()=> openTemplateEditor(null)}, '+ Add template'));
+    const legacy = legacyTemplates();
+    if (legacy.length) row.append(h('button', {type:'button', class:'btn', onclick:()=> importLegacyTemplates(legacy)}, 'Import ' + legacy.length + ' template(s) saved on this device'));
+    root.append(row);
+  }
+  const list = adminMode ? cfg.templates : cfg.templates.filter(t => t.active);
+  if (!list.length) root.append(h('div', {class:'empty'}, 'No templates yet.'));
+  list.forEach(t => root.append(templateRow(t, false)));
+}
+function legacyTemplates(){
+  const raw = lsGetJSON('vhm_quickreply_templates');
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(x => typeof x === 'string' && x.trim() && !cfg.templates.some(t => normalizeText(t.text) === normalizeText(x)));
+}
+async function importLegacyTemplates(list){
+  if (!confirm('Copy ' + list.length + ' template(s) from this device into the shared team templates?')) return;
+  const now = Date.now();
+  if (await mutateConfig(c => { list.forEach((text, i) => c.templates.push({id:uid('tpl'), name:'Imported ' + (i + 1), kind:'general', text, active:true, createdAt:now, updatedAt:now})); })) toast('Imported. Rename them as needed.', 'ok');
+}
+function openTemplateEditor(t){
+  if (!adminMode){ toast('Turn on admin mode in Settings to edit.', 'warn'); return; }
+  const isNew = !t;
+  const x = t ? clone(t) : { id:uid('tpl'), name:'', kind:'general', text:'', active:true, createdAt:0, updatedAt:0 };
+  const f = {
+    name: h('input', {class:'in', type:'text', value:x.name}),
+    kind: h('select', {class:'in'}, TPL_KINDS.map(([v,l]) => h('option', {value:v, selected:x.kind === v}, l))),
+    text: h('textarea', {class:'in kh', style:'min-height:120px'}, x.text),
+    active: h('input', {type:'checkbox', checked:x.active})
+  };
+  const err = h('div', {class:'banner bad', hidden:true, role:'alert'});
+  const body = h('div', {class:'form'}, err, h('label', {class:'fld'}, 'Template name *', f.name), h('label', {class:'fld'}, 'Type', f.kind),
+    h('label', {class:'fld'}, 'Text *', f.text), h('p', {class:'small muted'}, 'Type “Greeting” is what the automatic-greeting rule and the + Greeting button use (and what prevents a greeting being added twice).'),
+    h('label', {class:'check'}, f.active, 'Active (visible to staff)'));
+  openDialog({ title:isNew ? 'Add template' : 'Edit template', body, actions:[
+    { label:'Cancel', onClick:()=>{} },
+    { label:'Save template', kind:'primary', onClick: async ()=>{
+        const name = f.name.value.trim(), text = f.text.value.replace(/\s+$/, '');
+        if (!name || !text.trim()){ err.hidden = false; err.textContent = 'A name and some text are required.'; return false; }
+        const now = Date.now();
+        const nu = { id:x.id, name, kind:f.kind.value, text, active:f.active.checked, createdAt:x.createdAt || now, updatedAt:now };
+        if (!(await mutateConfig(c => { const i = c.templates.findIndex(y => y.id === nu.id); if (i >= 0) c.templates[i] = nu; else c.templates.push(nu); }))) return false;
+        toast('Template saved.', 'ok');
+      } } ]});
+}
+
+/* =====================================================================
+   Team broadcasts, settings, workflows, import / export
+   ===================================================================== */
+
+/* ---------- Broadcasts (publishes to OUR staff devices only) ---------- */
+const bc = { current:null, updatedAtMs:null, loaded:false, loading:false, err:'', image:null, imageName:'', publishing:false, compressing:false };
+async function loadBroadcast(){
+  bc.loading = true; bc.err = '';
+  try{
+    const r = await storage.getDoc(UPSELL_BROADCAST_KEY);
+    bc.current = r ? r.data : null; bc.updatedAtMs = r ? r.updatedAtMs : null; bc.loaded = true;
+  }catch(e){ bc.err = fbErrorText(e); }
+  bc.loading = false;
+  if (!$('sec-broadcasts').hidden) renderBroadcasts(true);
+}
+function compressImageFileOnce(file, maxDim, quality){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      const img = new Image();
+      img.onload = ()=>{
+        let w = img.width, hh = img.height;
+        if (w > maxDim || hh > maxDim){
+          if (w >= hh){ hh = Math.round(hh * maxDim / w); w = maxDim; } else { w = Math.round(w * maxDim / hh); hh = maxDim; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = hh;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, hh);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = ()=> reject(new Error('Could not read that image'));
+      img.src = reader.result;
+    };
+    reader.onerror = ()=> reject(new Error('Could not read that file'));
+    reader.readAsDataURL(file);
+  });
+}
+async function compressImageToLimit(file, limitBytes){
+  let maxDim = 900, quality = 0.75;
+  for (let i = 0; i < 6; i++){
+    const dataUrl = await compressImageFileOnce(file, maxDim, quality);
+    if (Math.round(dataUrl.length * 0.75) <= limitBytes) return dataUrl;
+    if (quality > 0.4) quality -= 0.15; else { maxDim = Math.round(maxDim * 0.7); quality = 0.6; }
+  }
+  return compressImageFileOnce(file, 300, 0.4);
+}
+async function handleBroadcastImage(file){
+  if (!file || !(file.type || '').startsWith('image/')){ toast('That file is not an image.', 'error'); return; }
+  if (file.size > 25 * 1024 * 1024){ toast('That image is too large (over 25 MB). Choose a smaller one.', 'error'); return; }
+  bc.compressing = true; renderBroadcasts(true);
+  try{
+    bc.image = await compressImageToLimit(file, 650000);
+    bc.imageName = file.name || 'Pasted image';
+  }catch(e){ toast(e.message || 'Could not read that image — try another.', 'error'); }
+  bc.compressing = false; renderBroadcasts(true);
+}
+document.addEventListener('paste', (e)=>{
+  if ($('sec-broadcasts').hidden) return;
+  const items = (e.clipboardData && e.clipboardData.items) || [];
+  for (const it of items){
+    if (it.type && it.type.indexOf('image/') === 0){ const f = it.getAsFile(); if (f){ handleBroadcastImage(f); e.preventDefault(); } break; }
+  }
+});
+async function publishBroadcast(){
+  if (bc.publishing) return;
+  const text = ($('bcText').value || '').trim();
+  if (!text && !bc.image){ toast('Add a message or an image first.', 'warn'); return; }
+  const payload = { text, image: bc.image || null, publishedAt: Date.now(), publishedBy: getStaffName() || '' };
+  if (new Blob([JSON.stringify(payload)]).size > 980000){ toast('This announcement is too large for Firestore (limit ≈ 1 MB). Use a smaller image or shorter text.', 'error'); return; }
+  const hasCur = bc.current && (bc.current.text || bc.current.image);
+  if (!confirm('Publish to ALL staff phones now?' + (hasCur ? '\n\nThis REPLACES the announcement that is currently published.' : '') + '\n\n(Staff only — nothing is sent to customers.)')) return;
+  bc.publishing = true; renderBroadcasts(true);
+  try{
+    await storage.set(UPSELL_BROADCAST_KEY, payload);
+    toast('Published to all staff phones at ' + fmtTime(payload.publishedAt) + '.', 'ok');
+    bc.image = null; bc.imageName = '';
+    bc.current = payload; bc.updatedAtMs = payload.publishedAt; bc.loaded = true;
+    bc.publishing = false; renderBroadcasts();
+    const t = $('bcText'); if (t) t.value = '';
+    return;
+  }catch(e){ toast('Could not publish: ' + fbErrorText(e), 'error'); }
+  bc.publishing = false; renderBroadcasts(true);
+}
+function renderBroadcasts(keepText){
+  const root = $('sec-broadcasts');
+  const prevText = keepText && $('bcText') ? $('bcText').value : '';
+  root.innerHTML = '';
+  root.append(h('h2', {class:'sec-title'}, 'Broadcasts'));
+
+  const cur = h('div', {class:'card'}, h('h3', null, 'Currently published'));
+  if (bc.loading && !bc.loaded) cur.append(h('p', {class:'muted'}, 'Loading…'));
+  else if (bc.err) cur.append(h('div', {class:'banner bad', role:'alert'}, 'Could not load the current announcement: ' + bc.err));
+  else if (!bc.current || (!bc.current.text && !bc.current.image)) cur.append(h('p', {class:'muted'}, 'Nothing published yet.'));
+  else {
+    const when = bc.current.publishedAt || bc.updatedAtMs;
+    cur.append(h('p', {class:'small muted'}, 'Published ' + fmtDateTime(when) + (bc.current.publishedBy ? ' by ' + bc.current.publishedBy : '')));
+    if (bc.current.text) cur.append(h('div', {class:'preview kh'}, bc.current.text));
+    if (bc.current.image) cur.append(h('img', {class:'bcast-img', src:bc.current.image, alt:'Published announcement image'}));
+    cur.append(h('div', {class:'row', style:'margin-top:8px'},
+      bc.current.text ? h('button', {type:'button', class:'btn sm', onclick: async ()=>{ toast(await copyText(bc.current.text) ? 'Text copied.' : 'Clipboard blocked — select and copy manually.', 'ok'); }}, 'Copy text') : null,
+      bc.current.image ? h('button', {type:'button', class:'btn sm', onclick: async ()=>{ try{ await copyImage(bc.current.image); toast('Image copied.', 'ok'); }catch(e){ toast(e.message + ' — long-press / right-click the image to copy or save it.', 'warn', 7000); } }}, 'Copy image') : null));
+  }
+  cur.append(h('div', {style:'margin-top:8px'}, h('button', {type:'button', class:'btn sm', onclick: loadBroadcast}, '↻ Refresh')));
+  root.append(cur);
+
+  const comp = h('div', {class:'card'}, h('h3', null, 'Compose a new announcement'));
+  comp.append(h('label', {class:'fld'}, 'Message', h('textarea', {class:'in kh', id:'bcText', placeholder:'Message everyone should send, e.g. this week\'s promo…'}, prevText)));
+  const file = h('input', {type:'file', accept:'image/*', hidden:true, id:'bcFile', onchange:(e)=>{ const f = e.target.files && e.target.files[0]; if (f) handleBroadcastImage(f); e.target.value = ''; }});
+  comp.append(h('div', {class:'row', style:'margin-top:8px'}, file,
+    h('button', {type:'button', class:'btn', onclick:()=> file.click(), disabled:bc.compressing}, bc.compressing ? 'Compressing…' : '🖼 Choose image'),
+    h('span', {class:'small muted'}, bc.image ? bc.imageName : 'No image — or paste one with Ctrl+V'),
+    bc.image ? h('button', {type:'button', class:'btn link', onclick:()=>{ bc.image = null; bc.imageName = ''; renderBroadcasts(true); }}, 'remove') : null));
+  if (bc.image){
+    comp.append(h('img', {class:'bcast-img', src:bc.image, alt:'Image preview'}));
+  }
+  comp.append(h('div', {style:'margin-top:10px'}, h('button', {type:'button', class:'btn primary', id:'bcPublish', disabled:bc.publishing || bc.compressing, onclick: publishBroadcast}, bc.publishing ? 'Publishing…' : '📢 Publish to all staff phones')));
+  root.append(comp);
+}
+
+/* ---------- Settings ---------- */
+function renderSettings(){
+  const root = $('sec-settings');
+  root.innerHTML = '';
+  root.append(h('h2', {class:'sec-title'}, 'Settings'));
+
+  /* admin toggle */
+  root.append(h('div', {class:'card'}, h('h3', null, 'Admin editing'),
+    h('label', {class:'check'}, h('input', {type:'checkbox', id:'adminToggle', checked:adminMode, onchange:(e)=>{ setAdminMode(e.target.checked); rerenderAll(); }}), 'Show editing controls on this device'),
+    h('div', {class:'small muted'}, 'Not a security lock.')));
+
+  /* publish starter */
+  if (cfgSource === 'defaults'){
+    root.append(h('div', {class:'card'}, h('h3', null, 'Starter library'),
+      h('p', null, 'Starter library — not published yet.'),
+      adminMode ? h('button', {type:'button', class:'btn primary', onclick: async ()=>{ if (confirm('Publish the starter library to Firebase for all staff?') && await mutateConfig(()=>{})) toast('Starter library published.', 'ok'); }}, 'Publish starter library now') : h('p', {class:'small muted'}, 'Turn on admin editing to publish.')));
+  }
+
+  /* device prefs */
+  root.append(h('div', {class:'card'}, h('h3', null, 'This device only (not shared)'),
+    h('label', {class:'check'}, h('input', {type:'checkbox', checked:prefs.autoCopy, onchange:(e)=>{ prefs.autoCopy = e.target.checked; savePrefs(); }}), 'Copy immediately when I tap a quick reply (old behaviour; default is review first)')));
+
+  if (!adminMode){
+    root.append(h('div', {class:'card'}, h('h3', null, 'Shared settings (read-only)'),
+      h('ul', {class:'small', style:'margin:0 0 0 18px;padding:0'},
+        h('li', null, 'Staff: ' + cfg.settings.staff.join(', ')), h('li', null, 'Default answer language: ' + langLabel(cfg.settings.defaultLang)),
+        h('li', null, cfg.entries.length + ' saved answers · ' + cfg.templates.length + ' templates · ' + cfg.workflows.length + ' workflows'))));
+    root.append(diagnosticsCard());
+    return;
+  }
+
+  /* general */
+  const staffTa = h('textarea', {class:'in', style:'min-height:110px'}, cfg.settings.staff.join('\n'));
+  const langTa = h('textarea', {class:'in', style:'min-height:70px'}, cfg.settings.languages.map(l => l.code + ' | ' + l.label).join('\n'));
+  const defLang = h('select', {class:'in'}, cfg.settings.languages.map(l => h('option', {value:l.code, selected:l.code === cfg.settings.defaultLang}, l.label)));
+  const fresh = h('input', {class:'in', type:'number', min:'1', value:String(cfg.settings.freshMinutes)});
+  const greet = h('select', {class:'in'}, h('option', {value:''}, '(none)'), cfg.templates.filter(t => t.kind === 'greeting').map(t => h('option', {value:t.id, selected:t.id === cfg.settings.defaultGreetingId}, t.name)));
+  const ups = h('input', {class:'in', type:'text', value:cfg.settings.defaultUpsell, placeholder:'Optional default upsell line'});
+  root.append(h('div', {class:'card'}, h('h3', null, 'General (shared)'), h('div', {class:'form'},
+    h('label', {class:'fld'}, 'Staff names (one per line) — these key the phone pages, so do not rename existing ones casually', staffTa),
+    h('label', {class:'fld'}, 'Answer languages (“code | label” per line)', langTa),
+    h('div', {class:'two'}, h('label', {class:'fld'}, 'Default answer language', defLang)),
+    h('div', {class:'two'}, h('label', {class:'fld'}, 'Default greeting template', greet), h('label', {class:'fld'}, 'Default upsell line', ups)),
+    h('div', null, h('button', {type:'button', class:'btn primary', onclick: async ()=>{
+      const staff = Array.from(new Set(staffTa.value.split('\n').map(s => s.trim()).filter(Boolean)));
+      if (!staff.length){ toast('Add at least one staff name.', 'warn'); return; }
+      const tokens = staff.map(nameToken);
+      if (tokens.some(t => !t) || new Set(tokens).size !== tokens.length){ toast('Staff names must be unique and contain letters/numbers (case and symbols are ignored in the Firebase key).', 'warn'); return; }
+      const langs = [];
+      for (const line of langTa.value.split('\n').map(s => s.trim()).filter(Boolean)){
+        const [code, ...rest] = line.split('|');
+        const cd = (code || '').trim().toLowerCase();
+        if (!/^[a-z]{2,8}(-[a-z0-9]{2,8})?$/.test(cd)){ toast('Language code “' + cd + '” is not valid (use e.g. km, en, zh).', 'warn'); return; }
+        if (!langs.some(l => l.code === cd)) langs.push({code:cd, label:(rest.join('|').trim()) || cd});
+      }
+      if (!langs.length || !langs.some(l => l.code === defLang.value) && !langs.some(l => l.code === cfg.settings.defaultLang)){ toast('The default language must be in the language list.', 'warn'); return; }
+      const dl = langs.some(l => l.code === defLang.value) ? defLang.value : langs[0].code;
+      const mins = Math.max(1, Math.round(Number(fresh.value) || 0));
+      if (!mins){ toast('Enter a freshness limit in minutes.', 'warn'); return; }
+      if (await mutateConfig(c => { Object.assign(c.settings, {staff, languages:langs, defaultLang:dl, freshMinutes:mins, defaultGreetingId:greet.value, defaultUpsell:ups.value.trim()}); })) toast('Settings saved.', 'ok');
+    }}, 'Save general settings')))));
+
+  /* verified values */
+  const vals = Object.entries(cfg.settings.values || {}).map(([k, v]) => ({k, v}));
+  const vHolder = h('div', {class:'stack'});
+  const drawVals = ()=>{
+    vHolder.innerHTML = '';
+    vals.forEach((r, i) => vHolder.append(h('div', {class:'row', style:'flex-wrap:nowrap'},
+      h('input', {class:'in', style:'flex:0 0 38%', type:'text', value:r.k, placeholder:'key e.g. delivery_fee', 'aria-label':'Value key', oninput:(e)=>{ r.k = e.target.value; }}),
+      h('input', {class:'in grow', type:'text', value:r.v, placeholder:'verified wording / amount', 'aria-label':'Value for ' + r.k, oninput:(e)=>{ r.v = e.target.value; }}),
+      h('button', {type:'button', class:'btn sm danger', 'aria-label':'Remove', onclick:()=>{ vals.splice(i, 1); drawVals(); }}, '✕'))));
+  };
+  drawVals();
+  root.append(h('div', {class:'card'}, h('h3', null, 'Verified values (shared)'),
+    h('p', {class:'small muted'}, 'Maintained business facts that placeholders like {delivery_fee} are filled from. Leave a value empty and any reply using it is flagged for manual completion — it is never guessed. ' + (cfg.settings.valuesUpdatedAt ? 'Last updated ' + fmtDateTime(cfg.settings.valuesUpdatedAt) + '.' : 'Not yet updated.')),
+    vHolder,
+    h('div', {class:'row', style:'margin-top:8px'},
+      h('button', {type:'button', class:'btn', onclick:()=>{ vals.push({k:'', v:''}); drawVals(); }}, '+ Add value'),
+      h('button', {type:'button', class:'btn primary', onclick: async ()=>{
+        const out = {}; const reserved = ['customer_name','product_code','product_name','price','size','color'];
+        for (const r of vals){
+          const k = r.k.trim().toLowerCase();
+          if (!k && !r.v.trim()) continue;
+          if (!/^[a-z][a-z0-9_]*$/.test(k)){ toast('Key “' + r.k + '” must be lowercase letters, numbers and underscores (e.g. delivery_fee).', 'warn'); return; }
+          if (reserved.includes(k)){ toast('“' + k + '” is filled automatically — choose another key.', 'warn'); return; }
+          if (k in out){ toast('Key “' + k + '” appears twice.', 'warn'); return; }
+          out[k] = r.v.trim();
+        }
+        if (await mutateConfig(c => { c.settings.values = out; c.settings.valuesUpdatedAt = Date.now(); })) toast('Verified values saved.', 'ok');
+      }}, 'Save values'))));
+
+  /* workflows */
+  const wf = h('div', {class:'card'}, h('h3', null, 'Workflows (shared)'));
+  cfg.workflows.forEach((w, i)=>{
+    wf.append(h('div', {class:'item'}, h('h3', null, w.name),
+      h('div', {class:'small muted'}, w.categoryIds.map(id => (catById(id) || {name:'?'}).name).join(' · ') || 'No categories'),
+      h('div', {class:'row', style:'margin-top:6px'},
+        h('button', {type:'button', class:'btn sm', onclick:()=> openWorkflowEditor(w)}, 'Edit'),
+        h('button', {type:'button', class:'btn sm', onclick: async ()=>{ const c2 = Object.assign(clone(w), {id:uid('wf'), name:w.name + ' (copy)'}); if (await mutateConfig(c => { c.workflows.push(c2); })) toast('Duplicated.', 'ok'); }}, 'Duplicate'),
+        h('button', {type:'button', class:'btn sm', disabled:i === 0, 'aria-label':'Move up', onclick:()=> mutateConfig(c => { [c.workflows[i-1], c.workflows[i]] = [c.workflows[i], c.workflows[i-1]]; })}, '↑'),
+        h('button', {type:'button', class:'btn sm', disabled:i === cfg.workflows.length - 1, 'aria-label':'Move down', onclick:()=> mutateConfig(c => { [c.workflows[i+1], c.workflows[i]] = [c.workflows[i], c.workflows[i+1]]; })}, '↓'),
+        h('button', {type:'button', class:'btn sm danger', onclick: async ()=>{ if (cfg.workflows.length <= 1){ toast('Keep at least one workflow.', 'warn'); return; } if (!confirm('Delete the workflow "' + w.name + '"? Its answers and templates are kept.')) return; if (await mutateConfig(c => { c.workflows = c.workflows.filter(x => x.id !== w.id); })) toast('Deleted.', 'ok'); }}, 'Delete'))));
+  });
+  wf.append(h('button', {type:'button', class:'btn', onclick:()=> openWorkflowEditor(null)}, '+ Add workflow'));
+  root.append(wf);
+
+  /* categories & import/export */
+  root.append(h('div', {class:'card'}, h('h3', null, 'Categories, import & export'),
+    h('div', {class:'row'},
+      h('button', {type:'button', class:'btn', onclick: openCategoryManager}, 'Manage categories…'),
+      h('button', {type:'button', class:'btn', onclick: exportJSON}, 'Export JSON (library, templates, workflows)'),
+      h('button', {type:'button', class:'btn', onclick: exportCSV}, 'Export CSV (answers)'),
+      h('button', {type:'button', class:'btn', onclick:()=> $('importFile').click()}, 'Import JSON / CSV…'))));
+
+  root.append(diagnosticsCard());
+}
+function diagnosticsCard(){
+  const size = new Blob([JSON.stringify(cfg)]).size;
+  return h('div', {class:'card'}, h('h3', null, 'Status & security'),
+    h('ul', {class:'small', style:'margin:0 0 8px 18px;padding:0'},
+      h('li', null, 'Library source: ' + (cfgSource === 'shared' ? 'Firebase (shared), revision ' + cfg.rev : 'built-in starter (not yet published)') + ' · ' + Math.round(size / 1024) + ' KB of ≈ 900 KB'),
+      h('li', null, 'Connection: ' + connText().text),
+      h('li', null, 'Catalog: ' + catalogState.status + (catalogState.err ? ' (' + catalogState.err + ')' : ''))),
+    h('div', {class:'row'}, h('button', {type:'button', class:'btn sm', onclick: reloadConfig}, 'Reload shared settings'), h('button', {type:'button', class:'btn sm', onclick: loadCatalog}, 'Reload catalog')),
+    h('div', {class:'small muted', style:'margin-top:10px'}, 'Firebase config is public. Protect data with Firestore rules + Auth.'));
+}
+
+/* ---------- workflow editor ---------- */
+function openWorkflowEditor(w){
+  const isNew = !w;
+  const x = w ? clone(w) : { id:uid('wf'), name:'', categoryIds:[], templateIds:[], lang:'', rules:{greeting:false, productActions:false}, escalation:'' };
+  const name = h('input', {class:'in', type:'text', value:x.name});
+  const lang = h('select', {class:'in'}, h('option', {value:''}, '(use the default language)'), langList().map(l => h('option', {value:l.code, selected:l.code === x.lang}, l.label)));
+  const catChecks = cfg.categories.map(c => ({ c, el:h('input', {type:'checkbox', checked:x.categoryIds.includes(c.id)}) }));
+  const tplChecks = cfg.templates.map(t => ({ t, el:h('input', {type:'checkbox', checked:x.templateIds.includes(t.id)}) }));
+  const rGreet = h('input', {type:'checkbox', checked:!!x.rules.greeting});
+  const rProd = h('input', {type:'checkbox', checked:x.rules.productActions !== false && !!x.rules.productActions});
+  const esc = h('textarea', {class:'in', style:'min-height:56px', placeholder:'Optional: when to hand over to a supervisor / which staff member'}, x.escalation);
+  const err = h('div', {class:'banner bad', hidden:true, role:'alert'});
+  const body = h('div', {class:'form'}, err, h('label', {class:'fld'}, 'Workflow name *', name), h('label', {class:'fld'}, 'Default answer language', lang),
+    h('fieldset', {style:'border:1px solid var(--line);border-radius:8px'}, h('legend', {class:'small'}, 'Answer categories shown'), catChecks.map(({c, el}) => h('label', {class:'check'}, el, c.name))),
+    h('fieldset', {style:'border:1px solid var(--line);border-radius:8px'}, h('legend', {class:'small'}, 'Templates shown'), tplChecks.length ? tplChecks.map(({t, el}) => h('label', {class:'check'}, el, t.name)) : h('span', {class:'muted small'}, 'No templates yet')),
+    h('label', {class:'check'}, rGreet, 'Automatically start new replies with the default greeting (only once)'),
+    h('label', {class:'check'}, rProd, 'Open the product replies (size/color/weight) by default'),
+    h('label', {class:'fld'}, 'Escalation note (optional)', esc));
+  openDialog({ title:isNew ? 'Add workflow' : 'Edit workflow', body, actions:[
+    { label:'Cancel', onClick:()=>{} },
+    { label:'Save workflow', kind:'primary', onClick: async ()=>{
+        if (!name.value.trim()){ err.hidden = false; err.textContent = 'A workflow name is required.'; return false; }
+        const nu = { id:x.id, name:name.value.trim(), lang:lang.value, categoryIds:catChecks.filter(r => r.el.checked).map(r => r.c.id), templateIds:tplChecks.filter(r => r.el.checked).map(r => r.t.id),
+          rules:{greeting:rGreet.checked, productActions:rProd.checked}, escalation:esc.value.trim() };
+        if (!(await mutateConfig(c => { const i = c.workflows.findIndex(y => y.id === nu.id); if (i >= 0) c.workflows[i] = nu; else c.workflows.push(nu); }))) return false;
+        toast('Workflow saved.', 'ok');
+      } } ]});
+}
+
+/* =====================================================================
+   Export
+   ===================================================================== */
+function exportJSON(){
+  const data = { format:'vhm-quickreply-library', version:1, exportedAt:new Date().toISOString(), languages:cfg.settings.languages,
+    categories:cfg.categories, entries:cfg.entries, templates:cfg.templates, workflows:cfg.workflows };
+  download('vhm-quickreply-library-' + dateStamp() + '.json', JSON.stringify(data, null, 2), 'application/json');
+}
+function csvCell(v){ const s = String(v == null ? '' : v); return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
+function exportCSV(){
+  const langs = Array.from(new Set(cfg.settings.languages.map(l => l.code).concat(cfg.entries.flatMap(e => Object.keys(e.answers)))));
+  const head = ['id','category','title','phrasings','keywords'].concat(langs.map(c => 'answer_' + c), ['note','active','priority','insert_mode','expires_on','eligible_codes','created_at','updated_at']);
+  const lines = [head.map(csvCell).join(',')];
+  cfg.entries.forEach(e => {
+    const cat = catById(e.categoryId);
+    lines.push([e.id, cat ? cat.name : '', e.title, e.phrasings.join(' | '), e.keywords.join(' | ')].concat(langs.map(c => e.answers[c] || ''),
+      [e.note, e.active ? 'yes' : 'no', e.priority, e.insertMode, e.expiresOn, e.eligibleCodes.join(' | '), e.createdAt ? new Date(e.createdAt).toISOString() : '', e.updatedAt ? new Date(e.updatedAt).toISOString() : '']).map(csvCell).join(','));
+  });
+  download('vhm-quickreply-answers-' + dateStamp() + '.csv', '﻿' + lines.join('\r\n') + '\r\n', 'text/csv;charset=utf-8');
+}
+
+/* =====================================================================
+   Import (validate → preview → apply; never silently replaces)
+   ===================================================================== */
+function parseCSV(text){
+  text = text.replace(/^﻿/, '');
+  const rows = []; let row = [], cell = '', q = false;
+  for (let i = 0; i < text.length; i++){
+    const c = text[i];
+    if (q){ if (c === '"'){ if (text[i+1] === '"'){ cell += '"'; i++; } else q = false; } else cell += c; }
+    else if (c === '"') q = true;
+    else if (c === ','){ row.push(cell); cell = ''; }
+    else if (c === '\n' || c === '\r'){ if (c === '\r' && text[i+1] === '\n') i++; row.push(cell); cell = ''; if (row.some(x => x !== '')) rows.push(row); row = []; }
+    else cell += c;
+  }
+  if (cell !== '' || row.length){ row.push(cell); if (row.some(x => x !== '')) rows.push(row); }
+  return rows;
+}
+function parsedFromCSV(text){
+  const rows = parseCSV(text), errors = [];
+  if (rows.length < 2) return { errors:['The CSV has no data rows.'], entries:[] };
+  const head = rows[0].map(s => s.trim().toLowerCase());
+  const col = n => head.indexOf(n);
+  if (col('title') < 0 || col('category') < 0) return { errors:['The CSV needs at least “category” and “title” columns (export a CSV first to see the format).'], entries:[] };
+  const ansCols = head.map((n, i) => n.startsWith('answer_') ? [n.slice(7), i] : null).filter(Boolean);
+  if (!ansCols.length) return { errors:['The CSV needs at least one “answer_<language code>” column, e.g. answer_km.'], entries:[] };
+  const cats = [], entries = [];
+  const get = (r, n) => col(n) >= 0 ? (r[col(n)] || '') : '';
+  rows.slice(1).forEach((r, i) => {
+    const catName = get(r, 'category').trim();
+    let cat = cfg.categories.find(c => normalizeText(c.name) === normalizeText(catName)) || cats.find(c => normalizeText(c.name) === normalizeText(catName));
+    if (!cat && catName){ cat = { id:uid('cat'), name:catName, productSpecific:false }; cats.push(cat); }
+    const answers = {}; ansCols.forEach(([code, idx]) => { if ((r[idx] || '').trim()) answers[code] = r[idx]; });
+    const split = s => s.split('|').map(x => x.trim()).filter(Boolean);
+    entries.push({ id:get(r, 'id').trim(), categoryId:cat ? cat.id : '', title:get(r, 'title').trim(), phrasings:split(get(r, 'phrasings')), keywords:split(get(r, 'keywords')),
+      answers, note:get(r, 'note'), active:!/^(no|false|0)$/i.test(get(r, 'active').trim() || 'yes'), priority:Number(get(r, 'priority')) || 0,
+      insertMode:get(r, 'insert_mode') === 'append' ? 'append' : 'replace', expiresOn:get(r, 'expires_on').trim(), eligibleCodes:split(get(r, 'eligible_codes')),
+      createdAt:Date.parse(get(r, 'created_at')) || 0, updatedAt:Date.parse(get(r, 'updated_at')) || 0, __row:i + 2 });
+  });
+  return { errors, entries, categories:cats };
+}
+async function handleImportFile(file){
+  if (!adminMode){ toast('Turn on admin editing in Settings to import.', 'warn'); return; }
+  if (!file) return;
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  if (!['json','csv'].includes(ext)){ toast('Only .json or .csv files can be imported.', 'error'); return; }
+  if (file.size > 3 * 1024 * 1024){ toast('That file is over 3 MB — too large to import.', 'error'); return; }
+  let text;
+  try{ text = await file.text(); }catch(e){ toast('Could not read that file.', 'error'); return; }
+  let parsed;
+  if (ext === 'json'){
+    let j;
+    try{ j = JSON.parse(text); }catch(e){ toast('That file is not valid JSON: ' + e.message, 'error', 8000); return; }
+    if (!j || typeof j !== 'object' || (j.format !== 'vhm-quickreply-library' && !Array.isArray(j.entries))){ toast('This does not look like a VH MEN Q&A library export (missing format/entries).', 'error', 8000); return; }
+    if (j.version && Number(j.version) > 1){ toast('This file was made by a newer version (v' + j.version + ') and cannot be imported safely.', 'error', 8000); return; }
+    parsed = { errors:[], languages:asArr(j.languages), categories:asArr(j.categories), entries:asArr(j.entries), templates:asArr(j.templates), workflows:asArr(j.workflows) };
+  } else parsed = parsedFromCSV(text);
+  showImportPreview(planImport(parsed), file.name);
+}
+function stableStringify(o){
+  if (Array.isArray(o)) return '[' + o.map(stableStringify).join(',') + ']';
+  if (o && typeof o === 'object') return '{' + Object.keys(o).sort().map(k => JSON.stringify(k) + ':' + stableStringify(o[k])).join(',') + '}';
+  return JSON.stringify(o);
+}
+function sameJSON(a, b){ const strip = o => { const c = clone(o); delete c.updatedAt; delete c.createdAt; delete c.__row; return stableStringify(c); }; return strip(a) === strip(b); }
+function planImport(p){
+  const rows = [], errors = (p.errors || []).slice();
+  const push = (kind, item, label, status, msg) => {
+    const opts = { new:['add','skip'], same:['skip'], conflict:['skip','replace','copy'], dup:['skip','copy'], invalid:['skip'] }[status];
+    rows.push({ kind, item, label, status, msg:msg || '', action: status === 'new' ? 'add' : 'skip', opts });
+  };
+  const catIdsInImport = new Set();
+  asArr(p.categories).forEach((c, i)=>{
+    if (!c || !str(c.id).trim() || !str(c.name).trim()){ push('category', c, '(category #' + (i + 1) + ')', 'invalid', 'needs an id and a name'); return; }
+    catIdsInImport.add(c.id);
+    const ex = cfg.categories.find(x => x.id === c.id);
+    if (ex) { if (normalizeText(ex.name) === normalizeText(c.name)) push('category', c, c.name, 'same', 'already exists'); else push('category', c, c.name, 'conflict', 'same id as “' + ex.name + '” but a different name'); return; }
+    const dn = cfg.categories.find(x => normalizeText(x.name) === normalizeText(c.name));
+    if (dn) push('category', c, c.name, 'dup', 'a category with this name already exists — its answers will go there if you skip'); else push('category', c, c.name, 'new');
+  });
+  asArr(p.templates).forEach((t, i)=>{
+    if (!t || !str(t.text).trim()){ push('template', t, '(template #' + (i + 1) + ')', 'invalid', 'needs text'); return; }
+    const label = str(t.name) || t.text.slice(0, 30);
+    const id = str(t.id);
+    const ex = id && cfg.templates.find(x => x.id === id);
+    if (ex){ if (sameJSON(ex, t)) push('template', t, label, 'same', 'already exists'); else push('template', t, label, 'conflict', 'same id as existing template “' + ex.name + '”'); return; }
+    if (cfg.templates.some(x => normalizeText(x.text) === normalizeText(t.text))) push('template', t, label, 'dup', 'a template with identical text exists'); else push('template', t, label, 'new');
+  });
+  const newEntryIds = new Set();
+  asArr(p.entries).forEach((e, i)=>{
+    const label = (e && e.title ? str(e.title) : '(entry #' + (i + 1) + (e && e.__row ? ', CSV row ' + e.__row : '') + ')');
+    if (!e || !str(e.title).trim()){ push('answer', e, label, 'invalid', 'missing title'); return; }
+    const answers = e.answers && typeof e.answers === 'object' ? e.answers : {};
+    if (!Object.values(answers).some(v => str(v).trim())){ push('answer', e, label, 'invalid', 'no answer text in any language'); return; }
+    if (!str(e.categoryId).trim() || !(cfg.categories.some(c => c.id === e.categoryId) || catIdsInImport.has(e.categoryId))){ push('answer', e, label, 'invalid', 'category “' + str(e.categoryId) + '” not found (and not in the import)'); return; }
+    if (e.expiresOn && !/^\d{4}-\d{2}-\d{2}$/.test(str(e.expiresOn))){ push('answer', e, label, 'invalid', 'expires_on must be YYYY-MM-DD'); return; }
+    const id = str(e.id).trim();
+    const ex = id && cfg.entries.find(x => x.id === id);
+    if (ex){ if (sameJSON(ex, normEntry(Object.assign({}, e, {id})))) push('answer', e, label, 'same', 'already exists, identical'); else push('answer', e, label, 'conflict', 'same id as existing answer “' + ex.title + '” — content differs'); return; }
+    const dn = cfg.entries.find(x => x.categoryId === e.categoryId && normalizeText(x.title) === normalizeText(e.title));
+    if (dn) push('answer', e, label, 'dup', 'same title already in this category'); else push('answer', e, label, 'new');
+    if (id) newEntryIds.add(id);
+  });
+  asArr(p.workflows).forEach((w, i)=>{
+    if (!w || !str(w.name).trim()){ push('workflow', w, '(workflow #' + (i + 1) + ')', 'invalid', 'needs a name'); return; }
+    const id = str(w.id), ex = id && cfg.workflows.find(x => x.id === id);
+    if (ex){ if (sameJSON(ex, w)) push('workflow', w, w.name, 'same', 'already exists'); else push('workflow', w, w.name, 'conflict', 'same id as existing workflow “' + ex.name + '”'); return; }
+    if (cfg.workflows.some(x => normalizeText(x.name) === normalizeText(w.name))) push('workflow', w, w.name, 'dup', 'a workflow with this name exists'); else push('workflow', w, w.name, 'new');
+  });
+  if (!rows.length) errors.push('Nothing to import was found in this file.');
+  return { rows, errors, languages:asArr(p.languages), categories:asArr(p.categories) };
+}
+function showImportPreview(plan, fileName){
+  const sel = [];
+  const counts = {}; plan.rows.forEach(r => counts[r.status] = (counts[r.status] || 0) + 1);
+  const body = h('div', {class:'stack'});
+  body.append(h('p', null, h('b', null, fileName), ' — ' + plan.rows.length + ' item(s): ' + Object.entries(counts).map(([k, v]) => v + ' ' + k).join(', ')));
+  if (plan.errors.length) body.append(h('div', {class:'banner bad', role:'alert'}, h('b', null, 'Problems found:'), h('ul', null, plan.errors.map(e => h('li', null, e)))));
+  const invalid = plan.rows.filter(r => r.status === 'invalid');
+  if (invalid.length) body.append(h('div', {class:'banner warn'}, h('b', null, invalid.length + ' item(s) cannot be imported:'), h('ul', null, invalid.map(r => h('li', null, r.label + ' — ' + r.msg)))));
+  const tbl = h('table', {class:'t'}, h('thead', null, h('tr', null, ['Type','Item','Status','Action'].map(x => h('th', null, x)))));
+  const tb = h('tbody');
+  plan.rows.filter(r => r.status !== 'invalid').forEach(r => {
+    const s = h('select', {class:'in', 'aria-label':'Action for ' + r.label, style:'min-height:34px;padding:2px 6px', onchange:(e)=>{ r.action = e.target.value; }},
+      r.opts.map(o => h('option', {value:o, selected:o === r.action}, { add:'Add', skip:'Skip', replace:'Replace existing', copy: r.status === 'dup' ? 'Add anyway' : 'Add as a copy' }[o])));
+    tb.append(h('tr', null, h('td', null, r.kind), h('td', {class:'kh'}, r.label), h('td', null, h('b', null, r.status), r.msg ? h('div', {class:'small muted'}, r.msg) : null), h('td', null, s)));
+  });
+  tbl.append(tb);
+  if (tb.children.length) body.append(h('div', {class:'tablewrap'}, tbl));
+  const bk = h('input', {type:'checkbox', checked:true});
+  body.append(h('label', {class:'check'}, bk, 'Download a backup of the current library first'));
+  openDialog({ title:'Import preview', wide:true, body, actions:[
+    { label:'Cancel', onClick:()=>{ toast('Import cancelled — nothing changed.'); } },
+    { label:'Apply import', kind:'primary', onClick: async ()=>{
+        const todo = plan.rows.filter(r => r.status !== 'invalid' && r.action !== 'skip');
+        if (!todo.length){ toast('Nothing selected to import.', 'warn'); return false; }
+        if (bk.checked) exportJSON();
+        const res = await applyImport(plan);
+        if (!res) return false;
+        toast('Import applied: ' + res, 'ok', 7000);
+      } } ]});
+}
+async function applyImport(plan){
+  const now = Date.now();
+  let n = { cat:0, tpl:0, ans:0, wf:0, repl:0 };
+  const ok = await mutateConfig(c => {
+    const catMap = {}, tplMap = {};
+    const ensureLang = code => { if (!c.settings.languages.some(l => l.code === code)) c.settings.languages.push({ code, label: (plan.languages.find(l => l && l.code === code) || {}).label || code }); };
+    // categories
+    plan.rows.filter(r => r.kind === 'category' && r.status !== 'invalid').forEach(r => {
+      const it = r.item;
+      const ex = c.categories.find(x => x.id === it.id);
+      if (r.action === 'add'){ c.categories.push({id:it.id, name:str(it.name).trim(), productSpecific:!!it.productSpecific}); catMap[it.id] = it.id; n.cat++; }
+      else if (r.action === 'replace' && ex){ ex.name = str(it.name).trim(); ex.productSpecific = !!it.productSpecific; catMap[it.id] = ex.id; n.cat++; n.repl++; }
+      else if (r.action === 'copy'){ const id = uid('cat'); c.categories.push({id, name:str(it.name).trim() + (r.status === 'conflict' ? ' (copy)' : ''), productSpecific:!!it.productSpecific}); catMap[it.id] = id; n.cat++; }
+      else { const byName = c.categories.find(x => normalizeText(x.name) === normalizeText(it.name)); if (ex) catMap[it.id] = ex.id; else if (byName) catMap[it.id] = byName.id; }
+    });
+    const resolveCat = id => {
+      if (catMap[id]) return catMap[id];
+      if (c.categories.some(x => x.id === id)) return id;
+      const def = plan.categories.find(x => x && x.id === id);
+      if (def){ c.categories.push({id, name:str(def.name).trim(), productSpecific:!!def.productSpecific}); catMap[id] = id; n.cat++; return id; }
+      return id;
+    };
+    // templates
+    plan.rows.filter(r => r.kind === 'template' && r.status !== 'invalid').forEach(r => {
+      const t = r.item, id0 = str(t.id);
+      const base = { name:str(t.name) || 'Template', kind:str(t.kind) || 'general', text:str(t.text), active:t.active !== false };
+      if (r.action === 'add'){ const id = id0 || uid('tpl'); c.templates.push(Object.assign({id, createdAt:Number(t.createdAt) || now, updatedAt:now}, base)); tplMap[id0] = id; n.tpl++; }
+      else if (r.action === 'replace'){ const i = c.templates.findIndex(x => x.id === id0); if (i >= 0){ c.templates[i] = Object.assign({id:id0, createdAt:c.templates[i].createdAt, updatedAt:now}, base); tplMap[id0] = id0; n.tpl++; n.repl++; } }
+      else if (r.action === 'copy'){ const id = uid('tpl'); c.templates.push(Object.assign({id, createdAt:now, updatedAt:now}, base, {name:base.name + ' (copy)'})); tplMap[id0] = id; n.tpl++; }
+      else if (id0 && c.templates.some(x => x.id === id0)) tplMap[id0] = id0;
+    });
+    // answers
+    plan.rows.filter(r => r.kind === 'answer' && r.status !== 'invalid').forEach(r => {
+      if (r.action === 'skip') return;
+      const e = r.item, id0 = str(e.id).trim();
+      Object.keys(e.answers || {}).forEach(ensureLang);
+      const mk = (id, extra) => normEntry(Object.assign({}, e, { id, categoryId:resolveCat(e.categoryId), createdAt:Number(e.createdAt) || now, updatedAt:now }, extra || {}));
+      if (r.action === 'add'){ c.entries.push(mk(id0 || uid('qa'))); n.ans++; }
+      else if (r.action === 'replace'){ const i = c.entries.findIndex(x => x.id === id0); if (i >= 0){ c.entries[i] = mk(id0, { createdAt:c.entries[i].createdAt }); n.ans++; n.repl++; } }
+      else if (r.action === 'copy'){ c.entries.push(mk(uid('qa'), { title:str(e.title).trim() + (r.status === 'conflict' ? ' (copy)' : '') })); n.ans++; }
+    });
+    // workflows (references mapped; unknown references dropped)
+    plan.rows.filter(r => r.kind === 'workflow' && r.status !== 'invalid').forEach(r => {
+      if (r.action === 'skip') return;
+      const w = r.item, id0 = str(w.id);
+      const nu = { id:id0 || uid('wf'), name:str(w.name).trim(), lang:str(w.lang), escalation:str(w.escalation),
+        categoryIds:asArr(w.categoryIds).map(id => catMap[id] || id).filter(id => c.categories.some(x => x.id === id)),
+        templateIds:asArr(w.templateIds).map(id => tplMap[id] || id).filter(id => c.templates.some(x => x.id === id)),
+        rules:{ greeting:!!(w.rules && w.rules.greeting), productActions:!!(w.rules && w.rules.productActions) } };
+      if (r.action === 'add'){ c.workflows.push(nu); n.wf++; }
+      else if (r.action === 'replace'){ const i = c.workflows.findIndex(x => x.id === id0); if (i >= 0){ c.workflows[i] = nu; n.wf++; n.repl++; } }
+      else if (r.action === 'copy'){ nu.id = uid('wf'); nu.name += ' (copy)'; c.workflows.push(nu); n.wf++; }
+    });
+  });
+  return ok ? (n.ans + ' answer(s), ' + n.cat + ' categor' + (n.cat === 1 ? 'y' : 'ies') + ', ' + n.tpl + ' template(s), ' + n.wf + ' workflow(s)' + (n.repl ? ', ' + n.repl + ' replaced' : '')) : null;
+}
+
+/* =====================================================================
+   Universal search, navigation, status chips, remote trigger, boot
+   ===================================================================== */
+const SECTIONS = ['quick','qa','templates','broadcasts','settings'];
+function renderSection(id){
+  ({ quick:renderQuick, qa:renderQA, templates:renderTemplates, broadcasts:()=>renderBroadcasts(), settings:renderSettings })[id]();
+}
+function showSection(id){
+  if (!SECTIONS.includes(id)) id = 'quick';
+  SECTIONS.forEach(s => { $('sec-' + s).hidden = s !== id; });
+  document.querySelectorAll('#nav button').forEach(b => { if (b.dataset.sec === id) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
+  if (prefs.section !== id){ prefs.section = id; savePrefs(); }
+  renderSection(id);
+  if (id === 'broadcasts' && !bc.loaded && !bc.loading) loadBroadcast();
+}
+function currentSection(){ return SECTIONS.find(s => !$('sec-' + s).hidden) || 'quick'; }
+function rerenderAll(){
+  renderStaffSelect(); renderStatus(); renderTemplateSelect();
+  renderSection(currentSection());
+  renderComposer();
+}
+function onConfigChanged(changed){
+  renderStaffSelect(); renderStatus(); renderTemplateSelect();
+  if (cfg.settings.defaultUpsell && !$('cmpUpsell').value) $('cmpUpsell').value = cfg.settings.defaultUpsell;
+  if (!changed){ return; }
+  const sec = currentSection();
+  const ae = document.activeElement;
+  const typing = ae && ['INPUT','TEXTAREA','SELECT'].includes(ae.tagName) && $('sec-' + sec).contains(ae) && ae.id !== 'search';
+  if (typing && (sec === 'settings')) { toast('Shared settings were updated by someone else. Finish your edit, then reopen Settings to see the latest.', 'warn', 7000); }
+  else renderSection(sec);
+  if (sec !== 'quick') renderQuick();
+  renderComposer();
+}
+
+/* ---------- status chips (only verifiable facts) ---------- */
+function connText(){
+  switch (conn.state){
+    case 'ok': return { cls:'ok', text:'Firebase OK' + (conn.okAt ? ' · ' + fmtTime(conn.okAt) : '') };
+    case 'cache': return { cls:'warn', text:'Showing cached data (not confirmed live)' };
+    case 'offline': return { cls:'bad', text:'Offline — no connection' };
+    case 'error': return { cls:'bad', text:'Firebase error: ' + (conn.err || 'unknown') };
+    default: return { cls:'', text:'Connecting…' };
+  }
+}
+function renderStatus(){
+  const box = $('statusChips');
+  if (!box) return;
+  const c = connText();
+  box.innerHTML = '';
+  if (c.cls && c.cls !== 'ok') box.append(h('span', {class:'chip ' + c.cls, title:'Result of the last Firebase read/write'}, '⚠ ' + c.text));
+  if (catalogState.status === 'error') box.append(h('span', {class:'chip bad'}, '⚠ Catalog not loaded'));
+}
+function renderStaffSelect(){
+  const sel = $('staffSelect');
+  const cur = getStaffName();
+  sel.innerHTML = '';
+  sel.append(h('option', {value:''}, '— select —'));
+  const names = cfg.settings.staff.slice();
+  if (cur && !names.includes(cur)) names.push(cur);
+  names.forEach(n => sel.append(h('option', {value:n, selected:n === cur}, n + (cfg.settings.staff.includes(n) ? '' : ' (not in list)'))));
+  sel.value = cur;
+}
+
+/* ---------- universal search ---------- */
+const S = { items:[], active:-1, timer:0 };
+function snippet(t, n){ t = String(t || '').replace(/\s+/g, ' ').trim(); return t.length > n ? t.slice(0, n) + '…' : t; }
+function runSearch(raw){
+  const q = normalizeText(raw), qc = normCode(raw);
+  const tokens = q.split(' ').filter(Boolean);
+  if (!tokens.length) return [];
+  const res = [];
+  // 1. product-specific data first
+  const codes = new Map();
+  PRODUCTS.forEach(p => { if (p && p.code) codes.set(normCode(p.code), { code:p.code, name:p.name || '', nameKh:p.nameKh || '', cat:true, stock:false }); });
+  codes.forEach((p, n) => {
+    let s = 0;
+    if (n === qc) s = 100; else if (n.startsWith(qc)) s = 70; else if (qc.length >= 2 && n.includes(qc)) s = 50;
+    else { const hay = normalizeText(p.name + ' ' + p.nameKh); if (hay && tokens.every(t => hay.includes(t))) s = 35; }
+    if (!s) return;
+    res.push({ type:'product', score:s, code:p.code, exact:n === qc, title:p.code + (p.name || p.nameKh ? ' — ' + (p.name || p.nameKh) : ''), sub:'', badges:['product'] });
+  });
+  // 2-3. saved answers: exact → phrasing/keyword → text
+  cfg.entries.filter(e => e.active).forEach(e => {
+    const title = normalizeText(e.title), phr = e.phrasings.map(normalizeText), kw = e.keywords.map(normalizeText);
+    let s = 0;
+    if (title === q) s = 80; else if (phr.includes(q)) s = 78; else if (kw.includes(q)) s = 65;
+    else if (tokens.every(t => title.includes(t))) s = 50;
+    else if (phr.some(p => tokens.every(t => p.includes(t)))) s = 45;
+    else if (kw.some(k => tokens.every(t => k.includes(t)))) s = 40;
+    else if (tokens.every(t => normalizeText(Object.values(e.answers).join(' ')).includes(t))) s = 15;
+    if (!s) return;
+    const cat = catById(e.categoryId);
+    res.push({ type:'qa', score:s + Math.min(9, e.priority / 10), entry:e, title:e.title, sub:(cat ? cat.name + ' · ' : '') + snippet(entryAnswer(e).text, 90), badges:['qa'] });
+  });
+  cfg.templates.filter(t => t.active).forEach(t => {
+    const n = normalizeText(t.name), tx = normalizeText(t.text);
+    let s = 0;
+    if (tokens.every(k => n.includes(k))) s = 35; else if (tokens.every(k => tx.includes(k))) s = 15;
+    if (s) res.push({ type:'template', score:s, tpl:t, title:t.name, sub:snippet(t.text, 90), badges:['template'] });
+  });
+  // 4. related categories
+  cfg.categories.forEach(c => { if (tokens.every(t => normalizeText(c.name).includes(t))) res.push({ type:'category', score:20, cat:c, title:c.name, sub:cfg.entries.filter(e => e.categoryId === c.id && e.active).length + ' saved answers', badges:['category'] }); });
+  return res.sort((a, b) => b.score - a.score).slice(0, 30);
+}
+function renderResults(raw){
+  const box = $('results'), inp = $('search');
+  const q = (raw || '').trim();
+  if (!q){ closeResults(); return; }
+  S.items = runSearch(q); S.active = -1; S.queryRendered = q;
+  box.innerHTML = '';
+  if (!S.items.length){
+    box.append(h('div', {class:'res-empty'}, 'No match for “' + q + '” ',
+      h('div', {style:'margin-top:6px'}, h('button', {type:'button', class:'btn sm', onclick:()=>{ closeResults(); $('composer').classList.add('open'); setSheet(true); $('cmpText').focus(); }}, 'Write manually'), ' ',
+        (activeWorkflow() && activeWorkflow().escalation) ? h('span', {class:'small'}, '↗ ' + activeWorkflow().escalation) : null)));
+  } else {
+    S.items.forEach((it, i) => box.append(h('button', {type:'button', class:'res', role:'option', id:'res-' + i, 'aria-selected':'false', onclick:()=> pickResult(it)},
+      h('span', null, it.badges.map(b => h('span', {class:'badge ' + b, style:'margin-right:4px'}, { product:'Product', stock:'Stock', qa:'Q&A', template:'Template', category:'Category' }[b]))),
+      h('span', {class:'grow'}, h('div', {class:'t kh'}, it.title), h('div', {class:'s kh'}, it.sub)))));
+  }
+  box.hidden = false; inp.setAttribute('aria-expanded', 'true');
+}
+function closeResults(){ $('results').hidden = true; $('search').setAttribute('aria-expanded', 'false'); $('search').removeAttribute('aria-activedescendant'); S.active = -1; }
+function setActive(i){
+  const nodes = $('results').querySelectorAll('.res');
+  if (!nodes.length) return;
+  S.active = (i + nodes.length) % nodes.length;
+  nodes.forEach((n, k) => n.setAttribute('aria-selected', k === S.active ? 'true' : 'false'));
+  nodes[S.active].scrollIntoView({block:'nearest'});
+  $('search').setAttribute('aria-activedescendant', 'res-' + S.active);
+}
+function pickResult(it){
+  closeResults();
+  if (it.type === 'product') openProduct(it.code);
+  else if (it.type === 'qa'){ useEntry(it.entry, 'auto'); }
+  else if (it.type === 'template'){ useTemplate(it.tpl, 'auto'); }
+  else if (it.type === 'category'){ qaState.cat = it.cat.id; qaState.q = ''; showSection('qa'); }
+}
+function initSearch(){
+  const inp = $('search');
+  inp.addEventListener('input', ()=>{ clearTimeout(S.timer); S.timer = setTimeout(()=> renderResults(inp.value), 90); });
+  inp.addEventListener('focus', ()=>{ if (inp.value.trim()) renderResults(inp.value); });
+  inp.addEventListener('keydown', (e)=>{
+    if (e.key === 'ArrowDown'){ e.preventDefault(); if ($('results').hidden) renderResults(inp.value); setActive(S.active + 1); }
+    else if (e.key === 'ArrowUp'){ e.preventDefault(); setActive(S.active - 1); }
+    else if (e.key === 'Escape'){ closeResults(); }
+    else if (e.key === 'Enter'){
+      e.preventDefault();
+      clearTimeout(S.timer);
+      if ($('results').hidden || !S.items.length || inp.value.trim() !== (S.queryRendered || inp.value.trim())) renderResults(inp.value);
+      if (S.active >= 0) pickResult(S.items[S.active]);
+      else {
+        const exact = S.items.filter(i => i.type === 'product' && i.exact);
+        if (exact.length === 1 && S.items.filter(i => i.score >= 70).length === 1) pickResult(exact[0]);   // single unambiguous code
+        // otherwise: show the choices, never pick silently
+      }
+    }
+  });
+  document.addEventListener('click', (e)=>{ if (!e.target.closest('.searchbox')) closeResults(); });
+  document.addEventListener('keydown', (e)=>{
+    if (e.key === '/' && !['INPUT','TEXTAREA','SELECT'].includes((document.activeElement || {}).tagName) && !dlg.open){ e.preventDefault(); inp.focus(); inp.select(); }
+  });
+}
+
+/* ---------- remote trigger (existing bookmarklet hook, behaviour preserved: generate, copy, relay) ---------- */
+async function applyQuickReplyAction(params){
+  try{
+    const action = params.get('action');
+    if (!action) return;
+    let ok = false;
+    if (action === 'hello'){ const g = cfg.templates.find(t => t.id === cfg.settings.defaultGreetingId && t.active) || cfg.templates.find(t => t.active); if (g){ useTemplate(g, 'replace'); ok = true; } }
+    else if (action === 'howmany') ok = replyHowMany();
+    else if (action === 'size') ok = replySize((params.get('size') || '').toUpperCase());
+    else if (action === 'color') ok = replyColorQuery((params.get('q') || '').toLowerCase());
+    else if (action === 'fit') ok = await runFit(parseFloat(params.get('kg') || ''), (params.get('cm') || '').trim());
+    if (ok){ await copyReply(); }
+  }catch(e){ console.error('Quick reply remote trigger failed', e); }
+}
+
+/* ---------- boot ---------- */
+function boot(){
+  const imp = h('input', {type:'file', id:'importFile', accept:'.json,.csv', hidden:true, onchange:(e)=>{ const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) handleImportFile(f); }});
+  document.body.append(imp);
+  document.querySelectorAll('#nav button').forEach(b => b.addEventListener('click', ()=> showSection(b.dataset.sec)));
+  $('btnSettings').addEventListener('click', ()=> showSection('settings'));
+  $('staffSelect').addEventListener('change', (e)=>{ setStaffName(e.target.value); renderStatus(); });
+  addEventListener('online', ()=>{ renderStatus(); });
+  addEventListener('offline', ()=>{ setConn('offline'); });
+  document.addEventListener('visibilitychange', ()=>{ if (!document.hidden){ renderStatus(); renderComposer('light'); } });
+  const ud = cfg.settings.defaultUpsell; if (ud) $('cmpUpsell').value = ud;
+  initSearch(); initComposer();
+  renderStaffSelect(); renderStatus();
+  subscribeConfig(); loadCatalog();
+  showSection(SECTIONS.includes(prefs.section) ? prefs.section : 'quick');
+  setInterval(()=>{ renderStatus(); renderComposer('light'); }, 30000);
+  if (location.hash){
+    const hp = new URLSearchParams(location.hash.slice(1));
+    setTimeout(()=> applyQuickReplyAction(hp), 600);
+  }
+  addEventListener('message', (e)=>{
+    if (!e.data || e.data.source !== 'vhmQuickReplyTrigger') return;
+    applyQuickReplyAction(new URLSearchParams(e.data.query || ''));
+  });
+}
+boot();
+
+</script>
+</body>
+</html>
