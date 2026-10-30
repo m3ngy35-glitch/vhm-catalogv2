@@ -86,7 +86,7 @@ footer input{width:20px;height:20px}
   .wrap{max-width:1100px}
   .tabs{display:none}
   main{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start;padding-bottom:140px}
-  #p-reply,#p-up{grid-column:1}
+  #p-reply,#p-up,#p-size{grid-column:1}
   #p-answers{grid-column:2;grid-row:1 / span 2}
   .panel{display:block!important}
   .copybar{display:block!important}
@@ -124,6 +124,7 @@ header h1{min-width:0;overflow-wrap:anywhere}
   </header>
   <div class="tabs" role="tablist" id="tabs">
     <button role="tab" id="tab-reply" aria-selected="true" data-tab="reply">Reply</button>
+    <button role="tab" id="tab-size" aria-selected="false" data-tab="size">ទំហំ<span class="hide-s"> · Size</span></button>
     <button role="tab" id="tab-answers" aria-selected="false" data-tab="answers">Answers</button>
     <button role="tab" id="tab-up" aria-selected="false" data-tab="up">News<span class="nb" id="upBadge" hidden>NEW</span></button>
   </div>
@@ -139,6 +140,8 @@ header h1{min-width:0;overflow-wrap:anywhere}
         <div class="links"><a class="btn sm" href="https://www.messenger.com/" target="_blank" rel="noopener" id="msgWeb">or open messenger.com in browser</a></div>
       </div>
     </section>
+
+    <section class="panel" id="p-size" aria-label="Size chart and size recommendation" hidden></section>
 
     <section class="panel" id="p-answers" aria-label="Saved answers" hidden>
       <div id="ansBanner"></div>
@@ -169,6 +172,7 @@ header h1{min-width:0;overflow-wrap:anywhere}
 
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="size-chart.js"></script>
 <script>
 'use strict';
 /* Same Firebase project + keys as before: quickreply_live_<NAME>, upsell_broadcast (+ shared config for staff names / saved answers). */
@@ -472,7 +476,7 @@ let tab = 'reply';
 const wide = () => matchMedia('(min-width:900px)').matches;
 function setTab(t){
   tab = t;
-  ['reply','answers','up'].forEach(x => {
+  ['reply','size','answers','up'].forEach(x => {
     const on = x === t;
     $('tab-' + x).setAttribute('aria-selected', on ? 'true' : 'false');
     $('p-' + x).hidden = !on && !wide();
@@ -497,6 +501,15 @@ addEventListener('offline', renderStatus);
 addEventListener('resize', onResize);
 document.addEventListener('visibilitychange', ()=>{ if (!document.hidden){ renderStatus(); showReply(); if (getSavedName() && st.conn === 'error') watchName(getSavedName()); } });
 setInterval(()=>{ renderStatus(); if (rep.text) showReply(); }, 20000);
+/* ---------------- size chart (VH MEN System Google Sheet, read-only — see size-chart.js) ---------------- */
+const sizePanel = window.VHMSize ? window.VHMSize.createPanel({ mode:'phone', search:true }) : null;
+if (sizePanel) $('p-size').append(sizePanel.el);
+else $('p-size').append(h('div', {class:'banner bad', role:'alert'}, 'Size chart could not load (size-chart.js missing).'));
+try{
+  const qc = new URLSearchParams(location.search).get('code');
+  if (qc && sizePanel){ sizePanel.setCode(qc); tab = 'size'; }
+}catch(e){}
+
 renderNameSelect(); watchConfig(); watchUpsell();
 watchName(getSavedName());
 onResize();
