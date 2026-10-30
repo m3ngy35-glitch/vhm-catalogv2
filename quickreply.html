@@ -426,6 +426,7 @@ details.acc>summary{min-height:40px}
 
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="size-chart.js"></script>
 <script>
 'use strict';
 /* =====================================================================
@@ -1155,6 +1156,33 @@ let productView = { loading:false, missing:'' };
 let fitState = null;
 let openToken = 0;
 
+/* ===== Size chart & recommendation (VH MEN System Google Sheet, read-only — see size-chart.js) ===== */
+let sizeOpen = true;
+const sizePanel = window.VHMSize ? window.VHMSize.createPanel({
+  mode: 'admin',
+  stockFor: (size)=>{
+    const se = currentStockEntry();
+    if (!se || !currentCode || normCode(sizePanel.code()) !== normCode(currentCode)) return null;
+    const colors = colorsHavingSize(size, se);
+    return { inStock: colors.length > 0, colors };
+  },
+  onUseReply: (text, info)=>{
+    const notes = [];
+    if (info.source === 'saved') notes.push({ gate:false, text:'Measurements come from a SAVED COPY of the size chart (read ' + fmtDateTime(Date.parse(info.generatedAt)) + ') — not live data. Refresh the size chart before sending if possible.' });
+    if (!info.recommend) notes.push({ gate:false, text:'Measurements only — no size recommendation was made for this customer.' });
+    setDraft(text, { label:'Product · ' + info.code + ' · size chart ' + info.size + (info.recommend ? ' (recommended)' : ''), type:'product', meta:{ notes, sizeChart:true }, ctx:{ size: info.size } });
+  }
+}) : null;
+function renderSizeSection(){
+  if (!sizePanel) return null;
+  const code = sizePanel.code();
+  const det = h('details', {class:'acc', id:'qSize', open: sizeOpen}, h('summary', null, '📏 Size chart & recommendation' + (code ? ' — ' + code.toUpperCase() : '')));
+  det.addEventListener('toggle', ()=>{ sizeOpen = det.open; });
+  det.append(h('div', null, sizePanel.el));
+  sizePanel.render();
+  return det;
+}
+
 function colorsArrOf(se, onlyAvail){
   const arr = [];
   if (!se) return arr;
@@ -1188,6 +1216,7 @@ async function openProduct(raw, opts){
   if (!n) return;
   const cp = findCatalogProduct(n);
   const sk = stock.index.get(n);
+  if (sizePanel) sizePanel.setCode(sk || (cp && cp.code) || n);
   if (!cp && !sk){
     currentCode = null; currentWeights = null; fitState = null;
     productView = { loading:false, missing:n };
@@ -1404,7 +1433,10 @@ function renderQuick(){
   if (!wf){ root.append(h('div', {class:'empty'}, 'No workflows')); return; }
   const prod = h('div', {id:'qProduct'});
   const saved = h('div', {id:'qSaved'});
-  root.append(prod, saved);
+  const sizeSec = renderSizeSection();
+  root.append(prod);
+  if (sizeSec) root.append(sizeSec);
+  root.append(saved);
   renderQuickProduct(); renderQuickSaved();
 }
 
@@ -2690,7 +2722,9 @@ function renderResults(raw){
   S.items = runSearch(q); S.active = -1; S.queryRendered = q;
   box.innerHTML = '';
   if (!S.items.length){
+    const qcode = String(q || '').trim();
     box.append(h('div', {class:'res-empty'}, 'No match for “' + q + '” ',
+      (window.VHMSize && /^[A-Za-z]{0,4}[-\s]?\d{2,6}[A-Za-z]?$/.test(qcode)) ? h('div', {style:'margin-top:6px'}, h('button', {type:'button', class:'btn sm', id:'resSizeChart', onclick:()=>{ closeResults(); openProduct(qcode); }}, '📏 Size chart for ' + qcode.toUpperCase())) : null,
       h('div', {style:'margin-top:6px'}, h('button', {type:'button', class:'btn sm', onclick:()=>{ closeResults(); $('composer').classList.add('open'); setSheet(true); $('cmpText').focus(); }}, 'Write manually'), ' ',
         (activeWorkflow() && activeWorkflow().escalation) ? h('span', {class:'small'}, '↗ ' + activeWorkflow().escalation) : null)));
   } else {
