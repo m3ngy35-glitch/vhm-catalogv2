@@ -1173,6 +1173,125 @@ const sizePanel = window.VHMSize ? window.VHMSize.createPanel({
     setDraft(text, { label:'Product · ' + info.code + ' · size chart ' + info.size + (info.recommend ? ' (recommended)' : ''), type:'product', meta:{ notes, sizeChart:true }, ctx:{ size: info.size } });
   }
 }) : null;
+/* ===== Weekly "most-searched codes" (Firestore kv: quickreply_searches_<YYYY-Www>, one doc per week) =====
+   Counted: a product opened on this laptop page by a person (search result, code list, size-chart button).
+   Not counted: automatic re-opens after a stock refresh, or the same code again on this device within 60 s.
+   Week = ISO week, Monday 00:00 – Sunday 23:59 local time. Existing Firebase documents are not touched. */
+const SEARCH_DEDUPE_MS = 60000;
+const searchSeen = new Map();
+function isoWeek(d){
+  const t = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const dow = (t.getDay() + 6) % 7;                       // Monday = 0
+  const monday = new Date(t); monday.setDate(t.getDate() - dow);
+  const thursday = new Date(monday); thursday.setDate(monday.getDate() + 3);
+  const y = thursday.getFullYear();
+  const jan4 = new Date(y, 0, 4);
+  const week1Mon = new Date(jan4); week1Mon.setDate(jan4.getDate() - ((jan4.getDay() + 6) % 7));
+  const wk = 1 + Math.round((monday - week1Mon) / 604800000);
+  const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
+  const ymd = x => x.getFullYear() + '-' + String(x.getMonth()+1).padStart(2,'0') + '-' + String(x.getDate()).padStart(2,'0');
+  return { id: y + '-W' + String(wk).padStart(2,'0'), start: ymd(monday), end: ymd(sunday), monday };
+}
+function searchStatsKey(weekId){ return 'quickreply_searches_' + weekId; }
+function recordCodeSearch(code, found){
+  try{
+    const c = String(code || '').trim().toUpperCase();
+    if (!c || c.length > 40) return;
+    const now = Date.now();
+    if (now - (searchSeen.get(c) || 0) < SEARCH_DEDUPE_MS) return;
+    searchSeen.set(c, now);
+    const w = isoWeek(new Date());
+    const inc = firebase.firestore.FieldValue.increment(1);
+    const staff = nameToken(getStaffName()) || 'UNKNOWN';
+    const data = { week: w.id, start: w.start, end: w.end, total: inc, staff: { [staff]: inc } };
+    if (found) data.counts = { [c]: inc }; else { data.notFound = { [c]: inc }; data.notFoundTotal = inc; }
+    firestore_().collection('kv').doc(searchStatsKey(w.id))
+      .set({ data, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge:true })
+      .catch(e => console.warn('search count not saved', e));   // never blocks or breaks the reply flow
+  }catch(e){ console.warn('search count not saved', e); }
+}
+const topState = { weeks: [], sel: '', docs: {}, loading: false, err: '', at: null, showAll: false };
+async function loadTopCodes(){
+  topState.loading = true; topState.err = ''; renderTopCard();
+  const now = new Date();
+  topState.weeks = Array.from({length: 12}, (_, i) => isoWeek(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7 * i)));
+  if (!topState.sel) topState.sel = topState.weeks[0].id;
+  try{
+    const snaps = await Promise.all(topState.weeks.map(w => firestore_().collection('kv').doc(searchStatsKey(w.id)).get()));
+    topState.docs = {};
+    snaps.forEach((d, i) => { const v = d.exists && d.data() && d.data().data; if (v) topState.docs[topState.weeks[i].id] = v; });
+    topState.at = Date.now();
+  }catch(e){ topState.err = fbErrorText(e); }
+  topState.loading = false; renderTopCard();
+}
+function topRows(weekId){
+  const d = topState.docs[weekId] || {};
+  const counts = d.counts || {};
+  return Object.keys(counts).map(code => ({ code, n: Number(counts[code]) || 0 })).filter(r => r.n > 0)
+    .sort((a, b) => b.n - a.n || a.code.localeCompare(b.code));
+}
+function topCsv(weekIds){
+  const lines = ['week,week_start,week_end,rank,code,name,searches'];
+  weekIds.forEach(id => {
+    const d = topState.docs[id]; if (!d) return;
+    topRows(id).forEach((r, i) => {
+      const cp = findCatalogProduct(r.code);
+      const name = cp ? (cp.name || cp.nameKh || '') : '';
+      lines.push([id, d.start || '', d.end || '', i + 1, r.code, '"' + String(name).replace(/"/g, '""') + '"', r.n].join(','));
+    });
+  });
+  return '\ufeff' + lines.join('\n');
+}
+function renderTopCard(){
+  const box = $('topCodes'); if (!box) return;
+  box.innerHTML = '';
+  box.append(h('h3', null, '📊 Most-searched codes (weekly)'));
+  if (topState.loading && !topState.weeks.length){ box.append(h('p', {class:'small muted'}, 'Loading…')); return; }
+  if (topState.err) box.append(h('div', {class:'banner bad', role:'alert'}, 'Could not load search counts: ' + topState.err));
+  if (!topState.weeks.length) return;
+  const wk = topState.weeks.find(w => w.id === topState.sel) || topState.weeks[0];
+  const idx = topState.weeks.indexOf(wk);
+  const prev = topState.weeks[idx + 1];
+  const d = topState.docs[wk.id] || {};
+  const rows = topRows(wk.id);
+  const prevMap = new Map(prev ? topRows(prev.id).map((r, i) => [r.code, { n: r.n, rank: i + 1 }]) : []);
+  const max = rows.length ? rows[0].n : 1;
+  const sel = h('select', {class:'in', id:'topWeek', style:'width:auto;flex:1 1 220px', 'aria-label':'Week', onchange:(e)=>{ topState.sel = e.target.value; topState.showAll = false; renderTopCard(); }},
+    topState.weeks.map((w, i) => h('option', {value:w.id, selected: w.id === wk.id},
+      (i === 0 ? 'This week' : i === 1 ? 'Last week' : w.id) + ' · ' + w.start.slice(5) + ' → ' + w.end.slice(5) + (topState.docs[w.id] ? ' (' + (topState.docs[w.id].total || 0) + ')' : ''))));
+  box.append(h('div', {class:'row', style:'margin-bottom:8px'}, sel,
+    h('button', {type:'button', class:'btn sm', id:'topRefresh', disabled: topState.loading, onclick: loadTopCodes}, topState.loading ? 'Loading…' : '↻ Refresh'),
+    h('button', {type:'button', class:'btn sm', id:'topCsvWeek', disabled: !rows.length, onclick: ()=> download('quickreply-top-codes-' + wk.id + '.csv', topCsv([wk.id]), 'text/csv;charset=utf-8')}, '⬇ CSV (selected week)'),
+    h('button', {type:'button', class:'btn sm', id:'topCsvAll', disabled: !Object.keys(topState.docs).length, onclick: ()=> download('quickreply-top-codes-' + topState.weeks[topState.weeks.length - 1].id + '_to_' + topState.weeks[0].id + '.csv', topCsv(topState.weeks.map(w => w.id)), 'text/csv;charset=utf-8')}, '⬇ CSV (12 weeks)')));
+  box.append(h('p', {class:'small muted', id:'topSummary'}, (d.total || 0) + ' searches · ' + rows.length + ' codes · ' + wk.start + ' to ' + wk.end +
+    (topState.at ? ' · loaded ' + fmtTime(topState.at) : '') + (d.notFoundTotal ? ' · ' + d.notFoundTotal + ' not in catalog/stock' : '')));
+  if (!rows.length){ box.append(h('div', {class:'empty', id:'topEmpty'}, idx === 0 ? 'No product searches recorded yet this week.' : 'No searches recorded for this week.')); }
+  else {
+    const shown = topState.showAll ? rows : rows.slice(0, 20);
+    box.append(h('div', {class:'wtable-wrap'}, h('table', {class:'wtable', id:'topTable'},
+      h('thead', null, h('tr', null, h('th', null, '#'), h('th', null, 'Code'), h('th', null, 'Searches'), h('th', null, prev ? 'vs ' + (idx === 0 ? 'last week' : prev.id) : ''))),
+      h('tbody', null, shown.map((r, i) => {
+        const cp = findCatalogProduct(r.code);
+        const p = prevMap.get(r.code);
+        const diff = p ? r.n - p.n : null;
+        return h('tr', {'data-code': r.code},
+          h('td', null, String(i + 1)),
+          h('td', null, h('button', {type:'button', class:'btn link', style:'padding:0;min-height:0;font-weight:700', title:'Open this product', onclick:()=> openProduct(r.code)}, r.code),
+            cp && (cp.name || cp.nameKh) ? h('div', {class:'small muted kh'}, cp.name || cp.nameKh) : null),
+          h('td', null, h('div', {style:'display:flex;align-items:center;gap:6px'}, h('b', null, String(r.n)),
+            h('span', {'aria-hidden':'true', style:'display:inline-block;height:8px;border-radius:4px;background:var(--accent);opacity:.55;width:' + Math.max(4, Math.round(r.n / max * 90)) + 'px'}))),
+          h('td', {class:'small'}, !prev || !topState.docs[prev.id] ? '—' : p ? (diff > 0 ? '▲ +' + diff : diff < 0 ? '▼ ' + diff : '= 0') : 'new'));
+      })))));
+    if (rows.length > 20) box.append(h('button', {type:'button', class:'btn sm', style:'margin-top:6px', onclick:()=>{ topState.showAll = !topState.showAll; renderTopCard(); }}, topState.showAll ? 'Show top 20' : 'Show all ' + rows.length));
+  }
+  const nf = d.notFound ? Object.keys(d.notFound).map(c => [c, d.notFound[c]]).sort((a, b) => b[1] - a[1]) : [];
+  if (nf.length) box.append(h('details', {class:'acc', style:'margin-top:8px'}, h('summary', null, 'Searched but not in catalog/stock (' + nf.length + ')'),
+    h('div', {class:'small'}, nf.slice(0, 50).map(x => x[0] + ' (' + x[1] + ')').join(' · '))));
+  const st = d.staff ? Object.keys(d.staff).map(k => [k, d.staff[k]]).sort((a, b) => b[1] - a[1]) : [];
+  if (st.length) box.append(h('p', {class:'small muted', style:'margin-top:6px'}, 'By staff: ' + st.map(x => x[0] + ' ' + x[1]).join(' · ')));
+  box.append(h('p', {class:'small muted', style:'margin-top:6px'}, 'Counts each product opened on the laptop Quick Reply (Mon–Sun). The same code again within 60 s on one device and automatic re-opens after a stock refresh are not counted.'));
+}
+
 function renderSizeSection(){
   if (!sizePanel) return null;
   const code = sizePanel.code();
@@ -1217,6 +1336,7 @@ async function openProduct(raw, opts){
   const cp = findCatalogProduct(n);
   const sk = stock.index.get(n);
   if (sizePanel) sizePanel.setCode(sk || (cp && cp.code) || n);
+  if (!(opts && opts.stay)) recordCodeSearch(sk || (cp && cp.code) || n, !!(cp || sk));
   if (!cp && !sk){
     currentCode = null; currentWeights = null; fitState = null;
     productView = { loading:false, missing:n };
@@ -2237,6 +2357,10 @@ function renderSettings(){
   const root = $('sec-settings');
   root.innerHTML = '';
   root.append(h('h2', {class:'sec-title'}, 'Settings'));
+
+  /* weekly most-searched codes */
+  root.append(h('div', {class:'card', id:'topCodes'}));
+  if (!topState.weeks.length || (topState.at && Date.now() - topState.at > 60000)) loadTopCodes(); else renderTopCard();
 
   /* admin toggle */
   root.append(h('div', {class:'card'}, h('h3', null, 'Admin editing'),
