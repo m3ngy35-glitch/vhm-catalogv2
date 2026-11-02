@@ -16,7 +16,7 @@
 
   /* The VH MEN System web app (/exec) link. Not a secret — the endpoint only returns customer-facing data.
      Override by defining window.VHM_SIZE_API_URL before this file loads. */
-  var DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbyfrqOrsqOPSG5aUz8a6XxOGIFzJwt3nq9ZfWSAYjwHCW58SBzP4ZPE0skQ1TYgVWUxfQ/exec';
+  var DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbwyFdZKW3ZB5Z83TiXhUkMzW6QIZ88g_aOYxa8LsdjljLSC-JwvO7IERFSaVOIR3ad8/exec';
   var API_VERSION = 1;
   var FRESH_MS = 10 * 60 * 1000;     // older than this → refreshed automatically
   var TIMEOUT_MS = 15000;
