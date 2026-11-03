@@ -314,7 +314,7 @@ details.acc>summary{min-height:40px}
 .cmp-sub{margin-top:6px;padding-top:6px}
 
 /* ---------- clipboard load + code list ---------- */
-.sb-btns{display:flex;gap:6px;flex:none}
+.sb-btns{display:flex;gap:6px;flex:none;flex-wrap:wrap;justify-content:flex-end}
 .codelist{display:flex;flex-direction:column;gap:4px;margin:0 0 8px}
 .codeitem{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px;text-align:left;width:100%;border:1.5px solid var(--line);background:#fff;border-radius:10px;padding:7px 10px;min-height:44px}
 .codeitem.on{border-color:var(--accent);background:var(--accent-soft)}
@@ -330,6 +330,10 @@ details.acc>summary{min-height:40px}
 .wtable thead th{font-size:13px;color:var(--muted,#666)}
 .wtable td.kg{white-space:nowrap}
 .wtable tr.off{opacity:.55}
+.demand-note{margin:0 0 10px;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:var(--accent-soft)}
+.demand-code{font-size:18px;font-weight:800;text-transform:uppercase}
+.demand-help{margin:3px 0 0;color:var(--muted);font-size:13px}
+.demand-hot{color:var(--bad);font-weight:800;white-space:nowrap}
 
 </style>
 </head>
@@ -1107,7 +1111,9 @@ function renderStockBar(){
       h('span', {class:'sb-text', id:'relayText', role:'status', 'aria-live':'polite'}, txt)),
     h('div', {class:'sb-btns'},
       h('button', {type:'button', class:'btn primary sm', id:'relayLoad', disabled: stockBusy, onclick: loadStockFromRelay, 'aria-label': stock.source === 'relay' ? 'Refresh stock' : 'Load stock'},
-        stockBusy ? 'Loading…' : (stock.source === 'relay' ? '↻ Refresh' : 'Load stock'))));
+        stockBusy ? 'Loading…' : (stock.source === 'relay' ? '↻ Refresh' : 'Load stock')),
+      h('button', {type:'button', class:'btn sm', id:'demandReport', onclick: openDemandReportDialog, 'aria-label':'Report size demand or restock need'},
+        '⚑ Report / រាយការណ៍')));
   if (bad && relayState.msg) box.append(h('div', {class:'sb-msg', id:'relayMsg', role:'alert', title: relayState.detail || ''}, relayState.msg));
   else if (stock.source === 'relay' && name && stock.staff !== name) box.append(h('div', {class:'sb-msg warn', id:'relayMsg'}, 'Stock is ' + stock.staff + '\'s — Refresh'));
   else if (stock.issues && stock.issues.length) box.append(h('div', {class:'sb-msg warn', id:'relayMsg'}, stock.issues.length + ' stock row(s) need checking'));
@@ -1193,6 +1199,69 @@ function isoWeek(d){
   return { id: y + '-W' + String(wk).padStart(2,'0'), start: ymd(monday), end: ymd(sunday), monday };
 }
 function searchStatsKey(weekId){ return 'quickreply_searches_' + weekId; }
+
+/* Staff demand reports live in the same weekly document as searches, but in a
+   separate `demand` map. One press represents one customer request. */
+const DEMAND_TYPES = {
+  small:  { label:'អស់សាយតូច — Small size sold out', short:'Small' },
+  middle: { label:'អស់សាយកណ្តាល — Middle size sold out', short:'Middle' },
+  restock:{ label:'ត្រូវ Restock — Needs restock', short:'Restock' }
+};
+async function saveDemandReport(rawCode, kind){
+  const code = normCode(rawCode);
+  if (!code) throw new Error('Enter a product code first.');
+  if (code.length > 40) throw new Error('Product code is too long.');
+  if (!DEMAND_TYPES[kind]) throw new Error('Choose a report type.');
+  const w = isoWeek(new Date());
+  const staff = nameToken(getStaffName()) || 'UNKNOWN';
+  const ref = firestore_().collection('kv').doc(searchStatsKey(w.id));
+  const next = await firestore_().runTransaction(async tx => {
+    const snap = await tx.get(ref);
+    const old = snap.exists && snap.data() && snap.data().data && typeof snap.data().data === 'object' ? snap.data().data : {};
+    const data = Object.assign({}, old, { week:w.id, start:w.start, end:w.end });
+    data.demand = Object.assign({}, old.demand || {});
+    const before = data.demand[code] && typeof data.demand[code] === 'object' ? data.demand[code] : {};
+    const row = Object.assign({}, before);
+    row.small = Number(before.small) || 0;
+    row.middle = Number(before.middle) || 0;
+    row.restock = Number(before.restock) || 0;
+    row[kind] += 1;
+    row.total = row.small + row.middle + row.restock;
+    row.staff = Object.assign({}, before.staff || {});
+    row.staff[staff] = (Number(row.staff[staff]) || 0) + 1;
+    data.demand[code] = row;
+    data.demandTotal = (Number(old.demandTotal) || 0) + 1;
+    tx.set(ref, { data, updatedAt:firebase.firestore.FieldValue.serverTimestamp() });
+    return data;
+  });
+  setConn('ok');
+  topState.docs[w.id] = next;
+  topState.at = Date.now();
+  renderTopCard();
+  return { code, type:DEMAND_TYPES[kind] };
+}
+function openDemandReportDialog(){
+  const codeInput = h('input', {class:'in demand-code', type:'text', value:currentCode || '', maxlength:'40', autocomplete:'off', spellcheck:'false', placeholder:'Product code', 'aria-label':'Product code'});
+  const note = h('div', {class:'demand-note'},
+    h('div', null, 'Product code / លេខកូដ'), codeInput,
+    h('p', {class:'demand-help'}, currentCode ? 'Current product is filled automatically. Change it if needed.' : 'Fill the code, then choose what the customer requested.'));
+  const body = h('div', null, note,
+    h('p', {class:'small muted'}, 'Each tap records one customer request and raises this code in Most-searched codes.'));
+  const makeAction = kind => ({
+    label:DEMAND_TYPES[kind].label,
+    kind:kind === 'restock' ? 'primary' : '',
+    onClick:async ()=>{
+      const code = normCode(codeInput.value);
+      if (!code){ toast('Enter the product code.', 'warn'); codeInput.focus(); return false; }
+      const saved = await saveDemandReport(code, kind);
+      toast('✓ ' + saved.code + ' — ' + saved.type.short + ' demand recorded', 'ok');
+    }
+  });
+  openDialog({ title:'Report size demand / រាយការណ៍ស្តុក', body, actions:[
+    { label:'Cancel' }, makeAction('small'), makeAction('middle'), makeAction('restock')
+  ]});
+  setTimeout(()=>{ codeInput.focus(); codeInput.select(); }, 50);
+}
 function recordCodeSearch(code, found){
   try{
     const c = String(code || '').trim().toUpperCase();
@@ -1227,17 +1296,26 @@ async function loadTopCodes(){
 function topRows(weekId){
   const d = topState.docs[weekId] || {};
   const counts = d.counts || {};
-  return Object.keys(counts).map(code => ({ code, n: Number(counts[code]) || 0 })).filter(r => r.n > 0)
+  const demand = d.demand || {};
+  const codes = new Set(Object.keys(counts).concat(Object.keys(demand)));
+  return Array.from(codes).map(code => {
+    const x = demand[code] || {};
+    const searches = Number(counts[code]) || 0;
+    const small = Number(x.small) || 0;
+    const middle = Number(x.middle) || 0;
+    const restock = Number(x.restock) || 0;
+    return { code, searches, small, middle, restock, reports:small + middle + restock, n:searches + small + middle + restock };
+  }).filter(r => r.n > 0)
     .sort((a, b) => b.n - a.n || a.code.localeCompare(b.code));
 }
 function topCsv(weekIds){
-  const lines = ['week,week_start,week_end,rank,code,name,searches'];
+  const lines = ['week,week_start,week_end,rank,code,name,priority_total,searches,small_size_sold_out,middle_size_sold_out,restock_requests'];
   weekIds.forEach(id => {
     const d = topState.docs[id]; if (!d) return;
     topRows(id).forEach((r, i) => {
       const cp = findCatalogProduct(r.code);
       const name = cp ? (cp.name || cp.nameKh || '') : '';
-      lines.push([id, d.start || '', d.end || '', i + 1, r.code, '"' + String(name).replace(/"/g, '""') + '"', r.n].join(','));
+      lines.push([id, d.start || '', d.end || '', i + 1, r.code, '"' + String(name).replace(/"/g, '""') + '"', r.n, r.searches, r.small, r.middle, r.restock].join(','));
     });
   });
   return '\ufeff' + lines.join('\n');
@@ -1245,7 +1323,7 @@ function topCsv(weekIds){
 function renderTopCard(){
   const box = $('topCodes'); if (!box) return;
   box.innerHTML = '';
-  box.append(h('h3', null, '📊 Most-searched codes (weekly)'));
+  box.append(h('h3', null, '📊 Most-searched & restock priority (weekly)'));
   if (topState.loading && !topState.weeks.length){ box.append(h('p', {class:'small muted'}, 'Loading…')); return; }
   if (topState.err) box.append(h('div', {class:'banner bad', role:'alert'}, 'Could not load search counts: ' + topState.err));
   if (!topState.weeks.length) return;
@@ -1263,13 +1341,13 @@ function renderTopCard(){
     h('button', {type:'button', class:'btn sm', id:'topRefresh', disabled: topState.loading, onclick: loadTopCodes}, topState.loading ? 'Loading…' : '↻ Refresh'),
     h('button', {type:'button', class:'btn sm', id:'topCsvWeek', disabled: !rows.length, onclick: ()=> download('quickreply-top-codes-' + wk.id + '.csv', topCsv([wk.id]), 'text/csv;charset=utf-8')}, '⬇ CSV (selected week)'),
     h('button', {type:'button', class:'btn sm', id:'topCsvAll', disabled: !Object.keys(topState.docs).length, onclick: ()=> download('quickreply-top-codes-' + topState.weeks[topState.weeks.length - 1].id + '_to_' + topState.weeks[0].id + '.csv', topCsv(topState.weeks.map(w => w.id)), 'text/csv;charset=utf-8')}, '⬇ CSV (12 weeks)')));
-  box.append(h('p', {class:'small muted', id:'topSummary'}, (d.total || 0) + ' searches · ' + rows.length + ' codes · ' + wk.start + ' to ' + wk.end +
+  box.append(h('p', {class:'small muted', id:'topSummary'}, (d.total || 0) + ' searches · ' + (d.demandTotal || 0) + ' staff demand reports · ' + rows.length + ' codes · ' + wk.start + ' to ' + wk.end +
     (topState.at ? ' · loaded ' + fmtTime(topState.at) : '') + (d.notFoundTotal ? ' · ' + d.notFoundTotal + ' not in catalog/stock' : '')));
-  if (!rows.length){ box.append(h('div', {class:'empty', id:'topEmpty'}, idx === 0 ? 'No product searches recorded yet this week.' : 'No searches recorded for this week.')); }
+  if (!rows.length){ box.append(h('div', {class:'empty', id:'topEmpty'}, idx === 0 ? 'No product searches or stock-demand reports yet this week.' : 'No activity recorded for this week.')); }
   else {
     const shown = topState.showAll ? rows : rows.slice(0, 20);
     box.append(h('div', {class:'wtable-wrap'}, h('table', {class:'wtable', id:'topTable'},
-      h('thead', null, h('tr', null, h('th', null, '#'), h('th', null, 'Code'), h('th', null, 'Searches'), h('th', null, prev ? 'vs ' + (idx === 0 ? 'last week' : prev.id) : ''))),
+      h('thead', null, h('tr', null, h('th', null, '#'), h('th', null, 'Code'), h('th', null, 'Priority'), h('th', null, 'Search'), h('th', null, 'Small'), h('th', null, 'Middle'), h('th', null, 'Restock'), h('th', null, prev ? 'vs ' + (idx === 0 ? 'last week' : prev.id) : ''))),
       h('tbody', null, shown.map((r, i) => {
         const cp = findCatalogProduct(r.code);
         const p = prevMap.get(r.code);
@@ -1280,6 +1358,10 @@ function renderTopCard(){
             cp && (cp.name || cp.nameKh) ? h('div', {class:'small muted kh'}, cp.name || cp.nameKh) : null),
           h('td', null, h('div', {style:'display:flex;align-items:center;gap:6px'}, h('b', null, String(r.n)),
             h('span', {'aria-hidden':'true', style:'display:inline-block;height:8px;border-radius:4px;background:var(--accent);opacity:.55;width:' + Math.max(4, Math.round(r.n / max * 90)) + 'px'}))),
+          h('td', null, String(r.searches)),
+          h('td', null, r.small ? h('span', {class:'demand-hot'}, String(r.small)) : '—'),
+          h('td', null, r.middle ? h('span', {class:'demand-hot'}, String(r.middle)) : '—'),
+          h('td', null, r.restock ? h('span', {class:'demand-hot'}, '⚑ ' + r.restock) : '—'),
           h('td', {class:'small'}, !prev || !topState.docs[prev.id] ? '—' : p ? (diff > 0 ? '▲ +' + diff : diff < 0 ? '▼ ' + diff : '= 0') : 'new'));
       })))));
     if (rows.length > 20) box.append(h('button', {type:'button', class:'btn sm', style:'margin-top:6px', onclick:()=>{ topState.showAll = !topState.showAll; renderTopCard(); }}, topState.showAll ? 'Show top 20' : 'Show all ' + rows.length));
@@ -1289,7 +1371,7 @@ function renderTopCard(){
     h('div', {class:'small'}, nf.slice(0, 50).map(x => x[0] + ' (' + x[1] + ')').join(' · '))));
   const st = d.staff ? Object.keys(d.staff).map(k => [k, d.staff[k]]).sort((a, b) => b[1] - a[1]) : [];
   if (st.length) box.append(h('p', {class:'small muted', style:'margin-top:6px'}, 'By staff: ' + st.map(x => x[0] + ' ' + x[1]).join(' · ')));
-  box.append(h('p', {class:'small muted', style:'margin-top:6px'}, 'Counts each product opened on the laptop Quick Reply (Mon–Sun). The same code again within 60 s on one device and automatic re-opens after a stock refresh are not counted.'));
+  box.append(h('p', {class:'small muted', style:'margin-top:6px'}, 'Priority = searches + staff size/restock reports (Mon–Sun). Every report button press represents one customer request. Repeat searches for the same code within 60 s on one device are not counted.'));
 }
 
 function renderSizeSection(){
