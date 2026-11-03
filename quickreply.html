@@ -1180,11 +1180,9 @@ const sizePanel = window.VHMSize ? window.VHMSize.createPanel({
   }
 }) : null;
 /* ===== Weekly "most-searched codes" (Firestore kv: quickreply_searches_<YYYY-Www>, one doc per week) =====
-   Counted: a product opened on this laptop page by a person (search result, code list, size-chart button).
-   Not counted: automatic re-opens after a stock refresh, or the same code again on this device within 60 s.
+   Counted: every manual product open/search (search result, code list, size-chart button).
+   Not counted: automatic re-opens after a stock refresh.
    Week = ISO week, Monday 00:00 – Sunday 23:59 local time. Existing Firebase documents are not touched. */
-const SEARCH_DEDUPE_MS = 60000;
-const searchSeen = new Map();
 function isoWeek(d){
   const t = new Date(d.getFullYear(), d.getMonth(), d.getDate());
   const dow = (t.getDay() + 6) % 7;                       // Monday = 0
@@ -1266,9 +1264,6 @@ function recordCodeSearch(code, found){
   try{
     const c = String(code || '').trim().toUpperCase();
     if (!c || c.length > 40) return;
-    const now = Date.now();
-    if (now - (searchSeen.get(c) || 0) < SEARCH_DEDUPE_MS) return;
-    searchSeen.set(c, now);
     const w = isoWeek(new Date());
     const inc = firebase.firestore.FieldValue.increment(1);
     const staff = nameToken(getStaffName()) || 'UNKNOWN';
@@ -1371,7 +1366,7 @@ function renderTopCard(){
     h('div', {class:'small'}, nf.slice(0, 50).map(x => x[0] + ' (' + x[1] + ')').join(' · '))));
   const st = d.staff ? Object.keys(d.staff).map(k => [k, d.staff[k]]).sort((a, b) => b[1] - a[1]) : [];
   if (st.length) box.append(h('p', {class:'small muted', style:'margin-top:6px'}, 'By staff: ' + st.map(x => x[0] + ' ' + x[1]).join(' · ')));
-  box.append(h('p', {class:'small muted', style:'margin-top:6px'}, 'Priority = searches + staff size/restock reports (Mon–Sun). Every report button press represents one customer request. Repeat searches for the same code within 60 s on one device are not counted.'));
+  box.append(h('p', {class:'small muted', style:'margin-top:6px'}, 'Priority = searches + staff size/restock reports (Mon–Sun). Every manual search and every report button press represents one customer request. Automatic stock refreshes are not counted.'));
 }
 
 function renderSizeSection(){
