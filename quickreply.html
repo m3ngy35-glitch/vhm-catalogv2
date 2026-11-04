@@ -335,6 +335,24 @@ details.acc>summary{min-height:40px}
 .demand-help{margin:3px 0 0;color:var(--muted);font-size:13px}
 .demand-hot{color:var(--bad);font-weight:800;white-space:nowrap}
 
+/* Daily-use navigation: keep Stock & Replies visible; tuck occasional tools away. */
+nav#nav{position:relative;z-index:45;overflow:visible}
+nav#nav>.nav-primary{font-weight:750;color:#1f4fb8}
+.nav-more{position:relative;margin-left:auto;flex:none}
+.nav-more>summary{list-style:none;cursor:pointer;min-height:44px;padding:9px 14px;border-radius:8px;display:flex;align-items:center;justify-content:center;gap:6px;font-weight:650;color:var(--muted);white-space:nowrap}
+.nav-more>summary::-webkit-details-marker{display:none}
+.nav-more>summary::after{content:'▾';font-size:11px}
+.nav-more[open]>summary,.nav-more.active>summary{background:var(--accent-soft);color:#1f4fb8}
+.nav-more-list{position:absolute;right:0;top:calc(100% + 4px);z-index:90;display:flex;flex-direction:column;gap:2px;min-width:190px;padding:6px;background:#fff;border:1px solid var(--line-strong);border-radius:10px;box-shadow:0 10px 30px rgba(10,20,40,.16)}
+nav#nav .nav-more-list button{display:block;width:100%;text-align:left;padding:9px 12px}
+.quick-tools>.toolbar{margin-bottom:8px}
+@media (max-width:1099px){nav#nav>.nav-primary{flex:1 1 auto}.nav-more{flex:0 0 auto}}
+@media (min-width:1100px){
+  .nav-more{width:100%;margin-left:0}
+  .nav-more>summary{justify-content:flex-start}
+  .nav-more-list{position:static;min-width:0;padding:4px 0 0;border:0;border-radius:0;box-shadow:none;background:transparent}
+}
+
 </style>
 </head>
 <body>
@@ -357,11 +375,16 @@ details.acc>summary{min-height:40px}
   </header>
 
   <nav id="nav" aria-label="Sections">
-    <button type="button" data-sec="quick"><span class="l">Replies</span><span class="s">Replies</span></button>
-    <button type="button" data-sec="qa"><span class="l">Q&amp;A</span><span class="s">Q&amp;A</span></button>
-    <button type="button" data-sec="templates"><span class="l">Templates</span><span class="s">Templates</span></button>
-    <button type="button" data-sec="broadcasts"><span class="l">Broadcast</span><span class="s">Broadcast</span></button>
-    <button type="button" data-sec="settings"><span class="l">Settings</span><span class="s">Settings</span></button>
+    <button type="button" class="nav-primary" data-sec="quick"><span class="l">Stock &amp; Replies</span><span class="s">Stock</span></button>
+    <details class="nav-more" id="navMore">
+      <summary>More tools</summary>
+      <div class="nav-more-list">
+        <button type="button" data-sec="qa"><span class="l">Q&amp;A answers</span><span class="s">Q&amp;A</span></button>
+        <button type="button" data-sec="templates"><span class="l">Templates</span><span class="s">Templates</span></button>
+        <button type="button" data-sec="broadcasts"><span class="l">Team broadcast</span><span class="s">Broadcast</span></button>
+        <button type="button" data-sec="settings"><span class="l">Reports &amp; settings</span><span class="s">Reports</span></button>
+      </div>
+    </details>
   </nav>
 
   <main id="main" tabindex="-1">
@@ -371,8 +394,8 @@ details.acc>summary{min-height:40px}
         <span class="ico" aria-hidden="true">⌕</span>
         <input id="search" type="search" autocomplete="off" spellcheck="false"
           role="combobox" aria-expanded="false" aria-controls="results" aria-autocomplete="list"
-          placeholder="Search code, question or template"
-          aria-label="Universal search">
+          placeholder="Search product code"
+          aria-label="Search product code or other saved content">
         <div id="results" class="results" role="listbox" hidden></div>
       </div>
     </div>
@@ -1093,6 +1116,7 @@ async function loadStockFromRelay(){
     }
   }catch(e){ relayState.kind = 'error'; relayState.msg = 'Could not load stock'; relayState.detail = fbErrorText(e); }
   stockBusy = false; renderAfterStock();
+  if (relayState.kind === 'ok' && stock.codes.size > 1) setTimeout(()=>{ const q = $('search'); if (q){ q.focus(); q.select(); } }, 0);
 }
 /* Compact always-visible stock relay control (header area, every tab). */
 function renderStockBar(){
@@ -1349,7 +1373,7 @@ function renderTopCard(){
         const diff = p ? r.n - p.n : null;
         return h('tr', {'data-code': r.code},
           h('td', null, String(i + 1)),
-          h('td', null, h('button', {type:'button', class:'btn link', style:'padding:0;min-height:0;font-weight:700', title:'Open this product', onclick:()=> openProduct(r.code)}, r.code),
+          h('td', null, h('button', {type:'button', class:'btn link', style:'padding:0;min-height:0;font-weight:700', title:'Open this product', onclick:()=> openProduct(r.code, { noCount:true })}, r.code),
             cp && (cp.name || cp.nameKh) ? h('div', {class:'small muted kh'}, cp.name || cp.nameKh) : null),
           h('td', null, h('div', {style:'display:flex;align-items:center;gap:6px'}, h('b', null, String(r.n)),
             h('span', {'aria-hidden':'true', style:'display:inline-block;height:8px;border-radius:4px;background:var(--accent);opacity:.55;width:' + Math.max(4, Math.round(r.n / max * 90)) + 'px'}))),
@@ -1413,7 +1437,7 @@ async function openProduct(raw, opts){
   const cp = findCatalogProduct(n);
   const sk = stock.index.get(n);
   if (sizePanel) sizePanel.setCode(sk || (cp && cp.code) || n);
-  if (!(opts && opts.stay)) recordCodeSearch(sk || (cp && cp.code) || n, !!(cp || sk));
+  if (!(opts && (opts.stay || opts.noCount))) recordCodeSearch(sk || (cp && cp.code) || n, !!(cp || sk));
   if (!cp && !sk){
     currentCode = null; currentWeights = null; fitState = null;
     productView = { loading:false, missing:n };
@@ -1626,14 +1650,16 @@ function renderQuick(){
       cfg.workflows.map(w => h('option', {value:w.id, selected: wf && w.id === wf.id}, w.name)))),
     h('label', {class:'fld'}, 'Answer language', h('select', {id:'langSelect', onchange:(e)=>{ prefs.lang = e.target.value; savePrefs(); renderQuickSaved(); }},
       langList().map(l => h('option', {value:l.code, selected: l.code === currentLang()}, l.label)))));
-  root.append(bar);
   if (!wf){ root.append(h('div', {class:'empty'}, 'No workflows')); return; }
   const prod = h('div', {id:'qProduct'});
   const saved = h('div', {id:'qSaved'});
   const sizeSec = renderSizeSection();
   root.append(prod);
   if (sizeSec) root.append(sizeSec);
-  root.append(saved);
+  const more = h('details', {class:'acc', id:'qMoreTools'},
+    h('summary', null, 'More reply tools — saved answers & language'),
+    h('div', {class:'quick-tools'}, bar, saved));
+  root.append(more);
   renderQuickProduct(); renderQuickSaved();
 }
 
@@ -2819,7 +2845,8 @@ function renderSection(id){
 function showSection(id){
   if (!SECTIONS.includes(id)) id = 'quick';
   SECTIONS.forEach(s => { $('sec-' + s).hidden = s !== id; });
-  document.querySelectorAll('#nav button').forEach(b => { if (b.dataset.sec === id) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
+  document.querySelectorAll('#nav button[data-sec]').forEach(b => { if (b.dataset.sec === id) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
+  const more = $('navMore'); if (more) more.classList.toggle('active', id !== 'quick');
   if (prefs.section !== id){ prefs.section = id; savePrefs(); }
   renderSection(id);
   if (id === 'broadcasts' && !bc.loaded && !bc.loading) loadBroadcast();
@@ -2946,7 +2973,7 @@ function setActive(i){
 }
 function pickResult(it){
   closeResults();
-  if (it.type === 'product') openProduct(it.code);
+  if (it.type === 'product'){ $('search').value = ''; openProduct(it.code); }
   else if (it.type === 'qa'){ useEntry(it.entry, 'auto'); toast('Answer prepared in the reply box — review it, then copy.', 'ok'); }
   else if (it.type === 'template'){ useTemplate(it.tpl, 'auto'); toast('Template added to the reply box.', 'ok'); }
   else if (it.type === 'category'){ qaState.cat = it.cat.id; qaState.q = ''; showSection('qa'); }
@@ -2996,7 +3023,7 @@ async function applyQuickReplyAction(params){
 function boot(){
   const imp = h('input', {type:'file', id:'importFile', accept:'.json,.csv', hidden:true, onchange:(e)=>{ const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) handleImportFile(f); }});
   document.body.append(imp);
-  document.querySelectorAll('#nav button').forEach(b => b.addEventListener('click', ()=> showSection(b.dataset.sec)));
+  document.querySelectorAll('#nav button[data-sec]').forEach(b => b.addEventListener('click', ()=>{ showSection(b.dataset.sec); const more = $('navMore'); if (more) more.open = false; }));
   $('btnSettings').addEventListener('click', ()=> showSection('settings'));
   $('staffSelect').addEventListener('change', (e)=>{ setStaffName(e.target.value); relayState.kind = 'idle'; relayState.msg = ''; renderStatus(); if (currentSection() === 'quick') renderProducts(); });
   addEventListener('online', ()=>{ renderStatus(); });
