@@ -1952,12 +1952,15 @@ async function copyReply(){
 }
 /* Replies go to the staff member's phone page automatically (on select, on edit, on copy). Nothing is sent while
    the reply still has unfilled {placeholders}. */
-let phoneBusy = false, lastPushed = '', pushTimer = null;
+let phoneBusy = false, lastPushed = '', pushTimer = null, phoneQueued = null;
 async function sendToPhone(textArg){
   const name = getStaffName();
   if (!name) return;
   const text = typeof textArg === 'string' ? textArg : resolveDraft().text;
-  if (!text.trim() || phoneBusy) return;
+  if (!text.trim()) return;
+  // a send is still on its way: remember only the newest text and send it right after
+  // (before, it was dropped and the phone could stay one edit behind)
+  if (phoneBusy){ phoneQueued = text; return; }
   const sig = name + '\u0000' + text;
   if (sig === lastPushed) return;
   phoneBusy = true;
@@ -1967,6 +1970,7 @@ async function sendToPhone(textArg){
     if ($('cmpStatus').title) { $('cmpStatus').title = ''; if ($('cmpStatus').className.includes('bad')) setStatus(''); }
   }catch(e){ setStatus('Could not send to phone', 'bad'); $('cmpStatus').title = fbErrorText(e); }
   phoneBusy = false;
+  if (phoneQueued !== null){ const q = phoneQueued; phoneQueued = null; sendToPhone(q); }
 }
 function queuePush(delay){
   clearTimeout(pushTimer);
@@ -1989,6 +1993,7 @@ function initComposer(){
     if (draft.upsellLine && !draft.text.includes(draft.upsellLine)) draft.upsellLine = '';
     autosize();
     renderComposer(draftKeys().join(',') === before ? 'light' : undefined);
+    queuePush(1500);   // while typing: send to the phone 1.5 s after the last key (was every 600 ms pause)
   });
   t.addEventListener('focus', ()=>{ setTimeout(()=> t.scrollIntoView({block:'center', behavior:'smooth'}), 250); });
   $('cmpCopy').addEventListener('click', copyReply);

@@ -143,6 +143,20 @@
     #liveWeightInputs{margin-bottom:10px;}
     .fabric-grid{gap:7px;grid-template-columns:repeat(auto-fill,minmax(115px,1fr));}
   }
+
+/* ---- 🔴 Live session bar ---- */
+.ls-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1.5px solid var(--line);border-radius:10px;background:var(--card);padding:8px 10px;margin-bottom:10px;font-size:13px}
+.ls-bar.ls-on{border-color:#dc2626;background:#fff5f5}
+.ls-bar.ls-stale{border-color:#d97706;background:#fffbeb}
+.ls-btn{font:inherit;font-weight:700;font-size:13px;border-radius:8px;padding:8px 14px;cursor:pointer;border:1.5px solid var(--line);background:var(--card);color:var(--ink)}
+.ls-btn.ls-start{background:#dc2626;border-color:#dc2626;color:#fff}
+.ls-btn.ls-end{background:#1a1d23;border-color:#1a1d23;color:#fff}
+.ls-btn.ls-confirm{background:#b91c1c;border-color:#b91c1c;color:#fff}
+.ls-dot{width:10px;height:10px;border-radius:50%;background:#dc2626;display:inline-block;animation:lsblink 1.2s infinite}
+@keyframes lsblink{50%{opacity:.25}}
+.ls-codes{flex-basis:100%;display:flex;flex-wrap:wrap;gap:4px}
+.ls-code{font-family:'Space Mono',monospace;font-size:11.5px;border:1px solid var(--line);border-radius:4px;padding:1px 6px;background:var(--card)}
+.ls-muted{opacity:.7}
 </style>
 </head>
 <body>
@@ -152,6 +166,10 @@
 </header>
 
 <main>
+  <!-- 🔴 Live session: Start → codes sent to OBS / copied are remembered on this
+       computer → End sends ONE record to the database (kv/live_last + kv/live_session:<id>),
+       which VHM Inventory reads for its "put back" list. -->
+  <div id="liveSessionBar" class="ls-bar"></div>
   <div class="note" style="border:1px solid var(--line);border-radius:10px;background:var(--card);padding:8px 10px;margin-bottom:10px;">
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
       <select id="importNameSelect" style="font-size:12.5px;padding:6px 8px;">
@@ -357,6 +375,20 @@ window.storage = {
     const db = firestoreDb();
     await db.collection('kv').doc(key).delete();
     return { key, deleted:true };
+  },
+  // Saved values for every key under `prefix`, in ONE query: costs 1 read per
+  // document (the old list() + get() per key cost 2 reads per document).
+  async listValues(prefix){
+    const db = firestoreDb();
+    const p = prefix || '';
+    const snapshot = await db.collection('kv')
+      .orderBy(firebase.firestore.FieldPath.documentId())
+      .startAt(p)
+      .endAt(p + '\uf8ff')
+      .get({source:'server'});
+    const out = [];
+    snapshot.forEach(doc => { const d = doc.data && doc.data(); if(d && d.data !== undefined && d.data !== null) out.push(d.data); });
+    return out;
   },
   async list(prefix){
     const db = firestoreDb();
@@ -1000,6 +1032,7 @@ document.getElementById('liveCopyBtn').addEventListener('click', ()=>{
   const msg = finalBox.value;
   copyTextToClipboard(msg, document.getElementById('liveCopyBtn'));
   obsWriteMessage(msg);
+  if(window.liveSessionRecord) window.liveSessionRecord(code);
 });
 document.getElementById('liveClearBtn').addEventListener('click', ()=>{
   document.getElementById('liveCode').value = '';
@@ -1034,17 +1067,18 @@ document.getElementById('liveSaveBtn').addEventListener('click', async ()=>{
     liveRefreshWeightInputs();
     const weights = liveCollectWeights();
     const messageOptions = liveGetMessageOptions();
-    await withTimeout(window.storage.set(liveLogKey(code), JSON.stringify({
+    const savedEntry = {
       code, colorsText: document.getElementById('liveColorsBox').value,
       colors: colorsArr, weights,
       garmentType: messageOptions.garmentType, price: messageOptions.price, showWeight: messageOptions.showWeight,
       updatedAt: new Date().toISOString()
-    })), 25000, 'Save timed out after 25s — the server never responded. Check your connection and try again.');
+    };
+    await withTimeout(window.storage.set(liveLogKey(code), JSON.stringify(savedEntry)), 25000, 'Save timed out after 25s — the server never responded. Check your connection and try again.');
     btn.textContent = 'Saved ✅';
     const now = new Date();
     statusBox.style.color = 'var(--olive-dark)';
     statusBox.textContent = `✅ Saved "${code}" at ${now.toLocaleTimeString()}.`;
-    loadLiveLogList();
+    liveLogCachePut(savedEntry);
   }catch(e){
     console.error('Live log save failed:', e);
     btn.textContent = 'Error';
@@ -1067,21 +1101,45 @@ function liveLoadIntoForm(entry){
   window.scrollTo({top:0, behavior:'smooth'});
 }
 let liveLogSearchTerm = '';
-async function loadLiveLogList(){
+// Usage fix: typing in "Search saved codes" used to re-download every saved code
+// (twice) on every letter. Now the list is downloaded once (1 query) and the
+// search box only filters what is already here — 0 reads while typing.
+// Saves / edits / deletes still reload the list once, as before.
+let liveLogEntriesLoaded = false;
+// After saving / editing / deleting ONE code, update just that code in the list
+// already on screen (0 reads) instead of downloading every saved code again.
+// Bulk imports and opening the page still load the full list (one query).
+function liveLogCachePut(entry){
+  if(!liveLogEntriesLoaded){ loadLiveLogList(); return; }
+  const k = (entry.code || '').toUpperCase();
+  liveLogEntriesCache = [entry].concat(liveLogEntriesCache.filter(e => (e.code || '').toUpperCase() !== k));
+  loadLiveLogList({ fromCache: true });
+}
+function liveLogCacheRemove(code){
+  if(!liveLogEntriesLoaded){ loadLiveLogList(); return; }
+  const k = (code || '').toUpperCase();
+  liveLogEntriesCache = liveLogEntriesCache.filter(e => (e.code || '').toUpperCase() !== k);
+  loadLiveLogList({ fromCache: true });
+}
+async function loadLiveLogList(opts){
   const el = document.getElementById('liveLogList');
-  el.innerHTML = '<div class="stock-empty">Loading…</div>';
+  const fromCache = !!(opts && opts.fromCache && liveLogEntriesLoaded);
+  if(!fromCache) el.innerHTML = '<div class="stock-empty">Loading…</div>';
   try{
-    const listRes = await withTimeout(window.storage.list('live_log:'), 15000, 'Loading saved codes timed out after 15s — check your connection and tap the search box to retry.');
-    const keys = (listRes && listRes.keys) || [];
-    if(!keys.length){
+    let allEntries;
+    if(fromCache){
+      allEntries = liveLogEntriesCache;
+    }else{
+      const values = await withTimeout(window.storage.listValues('live_log:'), 15000, 'Loading saved codes timed out after 15s — check your connection and tap the search box to retry.');
+      allEntries = values.map(v => typeof v === 'string' ? JSON.parse(v) : v).filter(e => e && e.code);
+      allEntries.sort((a,b)=> (b.updatedAt||'').localeCompare(a.updatedAt||''));
+      liveLogEntriesCache = allEntries;
+      liveLogEntriesLoaded = true;
+    }
+    if(!allEntries.length){
       el.innerHTML = '<div class="stock-empty">// no live logs saved yet</div>';
-      liveLogEntriesCache = [];
       return;
     }
-    const results = await Promise.all(keys.map(key => window.storage.get(key).catch(()=>null)));
-    const allEntries = results.filter(r => r && r.value).map(r => JSON.parse(r.value));
-    allEntries.sort((a,b)=> (b.updatedAt||'').localeCompare(a.updatedAt||''));
-    liveLogEntriesCache = allEntries;
 
     const term = liveLogSearchTerm.trim().toUpperCase();
     const entries = term ? allEntries.filter(e => (e.code||'').toUpperCase().includes(term)) : allEntries;
@@ -1132,6 +1190,7 @@ async function loadLiveLogList(){
           const msg = buildLiveMessage(entry.code, entry.colors, entry.weights || {}, {garmentType: entry.garmentType, price: entry.price, showWeight: entry.showWeight});
           copyTextToClipboard(msg, btn);
           obsWriteMessage(msg);
+          if(window.liveSessionRecord) window.liveSessionRecord(entry.code);
         }
       });
     });
@@ -1170,7 +1229,7 @@ async function loadLiveLogList(){
           const updated = {...entry, weights: newWeights, updatedAt: new Date().toISOString()};
           await window.storage.set(liveLogKey(entry.code), JSON.stringify(updated));
           if(statusEl){ statusEl.style.color = 'var(--olive-dark)'; statusEl.textContent = '✅ Weight saved and confirmed'; }
-          loadLiveLogList();
+          liveLogCachePut(updated);
         }catch(e){
           console.error('Weight save failed:', e);
           if(statusEl){ statusEl.style.color = 'var(--rust)'; statusEl.textContent = '❌ ' + (e && e.message ? e.message : 'Save failed — check your connection and try again.'); }
@@ -1186,7 +1245,7 @@ async function loadLiveLogList(){
         if(!confirm(`Delete live log for ${entry.code}?`)) return;
         try{
           await window.storage.delete(liveLogKey(entry.code));
-          loadLiveLogList();
+          liveLogCacheRemove(entry.code);
         }catch(e){ console.error(e); alert('Could not delete — check connection.'); }
       });
     });
@@ -1197,7 +1256,7 @@ async function loadLiveLogList(){
 }
 document.getElementById('liveLogSearchBox').addEventListener('input', (e)=>{
   liveLogSearchTerm = e.target.value;
-  loadLiveLogList();
+  loadLiveLogList({ fromCache: true });       // filter what is loaded — no database reads while typing
 });
 
 /* ---- Export / Import via spreadsheet (two sheets: colors, weights) ---- */
@@ -1555,6 +1614,97 @@ document.getElementById('saveGarmentTypeBtn').addEventListener('click', ()=>{
   await runConnectionSelfTest();
   await loadCatalogCacheReadOnly();
   await loadLiveLogList();
+})();
+</script>
+
+<script>
+/* ============ 🔴 LIVE SESSION — Start / End live ============
+   While a live is on, every code sent to OBS or copied (Copy message, the
+   double-tap 1 / 2 pills, Copy message in Saved live logs) is remembered on
+   THIS computer only (localStorage) — no database writes during the live.
+   End live sends ONE record:
+     kv/live_session:<YYYY-MM-DD_HHMM>  → this live, kept as history
+     kv/live_last                        → the latest live (VHM Inventory reads this)
+   If the page closes or End is forgotten, the list stays on this computer and
+   the bar offers "End & send" next time. Nothing else in this page changes. */
+(function(){
+  const LS = 'vhm_live_session';
+  const bar = document.getElementById('liveSessionBar');
+  if(!bar) return;
+  const load = () => { try{ return JSON.parse(localStorage.getItem(LS) || 'null'); }catch(e){ return null; } };
+  const store = s => { try{ s ? localStorage.setItem(LS, JSON.stringify(s)) : localStorage.removeItem(LS); }catch(e){} };
+  const pad = n => String(n).padStart(2,'0');
+  const hm = d => pad(d.getHours()) + ':' + pad(d.getMinutes());
+  const dur = ms => { const m = Math.max(0, Math.floor(ms/60000)); return Math.floor(m/60) + ':' + pad(m%60); };
+  const who = () => { const el = document.getElementById('importNameSelect'); return (el && el.value) || localStorage.getItem('vhm_stock_name') || ''; };
+  let confirmEnd = false, confirmTimer = null, sending = false, lastErr = '';
+
+  window.liveSessionRecord = function(code){
+    const s = load(); if(!s) return;
+    code = String(code || '').trim().toUpperCase();
+    if(!code) return;
+    const now = new Date().toISOString(), c = s.codes[code];
+    if(c){ c.last = now; c.n += 1; } else s.codes[code] = { first: now, last: now, n: 1 };
+    store(s); render();
+  };
+
+  function start(){
+    const d = new Date();
+    const id = d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()) + '_' + pad(d.getHours()) + pad(d.getMinutes());
+    store({ v: 1, id, startedAt: d.toISOString(), by: who(), codes: {} });
+    lastErr = ''; render();
+  }
+  async function end(){
+    const s = load(); if(!s || sending) return;
+    sending = true; lastErr = ''; render();
+    const record = {
+      v: 1, id: s.id, startedAt: s.startedAt, endedAt: new Date().toISOString(), by: s.by || who(),
+      codes: Object.keys(s.codes).map(code => ({ code, first: s.codes[code].first, last: s.codes[code].last, n: s.codes[code].n }))
+               .sort((a,b) => a.first.localeCompare(b.first))
+    };
+    try{
+      const text = JSON.stringify(record);
+      await withTimeout(window.storage.set('live_session:' + s.id, text), 25000, 'Timed out after 25s');
+      await withTimeout(window.storage.set('live_last', text), 25000, 'Timed out after 25s');
+      store(null);
+      bar.innerHTML = '<b>✅ Live sent</b> <span class="ls-muted">' + record.codes.length + ' codes shown · ' + dur(new Date(record.endedAt) - new Date(record.startedAt)) + ' — VHM Inventory now shows the put-back list</span>';
+      bar.className = 'ls-bar';
+      setTimeout(render, 6000);
+    }catch(e){
+      lastErr = (e && e.message) || 'unknown error';
+    }finally{ sending = false; if(load()) render(); }
+  }
+
+  function render(){
+    const s = load();
+    if(!s){
+      bar.className = 'ls-bar';
+      bar.innerHTML = '<button type="button" class="ls-btn ls-start" id="lsStart">⏺ Start live</button>' +
+        '<span class="ls-muted">Press when the stream starts — codes you send to OBS are counted, and sent once at End live.</span>';
+      bar.querySelector('#lsStart').onclick = start;
+      return;
+    }
+    const n = Object.keys(s.codes).length, started = new Date(s.startedAt);
+    const stale = Date.now() - started.getTime() > 12 * 3600 * 1000;
+    bar.className = 'ls-bar ' + (stale ? 'ls-stale' : 'ls-on');
+    bar.innerHTML =
+      (stale ? '<b>⚠ Live from ' + started.toLocaleDateString() + ' ' + hm(started) + ' was not ended</b>'
+             : '<span class="ls-dot" aria-hidden="true"></span><b>LIVE</b> <span>' + dur(Date.now() - started) + '</span>') +
+      ' · <b>' + n + '</b> code' + (n === 1 ? '' : 's') + ' shown' +
+      ' <button type="button" class="ls-btn ' + (confirmEnd ? 'ls-confirm' : 'ls-end') + '" id="lsEnd"' + (sending ? ' disabled' : '') + '>' +
+        (sending ? 'Sending…' : confirmEnd ? 'Tap again to end & send' : stale ? '⏹ End & send now' : '⏹ End live') + '</button>' +
+      (stale ? ' <button type="button" class="ls-btn" id="lsGoOn">Continue this live</button>' : '') +
+      (lastErr ? ' <span style="color:#b91c1c;font-weight:700">Not sent: ' + escapeHtml(lastErr) + ' — the list is kept, tap End again</span>' : '') +
+      (n ? '<div class="ls-codes">' + Object.keys(s.codes).map(c => '<span class="ls-code">' + escapeHtml(c) + (s.codes[c].n > 1 ? ' ×' + s.codes[c].n : '') + '</span>').join('') + '</div>' : '');
+    bar.querySelector('#lsEnd').onclick = () => {
+      if(!confirmEnd){ confirmEnd = true; render(); clearTimeout(confirmTimer); confirmTimer = setTimeout(() => { confirmEnd = false; render(); }, 4000); return; }
+      confirmEnd = false; clearTimeout(confirmTimer); end();
+    };
+    const goOn = bar.querySelector('#lsGoOn');
+    if(goOn) goOn.onclick = () => { s.startedAt = new Date().toISOString(); store(s); render(); };
+  }
+  render();
+  setInterval(() => { if(load() && !confirmEnd && !sending) render(); }, 30000);
 })();
 </script>
 </body></html>
