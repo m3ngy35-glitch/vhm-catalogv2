@@ -236,6 +236,7 @@
       <div style="display:flex;flex-direction:column;gap:6px;">
         <label class="toggle-option send-target-pill" style="padding:7px 14px;min-height:0;"><input type="radio" name="obsSendTarget" value="1" checked> 1</label>
         <label class="toggle-option send-target-pill" style="padding:7px 14px;min-height:0;"><input type="radio" name="obsSendTarget" value="2"> 2</label>
+        <label class="toggle-option send-target-pill" style="padding:7px 14px;min-height:0;"><input type="radio" name="obsSendTarget" value="3"> 3</label>
         <label class="toggle-option send-target-pill" style="padding:7px 14px;min-height:0;font-size:12px;"><input type="radio" name="obsSendTarget" value="none"> ✕</label>
       </div>
       <div style="display:flex;flex-direction:column;gap:6px;margin-top:14px;">
@@ -264,11 +265,15 @@
       <div style="font-size:12.5px;font-family:'Space Mono',monospace;color:#6b6558;" id="obsStatusText1">[1] not linked</div>
       <button class="btn btn-ghost" id="obsLinkBtn1" style="font-size:12px;padding:7px 12px;">🔗 Link file [1]</button>
     </div>
-    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
       <div style="font-size:12.5px;font-family:'Space Mono',monospace;color:#6b6558;" id="obsStatusText2">[2] not linked</div>
       <button class="btn btn-ghost" id="obsLinkBtn2" style="font-size:12px;padding:7px 12px;">🔗 Link file [2]</button>
     </div>
-    <div class="field-hint" style="margin-top:8px;">e.g. link [1] for shirts, [2] for pants — pick which one next to the code field controls where Copy message sends.</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+      <div style="font-size:12.5px;font-family:'Space Mono',monospace;color:#6b6558;" id="obsStatusText3">[3] not linked</div>
+      <button class="btn btn-ghost" id="obsLinkBtn3" style="font-size:12px;padding:7px 12px;">🔗 Link file [3]</button>
+    </div>
+    <div class="field-hint" style="margin-top:8px;">Link up to three OBS text files, then pick 1, 2, or 3 next to the code field to control where Copy message sends.</div>
     <div class="field-hint" id="obsUnsupportedNote" style="display:none;margin-top:6px;">This needs Chrome or Edge — not supported in this browser.</div>
   </div>
 
@@ -531,12 +536,12 @@ function copyTextToClipboard(text, btn){
 /* ============ OBS text-file links (File System Access API — Chrome/Edge only) ============
    Lets the page write the copy-ready message straight into a file on disk that
    OBS's Text (GDI+) source reads from, so it updates live without any manual
-   copy/paste into a separate editor. Two independent slots — e.g. [1] for
-   shirts, [2] for pants — each linked once via the native file picker; after
+   copy/paste into a separate editor. Three independent slots — e.g. [1] for
+   shirts, [2] for pants, and [3] for a third category — each linked once via the native file picker; after
    that, writes to the same handle don't re-prompt for the rest of this
    browser session. Which slot (if any) gets written is chosen via the
    "Send Copy message to" selector near the Copy button. */
-const obsHandles = {1: null, 2: null};
+const obsHandles = {1: null, 2: null, 3: null};
 function obsSupported(){
   return typeof window.showSaveFilePicker === 'function';
 }
@@ -585,8 +590,9 @@ async function obsWriteMessage(text){
 }
 document.getElementById('obsLinkBtn1').addEventListener('click', ()=>obsLinkFile(1));
 document.getElementById('obsLinkBtn2').addEventListener('click', ()=>obsLinkFile(2));
+document.getElementById('obsLinkBtn3').addEventListener('click', ()=>obsLinkFile(3));
 
-// Double-tap a "Send to" pill (1 / 2 / ✕) = same as the (now hidden) Copy
+// Double-tap a "Send to" pill (1 / 2 / 3 / ✕) = same as the (now hidden) Copy
 // message button: copies the final message and, per the selected target,
 // writes it to the linked OBS file. A single tap still just selects the
 // target, same as any radio pill.
