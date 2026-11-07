@@ -352,6 +352,7 @@ const firebaseConfig = {
 let __db = null;
 const LIVE_GUIDES_DOC = 'live_guides_v1';
 const LIVE_GUIDES_HASH_KEY = 'vhm_live_guides_hash_v1';
+const LIVE_GUIDES_PENDING_KEY = 'vhm_live_guides_pending_v1';
 function firestoreDb(){
   if(!__db){
     firebase.initializeApp(firebaseConfig);
@@ -382,36 +383,33 @@ function liveGuidesHash(guides){
 function liveGuidesPayload(guides){
   return { schema:'vhm-live-guides', version:1, hash:liveGuidesHash(guides), at:new Date().toISOString(), guides };
 }
-async function updateLiveGuideSummary(entry, remove){
-  const code = String(entry && entry.code || '').trim().toUpperCase();
-  if(!code) return;
-  const db = firestoreDb(), ref = db.collection('kv').doc(LIVE_GUIDES_DOC);
-  let finalHash = '';
-  await db.runTransaction(async tx=>{
-    const snap = await tx.get(ref); let current = null;
-    if(snap.exists){
-      const stored = snap.data() && snap.data().data;
-      try{ current = typeof stored === 'string' ? JSON.parse(stored) : stored; }catch(e){ current = null; }
-    }
-    const guides = current && current.schema === 'vhm-live-guides' && current.guides ? {...current.guides} : {};
-    if(remove) delete guides[code]; else guides[code] = liveGuideEntry(entry);
-    const payload = liveGuidesPayload(guides); finalHash = payload.hash;
-    const encoded = JSON.stringify(payload);
-    if(encoded.length > 850000) throw new Error('Live guide summary is too large; split it before adding more codes.');
-    tx.set(ref, { data: encoded, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
-  });
-  try{ localStorage.setItem(LIVE_GUIDES_HASH_KEY, finalHash); }catch(e){}
+function liveGuidePending(){
+  try{ const v = JSON.parse(localStorage.getItem(LIVE_GUIDES_PENDING_KEY) || '{}'); return v && typeof v === 'object' ? v : {}; }
+  catch(e){ return {}; }
 }
-async function publishLiveGuideSummary(entries, force){
-  const guides = liveGuidesObject(entries), payload = liveGuidesPayload(guides);
-  if(!force && localStorage.getItem(LIVE_GUIDES_HASH_KEY) === payload.hash) return;
-  const encoded = JSON.stringify(payload);
-  if(encoded.length > 850000) throw new Error('Live guide summary is too large; split it before adding more codes.');
-  await firestoreDb().collection('kv').doc(LIVE_GUIDES_DOC).set({
-    data: encoded,
-    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+function markLiveGuidePending(code, remove){
+  code = String(code || '').trim().toUpperCase();
+  if(!code) return;
+  const pending = liveGuidePending();
+  pending[code] = remove ? 'remove' : 'update';
+  try{ localStorage.setItem(LIVE_GUIDES_PENDING_KEY, JSON.stringify(pending)); }catch(e){}
+}
+function clearLiveGuidePending(){
+  try{ localStorage.removeItem(LIVE_GUIDES_PENDING_KEY); }catch(e){}
+}
+function liveGuideChanges(entries){
+  const byCode = new Map((entries || []).map(entry => [String(entry.code || '').trim().toUpperCase(), entry]));
+  const pending = liveGuidePending();
+  const changes = {};
+  Object.keys(pending).forEach(code => {
+    const entry = byCode.get(code);
+    if(entry) changes[code] = liveGuideEntry(entry);
+    else if(pending[code] === 'remove') changes[code] = null;
   });
-  try{ localStorage.setItem(LIVE_GUIDES_HASH_KEY, payload.hash); }catch(e){}
+  return changes;
+}
+function sameLiveGuide(a, b){
+  return JSON.stringify(liveGuideEntry(a || {})) === JSON.stringify(liveGuideEntry(b || {}));
 }
 window.storage = {
   async get(key){
@@ -430,21 +428,25 @@ window.storage = {
       data: parsed,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     });
-    if(key.indexOf('live_log:') === 0 && !(opts && opts.skipGuideSync)){
-      try{ await updateLiveGuideSummary(parsed, false); }catch(e){ console.warn('Live guide summary not updated:', e); }
-    }
+    // Only a real size/weight change is queued. Editing price, message options,
+    // or pressing Save again with the same guide causes no guide update.
+    const previous = key.indexOf('live_log:') === 0
+      ? liveLogEntriesCache.find(e => String(e.code || '').trim().toUpperCase() === String(parsed && parsed.code || '').trim().toUpperCase())
+      : null;
+    // Weight-guide changes are queued locally and published once, together
+    // with the shown codes, when End Live is pressed. This avoids a summary
+    // transaction (one read + one write) for every individual edit.
+    if(key.indexOf('live_log:') === 0 && (!previous || !sameLiveGuide(previous, parsed))) markLiveGuidePending(parsed && parsed.code, false);
     return { key, value };
   },
   async delete(key, opts){
     const db = firestoreDb();
     let old = null;
-    if(key.indexOf('live_log:') === 0 && !(opts && opts.skipGuideSync)){
+    if(key.indexOf('live_log:') === 0){
       try{ const snap = await db.collection('kv').doc(key).get({source:'server'}); old = snap.exists && snap.data().data; }catch(e){}
     }
     await db.collection('kv').doc(key).delete();
-    if(old && !(opts && opts.skipGuideSync)){
-      try{ await updateLiveGuideSummary(old, true); }catch(e){ console.warn('Live guide summary not updated after delete:', e); }
-    }
+    if(old) markLiveGuidePending(old.code, true);
     return { key, deleted:true };
   },
   // Saved values for every key under `prefix`, in ONE query: costs 1 read per
@@ -1149,7 +1151,7 @@ document.getElementById('liveSaveBtn').addEventListener('click', async ()=>{
     btn.textContent = 'Saved ✅';
     const now = new Date();
     statusBox.style.color = 'var(--olive-dark)';
-    statusBox.textContent = `✅ Saved "${code}" at ${now.toLocaleTimeString()}.`;
+    statusBox.textContent = `✅ Saved "${code}" at ${now.toLocaleTimeString()}. Inventory checks guide changes at End Live.`;
     liveLogCachePut(savedEntry);
   }catch(e){
     console.error('Live log save failed:', e);
@@ -1207,8 +1209,6 @@ async function loadLiveLogList(opts){
       allEntries.sort((a,b)=> (b.updatedAt||'').localeCompare(a.updatedAt||''));
       liveLogEntriesCache = allEntries;
       liveLogEntriesLoaded = true;
-      try{ await publishLiveGuideSummary(allEntries, !!(opts && opts.forceGuidePublish)); }
-      catch(e){ console.warn('Live guide summary not published:', e); }
     }
     if(!allEntries.length){
       el.innerHTML = '<div class="stock-empty">// no live logs saved yet</div>';
@@ -1302,7 +1302,7 @@ async function loadLiveLogList(opts){
           panel.querySelectorAll('.live-edit-weight-input').forEach(inp=>{ newWeights[inp.dataset.size] = inp.value.trim(); });
           const updated = {...entry, weights: newWeights, updatedAt: new Date().toISOString()};
           await window.storage.set(liveLogKey(entry.code), JSON.stringify(updated));
-          if(statusEl){ statusEl.style.color = 'var(--olive-dark)'; statusEl.textContent = '✅ Weight saved and confirmed'; }
+          if(statusEl){ statusEl.style.color = 'var(--olive-dark)'; statusEl.textContent = '✅ Weight saved — unchanged guides are skipped at End Live'; }
           liveLogCachePut(updated);
         }catch(e){
           console.error('Weight save failed:', e);
@@ -1696,9 +1696,10 @@ document.getElementById('saveGarmentTypeBtn').addEventListener('click', ()=>{
    While a live is on, every code sent to OBS or copied (Copy message, the
    double-tap 1 / 2 pills, Copy message in Saved live logs) is remembered on
    THIS computer only (localStorage) — no database writes during the live.
-   End live sends ONE record:
+   End live sends ONE atomic batch:
      kv/live_session:<YYYY-MM-DD_HHMM>  → this live, kept as history
      kv/live_last                        → the latest live (VHM Inventory reads this)
+     kv/live_guides_v1                   → all weight guides, updated once
    If the page closes or End is forgotten, the list stays on this computer and
    the bar offers "End & send" next time. Nothing else in this page changes. */
 (function(){
@@ -1737,11 +1738,25 @@ document.getElementById('saveGarmentTypeBtn').addEventListener('click', ()=>{
                .sort((a,b) => a.first.localeCompare(b.first))
     };
     try{
-      const text = JSON.stringify(record);
-      await withTimeout(window.storage.set('live_session:' + s.id, text), 25000, 'Timed out after 25s');
-      await withTimeout(window.storage.set('live_last', text), 25000, 'Timed out after 25s');
+      // Include only actually changed guide entries in live_last so Inventory can
+      // refresh the status and weights with one read. The full compact guide
+      // snapshot is also replaced in this same atomic commit for new devices.
+      record.guideChanges = liveGuideChanges(liveLogEntriesCache);
+      const hasGuideChanges = Object.keys(record.guideChanges).length > 0;
+      const guidePayload = hasGuideChanges ? liveGuidesPayload(liveGuidesObject(liveLogEntriesCache)) : null;
+      const encodedGuides = guidePayload ? JSON.stringify(guidePayload) : '';
+      if(encodedGuides.length > 850000) throw new Error('Live guide summary is too large; split it before adding more codes.');
+
+      const db = firestoreDb(), kv = db.collection('kv'), batch = db.batch();
+      const serverTime = firebase.firestore.FieldValue.serverTimestamp();
+      batch.set(kv.doc('live_session:' + s.id), { data: record, updatedAt: serverTime });
+      batch.set(kv.doc('live_last'), { data: record, updatedAt: serverTime });
+      if(hasGuideChanges) batch.set(kv.doc(LIVE_GUIDES_DOC), { data: encodedGuides, updatedAt: serverTime });
+      await withTimeout(batch.commit(), 25000, 'Timed out after 25s');
+      if(guidePayload){ try{ localStorage.setItem(LIVE_GUIDES_HASH_KEY, guidePayload.hash); }catch(e){} }
+      clearLiveGuidePending();
       store(null);
-      bar.innerHTML = '<b>✅ Live sent</b> <span class="ls-muted">' + record.codes.length + ' codes shown · ' + dur(new Date(record.endedAt) - new Date(record.startedAt)) + ' — VHM Inventory now shows the put-back list</span>';
+      bar.innerHTML = '<b>✅ Live sent</b> <span class="ls-muted">' + record.codes.length + ' codes shown · ' + (hasGuideChanges ? Object.keys(record.guideChanges).length + ' weight guide change(s)' : 'weights unchanged') + ' · ' + dur(new Date(record.endedAt) - new Date(record.startedAt)) + ' — VHM Inventory is ready</span>';
       bar.className = 'ls-bar';
       setTimeout(render, 6000);
     }catch(e){
