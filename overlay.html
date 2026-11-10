@@ -112,7 +112,7 @@
       var sizes = (c.sizes || []).filter(function (s) { return s.remain > 0; })
         .sort(function (a, b) { return sizeKey(a.z) - sizeKey(b.z); })
         .map(function (s) { return { z: s.z, low: s.remain <= 2 }; });
-      return { c: c.c || '—', sizes: sizes };
+      return { c: /^(អាវ|ខោ|ឈុត|អាវក្រៅ|ខោខ្លី|ខោជើងវែង|ស្បែកជើង|មួក)$/.test(c.c || '') ? '' : (c.c || ''), sizes: sizes };
     }).filter(function (c) { return c.sizes.length; });
     var all = {}; colors.forEach(function (c) { c.sizes.forEach(function (s) { all[s.z] = 1; }); });
     var weights = entry.weights || {};
@@ -142,7 +142,7 @@
     var lines = el('div');
     if (!m.colors.length) lines.appendChild(el('div', 'line', 'អស់ស្តុក'));
     m.colors.forEach(function (c) {
-      var ln = el('div', 'line'); ln.appendChild(el('span', 'c', c.c));
+      var ln = el('div', 'line'); if (c.c) ln.appendChild(el('span', 'c', c.c));
       c.sizes.forEach(function (s) { ln.appendChild(el('span', 'z' + (s.low ? ' low' : ''), s.z)); });
       lines.appendChild(ln);
     });

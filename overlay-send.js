@@ -51,6 +51,7 @@
     var size = parts.length ? parts.pop() : '';
     if (parts.length > 1) parts.shift();
     var color = parts.join(' ');
+    if (/^(អាវ|ខោ|ឈុត|អាវក្រៅ|ខោខ្លី|ខោជើងវែង|ស្បែកជើង|មួក)$/.test(color)) color = ''; /* no colour in Vrich: the word left is the garment type */
     if (!codes[code]) { codes[code] = { code: code, price: m[2], colors: [] }; order.push(code); }
     var e = codes[code], col = null;
     for (var i = 0; i < e.colors.length; i++) if (e.colors[i].c === color) col = e.colors[i];
@@ -105,7 +106,8 @@
         if (!m2) { issues.push(esc(s) + ': "' + esc(v) + '" is not a range like 60-70'); return; }
         var a = parseFloat(m2[1]), b2 = parseFloat(m2[2]);
         if (a >= b2) issues.push(esc(s) + ': ' + esc(v) + ' is backwards');
-        if (prev && a < prev.a) issues.push(esc(s) + ' (' + esc(v) + ') starts lower than ' + esc(prev.s) + ' (' + esc(prev.v) + ')');
+        if (prev && v.replace(/\s|kg/gi, '') === prev.v.replace(/\s|kg/gi, '')) issues.push(esc(s) + ' has the same range as ' + esc(prev.s) + ' (' + esc(v) + ')');
+        else if (prev && a < prev.a) issues.push(esc(s) + ' (' + esc(v) + ') starts lower than ' + esc(prev.s) + ' (' + esc(prev.v) + ')');
         prev = { s: s, v: v, a: a };
       });
       if (!issues.length) return { bad: false, html: '✓ Weights OK' + (d.fit ? ' · ' + esc(d.fit) : ' · no fit set') };

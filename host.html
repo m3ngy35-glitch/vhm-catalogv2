@@ -165,7 +165,7 @@
     return (d.colors || []).map(function (c) {
       var z = (c.sizes || []).filter(function (x) { return x.remain > 0; }).sort(function (a, b) { return sizeKey(a.z) - sizeKey(b.z); })
         .map(function (x) { return (x.remain <= 2 ? '!' : '') + x.z; });
-      return { c: c.c || '—', sizes: z };
+      return { c: /^(អាវ|ខោ|ឈុត|អាវក្រៅ|ខោខ្លី|ខោជើងវែង|ស្បែកជើង|មួក)$/.test(c.c || '') ? '' : (c.c || ''), sizes: z };
     }).filter(function (c) { return c.sizes.length; });
   }
   function derived(slot) {
@@ -178,11 +178,13 @@
       .map(function (s) { return { s: s, k: String(w[s] || '').trim() }; });
     return { label: d.label || defaultLabel(slot.id, entry), code: d.code || '', price: String(entry.price || d.price || '').replace(/\$/g, ''), fit: entry.fit || '', colors: colors, weights: weights };
   }
-  function colorsToText(cs) { return cs.map(function (c) { return c.c + ': ' + c.sizes.join(' '); }).join('\n'); }
+  function colorsToText(cs) { return cs.map(function (c) { return (c.c ? c.c + ': ' : '') + c.sizes.join(' '); }).join('\n'); }
   function weightsToText(ws) { return ws.map(function (w) { return w.s + ': ' + w.k; }).join('\n'); }
   function textToColors(t) {
     return String(t || '').split('\n').map(function (l) { return l.trim(); }).filter(Boolean).map(function (l) {
-      var i = l.indexOf(':'); var c = i >= 0 ? l.slice(0, i).trim() : l; var rest = i >= 0 ? l.slice(i + 1) : '';
+      var i = l.indexOf(':');
+      if (i < 0 && l.split(/[\s,]+/).every(function (t) { return /^!?(XS|S|M|L|XL|\dXL|\d{2})$/i.test(t); })) return { c: '', sizes: l.split(/[\s,]+/).filter(Boolean) };
+      var c = i >= 0 ? l.slice(0, i).trim() : l; var rest = i >= 0 ? l.slice(i + 1) : '';
       return { c: c, sizes: rest.split(/[\s,]+/).filter(Boolean) };
     });
   }
@@ -208,6 +210,20 @@
   }
   function button(text, cls, fn) { var b = el('button', 'act' + (cls ? ' ' + cls : ''), text); b.type = 'button'; b.onclick = fn; return b; }
 
+  function weightIssues(w) {
+    var out = [], prev = null;
+    Object.keys(w || {}).sort(function (a, b) { return sizeKey(a) - sizeKey(b); }).forEach(function (s) {
+      var v = String(w[s] || '').trim(); if (!v) return;
+      var m = v.match(/(\d+(?:\.\d+)?)\s*(?:kg)?\s*[-–~]\s*(\d+(?:\.\d+)?)/i);
+      if (!m) { out.push(s + ' "' + v + '" is not a range'); return; }
+      var a = parseFloat(m[1]), b = parseFloat(m[2]), key = a + '-' + b;
+      if (a >= b) out.push(s + ' ' + v + ' is backwards');
+      if (prev && key === prev.key) out.push(s + ' same as ' + prev.s + ' (' + v + ')');
+      else if (prev && a < prev.a) out.push(s + ' starts lower than ' + prev.s);
+      prev = { s: s, a: a, key: key };
+    });
+    return out;
+  }
   function liveLogKey(code) { return 'live_log:' + String(code).trim().toUpperCase().replace(/\//g, '-'); }
 
   /* Save: label, price, fit and weights go into the code's Live Log entry (permanent, every future live);
@@ -325,7 +341,7 @@
 
   function productCard(s) {
     var d = state.slots[s.id], entry = state.entries[String(d.code).toUpperCase()];
-    var colors = (d.colors || []).map(function (c) { return { c: c.c || '—', m: c.sizes || [] }; });
+    var colors = (d.colors || []).map(function (c) { return { c: /^(អាវ|ខោ|ឈុត|អាវក្រៅ|ខោខ្លី|ខោជើងវែង|ស្បែកជើង|មួក)$/.test(c.c || '') ? '' : (c.c || ''), m: c.sizes || [] }; });
     var allSizes = {};
     colors.forEach(function (c) { c.m.forEach(function (z) { allSizes[z.z] = 1; }); });
     var sizes = Object.keys(allSizes).sort(function (a, b) { return sizeKey(a) - sizeKey(b); });
@@ -347,13 +363,14 @@
     var missing = inStock.filter(function (z) { return !String(w[z] || '').trim(); });
     {
       if (!entry) card.appendChild(el('div', 'warn', '⚠ Not in Live Log — customers see no weight or fit for this code'));
-      else if (missing.length) card.appendChild(el('div', 'warn', '⚠ No weight for ' + missing.join(', ') + ' — fix in Live Log or edit here'));
+      else if (missing.length) card.appendChild(el('div', 'warn', '⚠ No weight for ' + missing.join(', ') + ' — fix here (✏️ Edit mode) or in Live Log'));
+      var wi = weightIssues(w); if (entry && wi.length) card.appendChild(el('div', 'warn', '⚠ Check weights: ' + wi.join(' · ')));
     }
 
     if (colors.length) {
       var tbl = el('div', 'tbl'); tbl.style.gridTemplateColumns = '50px 84px repeat(' + colors.length + ', minmax(0, 1fr))';
       tbl.appendChild(el('span', 'h', 'SIZE')); tbl.appendChild(el('span', 'h', 'KG'));
-      colors.forEach(function (c) { tbl.appendChild(el('span', 'h', c.c)); });
+      colors.forEach(function (c) { tbl.appendChild(el('span', 'h', c.c || 'stock')); });
       sizes.forEach(function (z) {
         tbl.appendChild(el('span', 'sz', z));
         var kg = String(w[z] || '').trim();
