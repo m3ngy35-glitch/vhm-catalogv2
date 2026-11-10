@@ -216,6 +216,7 @@
           <input type="text" id="liveGarmentType" list="liveGarmentTypeList" placeholder="e.g. អាវលើខ្លួន, ឬ type anything for accessories" style="flex:1;">
           <button type="button" class="btn btn-ghost" id="saveGarmentTypeBtn" style="font-size:12px;padding:9px 10px;flex-shrink:0;" title="Save this as a new option">💾 Save new</button>
         </div>
+        <div id="garmentTypePicks" class="quick-picks"></div>
         <datalist id="liveGarmentTypeList">
           <option value="អាវលើខ្លួន">
           <option value="ខោលើខ្លួន">
@@ -223,6 +224,16 @@
           <option value="ខោលើដៃ">
         </datalist>
         <span id="garmentTypeSaveStatus" style="font-size:11px;font-family:'Space Mono',monospace;color:#8a8375;"></span>
+      </div>
+      <div class="field" style="margin-bottom:6px;">
+        <label>Fit <span style="font-weight:400;color:#8a8375;">(shown on the stream overlay, optional)</span></label>
+        <input type="text" id="liveFit" list="liveFitList" placeholder="ឧ. រាងស្លុីម — leave empty for no badge">
+        <div id="fitPicks" class="quick-picks"></div>
+        <datalist id="liveFitList">
+          <option value="រាងស្លុីម">
+          <option value="រាងធម្មតា">
+          <option value="រាងរលុង">
+        </datalist>
       </div>
 
       <div class="field">
@@ -889,6 +900,7 @@ function liveGetMessageOptions(){
   const weightEl = document.querySelector('input[name="liveShowWeight"]:checked');
   return {
     garmentType: document.getElementById('liveGarmentType').value.trim(),
+    fit: document.getElementById('liveFit').value.trim(),
     price: document.getElementById('livePrice').value.trim(),
     showWeight: weightEl ? weightEl.value !== 'no' : true
   };
@@ -896,9 +908,11 @@ function liveGetMessageOptions(){
 function liveSetMessageOptions(options){
   options = options || {};
   document.getElementById('liveGarmentType').value = options.garmentType || '';
+  document.getElementById('liveFit').value = options.fit || '';
   document.getElementById('livePrice').value = options.price || '';
   const weightEl = document.querySelector(`input[name="liveShowWeight"][value="${options.showWeight === false ? 'no' : 'yes'}"]`);
   if(weightEl) weightEl.checked = true;
+  if(typeof renderAllQuickPicks === 'function') renderAllQuickPicks();
 }
 function liveRefreshWeightInputs(){
   const {colorsArr} = liveGetFormState();
@@ -1144,7 +1158,7 @@ document.getElementById('liveSaveBtn').addEventListener('click', async ()=>{
     const savedEntry = {
       code, colorsText: document.getElementById('liveColorsBox').value,
       colors: colorsArr, weights,
-      garmentType: messageOptions.garmentType, price: messageOptions.price, showWeight: messageOptions.showWeight,
+      garmentType: messageOptions.garmentType, fit: messageOptions.fit, price: messageOptions.price, showWeight: messageOptions.showWeight,
       updatedAt: new Date().toISOString()
     };
     await withTimeout(window.storage.set(liveLogKey(code), JSON.stringify(savedEntry)), 25000, 'Save timed out after 25s — the server never responded. Check your connection and try again.');
@@ -1170,7 +1184,7 @@ function liveLoadIntoForm(entry){
   document.getElementById('liveCode').value = entry.code;
   document.getElementById('liveColorsBox').value = entry.colorsText || entry.colors.map(c=>`${c.color}:${c.sizes.join(' ')}`).join('\n');
   liveRenderWeightInputs(entry.colors, entry.weights);
-  liveSetMessageOptions({garmentType: entry.garmentType, price: entry.price, showWeight: entry.showWeight});
+  liveSetMessageOptions({garmentType: entry.garmentType, fit: entry.fit, price: entry.price, showWeight: entry.showWeight});
   liveRegenerateFinalMessage();
   window.scrollTo({top:0, behavior:'smooth'});
 }
@@ -1431,6 +1445,7 @@ document.getElementById('liveImportColorsPreviewBtn').addEventListener('click', 
           code: b.code, colorsText: liveColorsArrToText(b.colors),
           colors: b.colors, weights: b.weights,
           garmentType: b.existing ? b.existing.garmentType : undefined,
+          fit: b.existing ? b.existing.fit : undefined,
           price: b.existing ? b.existing.price : undefined,
           showWeight: b.existing ? b.existing.showWeight : undefined,
           updatedAt: new Date().toISOString()
@@ -1514,6 +1529,7 @@ document.getElementById('liveImportWeightsPreviewBtn').addEventListener('click',
           code: b.code, colorsText: liveColorsArrToText(b.colors),
           colors: b.colors, weights: b.weights,
           garmentType: b.existing ? b.existing.garmentType : undefined,
+          fit: b.existing ? b.existing.fit : undefined,
           price: b.existing ? b.existing.price : undefined,
           showWeight: b.existing ? b.existing.showWeight : undefined,
           updatedAt: new Date().toISOString()
@@ -1626,6 +1642,7 @@ function renderMessageImportPreview(blocks){
             code: r.block.code, colorsText: liveColorsArrToText(colors),
             colors, weights,
             garmentType: r.existing ? r.existing.garmentType : undefined,
+            fit: r.existing ? r.existing.fit : undefined,
             price: r.existing ? r.existing.price : undefined,
             showWeight: r.existing ? r.existing.showWeight : undefined,
             updatedAt: new Date().toISOString()
@@ -1653,6 +1670,36 @@ function loadCustomGarmentTypes(){
 function saveCustomGarmentTypes(arr){
   try{ localStorage.setItem(GARMENT_TYPE_STORAGE_KEY, JSON.stringify(arr)); }catch(e){ /* ignore */ }
 }
+/* One-tap choices under Garment type and Fit: a datalist only suggests options that match
+   what is already typed, so switching type meant deleting the text first. */
+function renderQuickPicks(inputId, listId, boxId, allowClear){
+  const input = document.getElementById(inputId), box = document.getElementById(boxId);
+  if(!input || !box) return;
+  const values = [];
+  document.querySelectorAll('#' + listId + ' option').forEach(o=>{ if(o.value && !values.includes(o.value)) values.push(o.value); });
+  box.innerHTML = '';
+  const cur = input.value.trim();
+  const make = (label, value) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.textContent = label;
+    const on = value === cur;
+    b.style.cssText = 'margin:4px 6px 0 0;padding:6px 10px;border-radius:999px;font-size:14px;cursor:pointer;border:1px solid ' + (on ? '#2f5d46' : '#cfc8b8') + ';background:' + (on ? '#2f5d46' : '#fff') + ';color:' + (on ? '#fff' : '#2b2a26');
+    b.addEventListener('click', ()=>{
+      input.value = value;
+      input.dispatchEvent(new Event('input', {bubbles:true}));
+      renderQuickPicks(inputId, listId, boxId, allowClear);
+    });
+    box.appendChild(b);
+  };
+  values.forEach(v => make(v, v));
+  if(allowClear) make('✕ None', '');
+}
+function renderAllQuickPicks(){
+  renderQuickPicks('liveGarmentType', 'liveGarmentTypeList', 'garmentTypePicks', false);
+  renderQuickPicks('liveFit', 'liveFitList', 'fitPicks', true);
+}
+document.getElementById('liveGarmentType').addEventListener('input', ()=> renderQuickPicks('liveGarmentType', 'liveGarmentTypeList', 'garmentTypePicks', false));
+document.getElementById('liveFit').addEventListener('input', ()=> renderQuickPicks('liveFit', 'liveFitList', 'fitPicks', true));
 function renderCustomGarmentTypeOptions(){
   const list = document.getElementById('liveGarmentTypeList');
   // remove any previously-injected custom options, then re-add from storage
@@ -1663,6 +1710,7 @@ function renderCustomGarmentTypeOptions(){
     opt.dataset.custom = '1';
     list.appendChild(opt);
   });
+  renderAllQuickPicks();
 }
 document.getElementById('saveGarmentTypeBtn').addEventListener('click', ()=>{
   const input = document.getElementById('liveGarmentType');
@@ -1738,6 +1786,19 @@ document.getElementById('saveGarmentTypeBtn').addEventListener('click', ()=>{
                .sort((a,b) => a.first.localeCompare(b.first))
     };
     try{
+      // Codes whose weights/fit/price were fixed on the host screen (host.html edit mode):
+      // reload them fresh so this laptop's copy is current and their guides are included below.
+      let remoteCodes = [];
+      try{
+        const kv0 = firestoreDb().collection('kv');
+        const rs = await withTimeout(kv0.doc('live_log_remote_edits').get({source:'server'}), 15000, 'Timed out reading host-screen edits');
+        const rmap = rs.exists && rs.data().data && typeof rs.data().data === 'object' ? rs.data().data : {};
+        for(const code of Object.keys(rmap)){
+          const snap = await withTimeout(kv0.doc(liveLogKey(code)).get({source:'server'}), 15000, 'Timed out reading ' + code);
+          if(snap.exists && snap.data().data){ liveLogCachePut(snap.data().data); markLiveGuidePending(code, false); }
+          remoteCodes.push(code);
+        }
+      }catch(e){ console.warn('Host-screen edits not merged this time:', e); }
       // Include only actually changed guide entries in live_last so Inventory can
       // refresh the status and weights with one read. The full compact guide
       // snapshot is also replaced in this same atomic commit for new devices.
@@ -1752,6 +1813,7 @@ document.getElementById('saveGarmentTypeBtn').addEventListener('click', ()=>{
       batch.set(kv.doc('live_session:' + s.id), { data: record, updatedAt: serverTime });
       batch.set(kv.doc('live_last'), { data: record, updatedAt: serverTime });
       if(hasGuideChanges) batch.set(kv.doc(LIVE_GUIDES_DOC), { data: encodedGuides, updatedAt: serverTime });
+      if(remoteCodes.length) batch.set(kv.doc('live_log_remote_edits'), { data: {}, updatedAt: serverTime });
       await withTimeout(batch.commit(), 25000, 'Timed out after 25s');
       if(guidePayload){ try{ localStorage.setItem(LIVE_GUIDES_HASH_KEY, guidePayload.hash); }catch(e){} }
       clearLiveGuidePending();

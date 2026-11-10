@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="km">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VHM Stream Overlay</title>
+<!--
+  VHM stream overlay — OBS Browser Source (1080 x 1920, transparent).
+  Data:  kv/live_overlay_{shirt|pants|hand|hand2}  ← written by the "Send to overlay" bookmarklet on Vrich
+         kv/live_overlay_settings                   ← text size / width / Cards-or-Text from the same panel
+         kv/live_log:{CODE}                         ← price, fit, garment label and weights from Live Log
+  Options in the link:
+    ?slot=shirt|pants|hand|hand2   show only that one card (place it yourself in OBS)
+    ?demo=1                        sample cards, no database (for setting up OBS)
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Noto+Sans+Khmer:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; background: transparent; overflow: hidden; }
+  #stage { position: absolute; left: 0; top: 0; width: 540px; height: 960px; transform-origin: 0 0;
+           font-family: Roboto, 'Noto Sans Khmer', -apple-system, 'Helvetica Neue', Arial, sans-serif; color: #fff; }
+  #col { position: absolute; top: 134px; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+  .card { box-sizing: border-box; padding: 0.55em 0.75em 0.6em 0.7em; background: rgba(14,16,15,0.82);
+          border-left: 3px solid var(--accent); border-radius: 10px; box-shadow: 0 6px 18px rgba(0,0,0,0.22); }
+  .inner { width: max-content; display: flex; flex-direction: column; gap: 0.35em; }
+  .head { display: flex; flex-wrap: wrap; row-gap: 0.15em; justify-content: space-between; align-items: center; gap: 0.6em; }
+  .label { font-size: 0.86em; font-weight: 700; color: #E1E4E1; white-space: nowrap; }
+  .fit { padding: 0 0.55em; background: var(--accent); color: #171510; border-radius: 999px; font-size: 0.86em; font-weight: 700; white-space: nowrap; }
+  .codeRow { display: flex; align-items: baseline; justify-content: space-between; gap: 0.8em; }
+  .code { font-size: 1.35em; font-weight: 700; line-height: 1; }
+  .price { font-size: 1.05em; font-weight: 700; color: var(--accent); }
+  .promoTitle { line-height: 1.2; }
+  .card[data-promo] { max-width: 100%; }
+  .card[data-promo] .inner { width: auto; max-width: 100%; }
+  .card[data-promo] .line, .card[data-promo] .promoTitle { white-space: normal; overflow-wrap: anywhere; }
+  .line { white-space: nowrap; font-weight: 700; line-height: 1.5; }
+  .line .c { margin-right: 0.55em; }
+  .line .z { margin-right: 0.5em; }
+  .line .low { color: var(--low); }
+  .weights { display: flex; flex-direction: column; padding-top: 0.3em; border-top: 1px solid rgba(255,255,255,0.14); }
+  .w { white-space: nowrap; font-weight: 700; line-height: 1.5; }
+  .w .s { display: inline-block; min-width: 2.6em; }
+  .w .k { color: var(--accent); }
+  /* safe text mode: plain lines, wraps instead of resizing */
+  .text .card { max-width: 100%; border-left: 0; box-shadow: none; border-radius: 6px; }
+  .text .inner { width: auto; max-width: 100%; gap: 0.1em; }
+  .text .line, .text .w { white-space: normal; }
+  .text .head, .text .codeRow { justify-content: flex-start; }
+  .text .code { font-size: 1.1em; }
+</style>
+</head>
+<body>
+<div id="stage"><div id="col"></div></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script>
+(function () {
+  var ACCENT = '#F1D88E', LOW = '#FF9F43', SAFE = 22, TOP = 134, BOTTOM_KEEP = 88;
+  var ORDER = ['XS','S','M','L','XL','2XL','3XL','4XL','5XL'];
+  var SLOTS = [
+    { id: 'promo', label: '' },
+    { id: 'shirt', label: 'អាវលើខ្លួន' },
+    { id: 'pants', label: 'ខោលើខ្លួន' },
+    { id: 'hand',  label: 'លើដៃ' },
+    { id: 'hand2', label: 'លើដៃ' }
+  ];
+  var params = new URLSearchParams(location.search);
+  var onlySlot = params.get('slot');
+  var demo = params.get('demo') === '1';
+
+  var stage = document.getElementById('stage');
+  var col = document.getElementById('col');
+  stage.style.setProperty('--accent', ACCENT);
+  stage.style.setProperty('--low', LOW);
+
+  /* scale the 540x960 design to whatever size OBS gives the source */
+  function fitStage() { stage.style.transform = 'scale(' + (window.innerWidth / 540) + ')'; }
+  window.addEventListener('resize', function () { fitStage(); layout(); });
+  fitStage();
+
+  var state = { slots: {}, entries: {}, settings: { textSize: 20, minText: 12, width: 2, mode: 'cards' } };
+
+  function sizeKey(s) { var i = ORDER.indexOf(s); if (i >= 0) return i; var n = parseFloat(s); return isNaN(n) ? 999 : 100 + n; }
+  function kg(v) { v = String(v || '').trim(); if (!v) return ''; return /kg/i.test(v) ? v : v + 'kg'; }
+  function money(p) { p = String(p || '').trim(); if (!p) return ''; return /\$/.test(p) ? p : p + '$'; }
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+
+  var STD_LABELS = ['អាវលើខ្លួន', 'ខោលើខ្លួន', 'អាវលើដៃ', 'ខោលើដៃ'];
+  /* label shown on a card: typed on the card > based on the slot (worn / in hand) and the garment kind in Live Log */
+  function defaultLabel(slotId, entry) {
+    var gt = String((entry && entry.garmentType) || '').trim();
+    if (gt && STD_LABELS.indexOf(gt) < 0) return gt;
+    var pants = /ខោ/.test(gt);
+    if (slotId === 'shirt') return 'អាវលើខ្លួន';
+    if (slotId === 'pants') return 'ខោលើខ្លួន';
+    return pants ? 'ខោលើដៃ' : 'អាវលើដៃ';
+  }
+  /* merge one slot's Vrich stock with its Live Log entry */
+  function model(slot) {
+    var d = state.slots[slot.id];
+    if (d && d.type === 'promo') {
+      if (d.show === false || (!d.title && !(d.lines || []).length)) return null;
+      return { key: slot.id, promo: true, at: '9999', title: d.title || '', lines: (d.lines || []).filter(Boolean) };
+    }
+    if (!d || !d.code) return null;
+    var entry = state.entries[String(d.code).toUpperCase()] || {};
+    var colors = (d.manual && d.manual.colors)
+      /* colours/sizes typed by hand on the host screen (stream only); everything else still comes from Live Log */
+      ? d.manual.colors.map(function (c) { return { c: c.c, sizes: (c.sizes || []).map(function (z) { var low = z.charAt(0) === '!'; return { z: low ? z.slice(1) : z, low: low }; }) }; })
+      : (d.colors || []).map(function (c) {
+      var sizes = (c.sizes || []).filter(function (s) { return s.remain > 0; })
+        .sort(function (a, b) { return sizeKey(a.z) - sizeKey(b.z); })
+        .map(function (s) { return { z: s.z, low: s.remain <= 2 }; });
+      return { c: c.c || '—', sizes: sizes };
+    }).filter(function (c) { return c.sizes.length; });
+    var all = {}; colors.forEach(function (c) { c.sizes.forEach(function (s) { all[s.z] = 1; }); });
+    var weights = entry.weights || {};
+    var sizes = Object.keys(all).sort(function (a, b) { return sizeKey(a) - sizeKey(b); })
+      .map(function (s) { return { s: s, k: kg(weights[s]) }; }).filter(function (x) { return x.k; });
+    return {
+      key: slot.id, at: d.at || '', code: d.code,
+      label: d.label || defaultLabel(slot.id, entry),
+      fit: entry.fit || '', price: money(entry.price || d.price),
+      colors: colors, sizes: sizes
+    };
+  }
+
+  function cardEl(m) {
+    var card = el('div', 'card'); var inner = el('div', 'inner'); card.appendChild(inner);
+    if (m.promo) {
+      var ph = el('div', 'head'); ph.appendChild(el('span', 'fit', '🎁 Giveaway')); inner.appendChild(ph);
+      if (m.title) inner.appendChild(el('div', 'code promoTitle', m.title));
+      var pl = el('div'); m.lines.forEach(function (t) { pl.appendChild(el('div', 'line', t)); }); inner.appendChild(pl);
+      card.dataset.key = m.key; card.dataset.at = m.at; card.dataset.promo = '1';
+      return card;
+    }
+    var head = el('div', 'head'); head.appendChild(el('span', 'label', m.label));
+    if (m.fit) head.appendChild(el('span', 'fit', m.fit));
+    inner.appendChild(head);
+    var cr = el('div', 'codeRow'); cr.appendChild(el('span', 'code', m.code)); cr.appendChild(el('span', 'price', m.price)); inner.appendChild(cr);
+    var lines = el('div');
+    if (!m.colors.length) lines.appendChild(el('div', 'line', 'អស់ស្តុក'));
+    m.colors.forEach(function (c) {
+      var ln = el('div', 'line'); ln.appendChild(el('span', 'c', c.c));
+      c.sizes.forEach(function (s) { ln.appendChild(el('span', 'z' + (s.low ? ' low' : ''), s.z)); });
+      lines.appendChild(ln);
+    });
+    inner.appendChild(lines);
+    if (m.sizes.length) {
+      var w = el('div', 'weights');
+      m.sizes.forEach(function (x) { var r = el('div', 'w'); r.appendChild(el('span', 's', x.s)); r.appendChild(el('span', 'k', x.k)); w.appendChild(r); });
+      inner.appendChild(w);
+    }
+    card.dataset.key = m.key; card.dataset.at = m.at;
+    return card;
+  }
+
+  var dropped = [];
+  function render() {
+    var st = state.settings;
+    var models = SLOTS.filter(function (s) { return !onlySlot || s.id === onlySlot; }).map(model).filter(Boolean)
+      .filter(function (m) { return dropped.indexOf(m.key) < 0; });
+    stage.classList.toggle('text', st.mode === 'text');
+    col.style.right = SAFE + 'px';
+    col.style.width = (onlySlot ? 540 - SAFE * 2 : Math.round(540 * st.width / 6) - SAFE) + 'px';
+    if (onlySlot) { col.style.right = 'auto'; col.style.left = SAFE + 'px'; col.style.top = SAFE + 'px'; col.style.alignItems = 'flex-start'; }
+    col.innerHTML = '';
+    models.forEach(function (m) { var c = cardEl(m); c.style.fontSize = st.textSize + 'px'; col.appendChild(c); });
+    layout();
+  }
+
+  /* V8 rules: shrink only cards that are too wide; keep the newest cards at their best size,
+     hide the oldest if more than 2 do not fit; text mode just wraps at the set size. */
+  function layout() {
+    var st = state.settings; var cards = Array.prototype.slice.call(col.children);
+    if (!cards.length || st.mode === 'text') return;
+    var base = Number(st.textSize) || 20, MIN = Math.min(base, Number(st.minText) || 12);
+    var wLimit = parseFloat(col.style.width);
+    cards.forEach(function (card) {
+      if (card.dataset.promo) { card.style.fontSize = base + 'px'; return; } /* giveaway text wraps instead of shrinking */
+      var inner = card.firstChild, head = inner.firstChild; card.style.fontSize = base + 'px';
+      head.style.display = 'none'; var natural = inner.scrollWidth; head.style.display = '';
+      var px = Math.max(MIN, Math.min(base, (wLimit - 3) / (natural / base + 1.45)));
+      card.style.fontSize = px.toFixed(1) + 'px';
+    });
+    if (onlySlot) return;
+    var availH = 960 - TOP - BOTTOM_KEEP, H = col.offsetHeight;
+    if (H > availH && cards.length > 2) {
+      var oldest = cards.filter(function (c) { return !c.dataset.promo; }).sort(function (a, b) { return String(a.dataset.at).localeCompare(String(b.dataset.at)); })[0];
+      dropped.push(oldest.dataset.key); render(); return;
+    }
+    if (H > availH) {
+      var f = availH / H;
+      cards.forEach(function (card) { card.style.fontSize = Math.max(MIN, parseFloat(card.style.fontSize) * f).toFixed(1) + 'px'; });
+    }
+  }
+  function rerender() { dropped = []; render(); }
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { layout(); });
+
+  /* ---------- demo data (no database) ---------- */
+  if (demo) {
+    var now = Date.now();
+    function stock(list) { return list.map(function (t) { var p = t.split(':'); return { c: p[0], sizes: p[1].split(' ').map(function (x) { var n = x.split('='); return { z: n[0], remain: Number(n[1]) }; }) }; }); }
+    state.slots = {
+      promo: { type: 'promo', show: true, title: 'ថ្ងៃនេះ Giveaway!', lines: ['ទាយលេខ ២ ខ្ទង់ (00–99)', 'រង្វាន់: E369 ១ ដើម', 'Comment លេខរបស់អ្នក 👇'] },
+      shirt: { code: 'E369', price: '6.60', at: new Date(now - 3e5).toISOString(), colors: stock(['ខ្មៅ:L=4 XL=5 2XL=0 3XL=3 4XL=2', 'សាច់:L=3 XL=4 2XL=5 3XL=3 4XL=0', 'កាហ្វេ:L=5 XL=4 2XL=3 3XL=1 4XL=4']) },
+      pants: { code: 'R295', price: '8.80', at: new Date(now - 6e5).toISOString(), colors: stock(['ខ្មៅ:S=3 M=4 L=5 XL=3', 'បៃតង:S=4 M=3 L=2 XL=5']) },
+      hand:  { code: 'E136', price: '6.40', at: new Date(now).toISOString(), colors: stock(['ប្រផេះ:XL=3', 'ដី:XL=2', 'មេឃ:L=4 XL=0', 'ខៀវ:L=3 XL=4', 'សរ:XL=5 3XL=0']) }
+    };
+    state.entries = {
+      E369: { garmentType: 'អាវលើខ្លួន', fit: 'រាងស្លុីម', price: '6.60', weights: { L: '50-60', XL: '60-70', '2XL': '70-80', '3XL': '80-85', '4XL': '85-90' } },
+      R295: { garmentType: 'ខោលើខ្លួន', fit: 'រាងធម្មតា', price: '8.80', weights: { S: '50-60', M: '60-70', L: '70-80', XL: '80-85' } },
+      E136: { garmentType: 'អាវលើដៃ', fit: 'រាងរលុង', price: '6.40', weights: { L: '60-70', XL: '70-80', '3XL': '85-90' } }
+    };
+    render();
+    return;
+  }
+
+  /* ---------- live data ---------- */
+  firebase.initializeApp({
+    apiKey: 'AIzaSyDDQp5_gvuRdX0flKQ3gm3zXJM_SXWUJSE', authDomain: 'vhm-catalog.firebaseapp.com', projectId: 'vhm-catalog',
+    storageBucket: 'vhm-catalog.firebasestorage.app', messagingSenderId: '892196724857', appId: '1:892196724857:web:8ed3f5f056284b63aa34a8'
+  });
+  var db = firebase.firestore();
+  var kvc = db.collection('kv');
+  function parseData(snap) {
+    if (!snap.exists) return null; var v = snap.data().data;
+    if (v == null || v === '') return null;
+    if (typeof v === 'string') { try { return JSON.parse(v); } catch (e) { return null; } }
+    return v;
+  }
+
+  /* Live Log entries: one listener per code currently on stream, so weights/fit added mid-live appear by themselves */
+  var entryUnsubs = {};
+  function syncEntryListeners() {
+    var wanted = {};
+    Object.keys(state.slots).forEach(function (k) { var d = state.slots[k]; if (d && d.code) wanted[String(d.code).toUpperCase()] = 1; });
+    Object.keys(entryUnsubs).forEach(function (code) { if (!wanted[code]) { entryUnsubs[code](); delete entryUnsubs[code]; delete state.entries[code]; } });
+    Object.keys(wanted).forEach(function (code) {
+      if (entryUnsubs[code]) return;
+      var key = 'live_log:' + code.replace(/\//g, '-');
+      entryUnsubs[code] = kvc.doc(key).onSnapshot(function (snap) { state.entries[code] = parseData(snap) || {}; rerender(); },
+        function (err) { console.warn('Live Log read failed for ' + code + ' — keeping what is on screen', err); });
+    });
+  }
+
+  SLOTS.forEach(function (s) {
+    kvc.doc('live_overlay_' + s.id).onSnapshot(function (snap) {
+      state.slots[s.id] = parseData(snap); syncEntryListeners(); rerender();
+    }, function (err) { console.warn('Slot ' + s.id + ' listener failed — keeping the last cards on screen', err); });
+  });
+  kvc.doc('live_overlay_settings').onSnapshot(function (snap) {
+    var d = parseData(snap) || {};
+    ['textSize', 'minText', 'width', 'mode'].forEach(function (k) { if (d[k] != null) state.settings[k] = d[k]; });
+    rerender();
+  }, function (err) { console.warn('Settings listener failed — using the last settings', err); });
+})();
+</script>
+</body>
+</html>

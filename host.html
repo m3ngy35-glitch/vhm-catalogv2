@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="km">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VHM Host Screen</title>
+<!--
+  VHM host screen.
+  View mode (default): read only — stock grid, weights and warnings for every card on stream.
+  Edit mode (?edit=1, or the ✏️ button): fix what customers see on the stream overlay, run the giveaway card,
+  and change overlay text size / width / Cards-or-Text. Writes only kv/live_overlay_* documents.
+  ?demo=1 sample data (edits stay on this page).   ?theme=light|dark
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#121513; --card:#1E2320; --text:#FFFFFF; --sub:#B3BAB5; --ok:#2E3A33; --lowBg:#4A3A1A; --lowText:#FFC94D;
+    --outBg:#262A27; --outText:#6F7672; --wBg:#26303F; --warnBg:#4A3A12; --warnText:#FFD98A; --bad:#E5484D;
+    --field:#121513; --line:#3A413C; --btn:#2E3A33; --save:#1D6E52;
+    --promo:#F4A6C0; --shirt:#7FB2FF; --pants:#5FD39A; --hand:#FFC94D; --hand2:#C9A6F4;
+  }
+  body.light {
+    --bg:#E9ECE9; --card:#FFFFFF; --text:#141714; --sub:#545C57; --ok:#E2EFE6; --lowBg:#FFE3A3; --lowText:#6B4300;
+    --outBg:#EEF0EE; --outText:#8E9590; --wBg:#E6ECF7; --warnBg:#FFF1CC; --warnText:#6B4300; --bad:#C2312F;
+    --field:#F6F7F5; --line:#CFD4D0; --btn:#E2EFE6; --save:#1D6E52;
+    --promo:#B0466B; --shirt:#2A64C9; --pants:#1E7A4C; --hand:#9A5F00; --hand2:#6B46B0;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; }
+  body { background: var(--bg); color: var(--text); font-family: 'Kantumruy Pro', system-ui, sans-serif; display: flex; flex-direction: column; padding: 16px; gap: 14px; min-height: 100vh; }
+  button { font-family: inherit; }
+  .bar { display: flex; align-items: center; gap: 14px; padding: 10px 16px; background: var(--card); border-radius: 12px; font-size: 18px; flex-wrap: wrap; }
+  .bar .dot { width: 12px; height: 12px; border-radius: 6px; background: var(--pants); display: inline-block; margin-right: 8px; }
+  .bar.off .dot { background: var(--bad); }
+  .bar .sub { color: var(--sub); font-size: 16px; }
+  .bar .sp { margin-left: auto; }
+  .tbtn { font-weight: 600; font-size: 15px; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--sub); background: transparent; color: var(--text); cursor: pointer; min-height: 40px; }
+  .tbtn.on { background: var(--save); border-color: var(--save); color: #fff; }
+  #look { display: none; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 16px; background: var(--card); border-radius: 12px; font-size: 16px; }
+  body.edit #look { display: flex; }
+  #look .grp { display: flex; align-items: center; gap: 6px; margin-right: 14px; }
+  #look b { min-width: 40px; text-align: center; }
+  .sm { min-width: 40px; min-height: 40px; border-radius: 8px; border: 0; background: var(--btn); color: var(--text); font-weight: 700; font-size: 18px; cursor: pointer; }
+  #grid { display: grid; gap: 14px; flex: 1; align-items: start; }
+  .empty { display: flex; align-items: center; justify-content: center; min-height: 240px; color: var(--sub); font-size: 22px; background: var(--card); border-radius: 14px; text-align: center; padding: 20px; }
+  .card { background: var(--card); border-radius: 14px; border-top: 8px solid var(--accent); padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .slot { font-size: 17px; font-weight: 700; letter-spacing: .05em; color: var(--accent); }
+  .age { font-size: 15px; color: var(--sub); }
+  .age.old { color: var(--lowText); font-weight: 700; }
+  .hand-tag { font-size: 14px; font-weight: 700; color: var(--warnText); background: var(--warnBg); padding: 2px 8px; border-radius: 999px; }
+  .codeRow { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  .code { font-family: 'Space Grotesk', sans-serif; font-size: clamp(40px, 5vw, 68px); font-weight: 700; line-height: 1; }
+  .price { font-family: 'Space Grotesk', sans-serif; font-size: 26px; font-weight: 700; color: var(--accent); }
+  .meta { font-size: 18px; color: var(--sub); }
+  .fit { display: inline-block; padding: 1px 10px; border-radius: 999px; background: var(--accent); color: #141714; font-weight: 700; font-size: 16px; margin-left: 6px; }
+  .warn { background: var(--warnBg); color: var(--warnText); border-radius: 8px; padding: 6px 10px; font-size: 16px; font-weight: 600; }
+  .tbl { display: grid; gap: 6px; align-items: center; text-align: center; }
+  .tbl .h { font-size: 15px; font-weight: 700; color: var(--sub); line-height: 1.15; overflow-wrap: anywhere; }
+  .tbl .sz { text-align: left; font-family: 'Space Grotesk', sans-serif; font-size: 24px; font-weight: 700; }
+  .tbl .kg { padding: 8px 0; background: var(--wBg); border-radius: 8px; font-family: 'Space Grotesk', sans-serif; font-size: 21px; font-weight: 700; white-space: nowrap; }
+  .tbl .kg.none { color: var(--warnText); background: var(--warnBg); font-size: 15px; }
+  .tbl .n { padding: 8px 0; border-radius: 8px; font-family: 'Space Grotesk', sans-serif; font-size: 24px; font-weight: 700; background: var(--ok); }
+  .tbl .n.low { background: var(--lowBg); color: var(--lowText); }
+  .tbl .n.out { background: var(--outBg); color: var(--outText); font-weight: 500; text-decoration: line-through; }
+  .tbl .n.na { background: transparent; color: var(--outText); font-weight: 500; }
+  .promoLines div { font-size: 22px; font-weight: 700; line-height: 1.5; }
+  .promoTitle { font-size: 30px; font-weight: 700; }
+  /* editor */
+  .ed { border-top: 2px dashed var(--line); padding-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .ed h3 { margin: 0; font-size: 16px; color: var(--accent); letter-spacing: .04em; }
+  .ed label { display: flex; flex-direction: column; gap: 3px; font-size: 14px; color: var(--sub); font-weight: 600; }
+  .ed .row2 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .ed input, .ed textarea { font: 600 17px 'Kantumruy Pro', system-ui, sans-serif; color: var(--text); background: var(--field); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; width: 100%; }
+  .ed textarea { min-height: 110px; line-height: 1.5; resize: vertical; }
+  .ed .hint { font-size: 13px; color: var(--sub); font-weight: 400; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { min-height: 36px; padding: 4px 12px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--text); font-size: 15px; cursor: pointer; }
+  .chip.on { background: var(--save); border-color: var(--save); color: #fff; }
+  .acts { display: flex; flex-wrap: wrap; gap: 8px; }
+  .act { min-height: 42px; padding: 8px 14px; border-radius: 8px; border: 0; font-weight: 700; font-size: 15px; cursor: pointer; background: var(--btn); color: var(--text); }
+  .act.save { background: var(--save); color: #fff; }
+  .act.danger { background: transparent; border: 1px solid var(--bad); color: var(--bad); }
+  .msg { font-size: 14px; color: var(--sub); min-height: 18px; }
+  .legend { display: flex; gap: 22px; font-size: 16px; color: var(--sub); flex-wrap: wrap; }
+  .legend b { color: var(--text); } .legend .l { color: var(--lowText); }
+</style>
+</head>
+<body>
+<div class="bar" id="bar">
+  <span><span class="dot"></span><b id="conn">Connecting…</b></span>
+  <span class="sub" id="note">Stock changes only when an admin sends it from Vrich</span>
+  <span class="sp"></span>
+  <button type="button" class="tbtn" id="editBtn">✏️ Edit mode</button>
+  <button type="button" class="tbtn" id="theme">☀ Light</button>
+</div>
+<div id="look">
+  <b style="min-width:auto">Overlay look:</b>
+  <span class="grp">Text size <button class="sm" data-k="textSize" data-d="-1">−</button><b id="v_textSize">20</b><button class="sm" data-k="textSize" data-d="1">+</button></span>
+  <span class="grp">Smallest <button class="sm" data-k="minText" data-d="-1">−</button><b id="v_minText">12</b><button class="sm" data-k="minText" data-d="1">+</button></span>
+  <span class="grp">Width <button class="sm" data-k="width" data-d="-1">−</button><b id="v_width">2/6</b><button class="sm" data-k="width" data-d="1">+</button></span>
+  <button class="tbtn" id="modeBtn">🃏 Cards</button>
+</div>
+<div id="grid"></div>
+<div class="legend"><span><b>5</b> pieces left</span><span class="l"><b style="color:inherit">2</b> only 1–2 left</span><span><s>0</s> sold out</span><span>— size not in this colour</span><span>✋ sizes typed by hand (🔄 Refresh won't overwrite them)</span></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script>
+(function () {
+  var ORDER = ['XS','S','M','L','XL','2XL','3XL','4XL','5XL'];
+  var FITS = ['រាងស្លុីម', 'រាងធម្មតា', 'រាងរលុង'];
+  var SLOTS = [
+    { id: 'shirt', name: 'អាវលើខ្លួន · SHIRT', label: 'អាវលើខ្លួន' },
+    { id: 'pants', name: 'ខោលើខ្លួន · PANTS', label: 'ខោលើខ្លួន' },
+    { id: 'hand',  name: 'លើដៃ · IN HAND', label: 'លើដៃ' },
+    { id: 'hand2', name: 'លើដៃ ២ · IN HAND 2', label: 'លើដៃ' }
+  ];
+  var params = new URLSearchParams(location.search);
+  var demo = params.get('demo') === '1';
+  var state = { slots: {}, entries: {}, settings: { textSize: 20, minText: 12, width: 2, mode: 'cards' } };
+  var drafts = {};
+  var grid = document.getElementById('grid');
+
+  function store(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} }
+  function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+
+  /* theme + edit mode: remembered on this computer */
+  var theme = params.get('theme') || load('vhm_host_theme') || 'dark';
+  var editing = params.get('edit') === '1' || load('vhm_host_edit') === '1';
+  var themeBtn = document.getElementById('theme'), editBtn = document.getElementById('editBtn');
+  function applyChrome() {
+    document.body.classList.toggle('light', theme === 'light');
+    document.body.classList.toggle('edit', editing);
+    themeBtn.textContent = theme === 'light' ? '☾ Dark' : '☀ Light';
+    editBtn.textContent = editing ? '✓ Done editing' : '✏️ Edit mode';
+    editBtn.classList.toggle('on', editing);
+  }
+  themeBtn.onclick = function () { theme = theme === 'light' ? 'dark' : 'light'; store('vhm_host_theme', theme); applyChrome(); };
+  editBtn.onclick = function () { editing = !editing; store('vhm_host_edit', editing ? '1' : null); drafts = {}; applyChrome(); render(); };
+  applyChrome();
+
+  function sizeKey(s) { var i = ORDER.indexOf(s); if (i >= 0) return i; var n = parseFloat(s); return isNaN(n) ? 999 : 100 + n; }
+  function money(p) { p = String(p || '').trim(); if (!p) return ''; return /\$/.test(p) ? p : p + '$'; }
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function ago(iso) {
+    if (!iso) return { t: '', old: false };
+    var m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+    return { t: m < 1 ? 'stock just now' : 'stock ' + m + ' min ago', old: m >= 10 };
+  }
+
+  /* ---------- what customers see (same rules as overlay.html) ---------- */
+  var STD_LABELS = ['អាវលើខ្លួន', 'ខោលើខ្លួន', 'អាវលើដៃ', 'ខោលើដៃ'];
+  /* label shown on a card: typed on the card > based on the slot (worn / in hand) and the garment kind in Live Log */
+  function defaultLabel(slotId, entry) {
+    var gt = String((entry && entry.garmentType) || '').trim();
+    if (gt && STD_LABELS.indexOf(gt) < 0) return gt;
+    var pants = /ខោ/.test(gt);
+    if (slotId === 'shirt') return 'អាវលើខ្លួន';
+    if (slotId === 'pants') return 'ខោលើខ្លួន';
+    return pants ? 'ខោលើដៃ' : 'អាវលើដៃ';
+  }
+  function vrichColors(d) {
+    return (d.colors || []).map(function (c) {
+      var z = (c.sizes || []).filter(function (x) { return x.remain > 0; }).sort(function (a, b) { return sizeKey(a.z) - sizeKey(b.z); })
+        .map(function (x) { return (x.remain <= 2 ? '!' : '') + x.z; });
+      return { c: c.c || '—', sizes: z };
+    }).filter(function (c) { return c.sizes.length; });
+  }
+  function derived(slot) {
+    var d = state.slots[slot.id] || {};
+    var entry = state.entries[String(d.code || '').toUpperCase()] || {};
+    var colors = d.manual && d.manual.colors ? JSON.parse(JSON.stringify(d.manual.colors)) : vrichColors(d);
+    var all = {}; colors.forEach(function (c) { c.sizes.forEach(function (z) { all[z.replace(/^!/, '')] = 1; }); });
+    var w = entry.weights || {};
+    var weights = Object.keys(all).sort(function (a, b) { return sizeKey(a) - sizeKey(b); })
+      .map(function (s) { return { s: s, k: String(w[s] || '').trim() }; });
+    return { label: d.label || defaultLabel(slot.id, entry), code: d.code || '', price: String(entry.price || d.price || '').replace(/\$/g, ''), fit: entry.fit || '', colors: colors, weights: weights };
+  }
+  function colorsToText(cs) { return cs.map(function (c) { return c.c + ': ' + c.sizes.join(' '); }).join('\n'); }
+  function weightsToText(ws) { return ws.map(function (w) { return w.s + ': ' + w.k; }).join('\n'); }
+  function textToColors(t) {
+    return String(t || '').split('\n').map(function (l) { return l.trim(); }).filter(Boolean).map(function (l) {
+      var i = l.indexOf(':'); var c = i >= 0 ? l.slice(0, i).trim() : l; var rest = i >= 0 ? l.slice(i + 1) : '';
+      return { c: c, sizes: rest.split(/[\s,]+/).filter(Boolean) };
+    });
+  }
+  function textToWeights(t) {
+    return String(t || '').split('\n').map(function (l) { return l.trim(); }).filter(Boolean).map(function (l) {
+      var i = l.indexOf(':'); return i >= 0 ? { s: l.slice(0, i).trim(), k: l.slice(i + 1).trim().replace(/\s*kg$/i, '') } : null;
+    }).filter(function (w) { return w && w.s && w.k; });
+  }
+
+  /* ---------- writing (edit mode only) ---------- */
+  var kvc = null;
+  function write(slotId, payload) {
+    if (demo) { state.slots[slotId] = payload; render(); return Promise.resolve(); }
+    return kvc.doc('live_overlay_' + slotId).set({ data: payload ? JSON.stringify(payload) : '', updatedAt: new Date() });
+  }
+
+  function field(labelText, value, onInput, multi, hint) {
+    var l = el('label'); l.appendChild(document.createTextNode(labelText));
+    var f = document.createElement(multi ? 'textarea' : 'input'); f.value = value || '';
+    f.addEventListener('input', function () { onInput(f.value); });
+    l.appendChild(f); if (hint) l.appendChild(el('span', 'hint', hint));
+    return l;
+  }
+  function button(text, cls, fn) { var b = el('button', 'act' + (cls ? ' ' + cls : ''), text); b.type = 'button'; b.onclick = fn; return b; }
+
+  function liveLogKey(code) { return 'live_log:' + String(code).trim().toUpperCase().replace(/\//g, '-'); }
+
+  /* Save: label, price, fit and weights go into the code's Live Log entry (permanent, every future live);
+     colour/size lines are stream-only and only stored on the card when they differ from Vrich. */
+  function saveCard(s, v) {
+    var d = state.slots[s.id], code = String(d.code).toUpperCase();
+    var colorsChanged = JSON.stringify(v.colors) !== JSON.stringify(vrichColors(d));
+    var slotPayload = JSON.parse(JSON.stringify(d));
+    if (colorsChanged) slotPayload.manual = { colors: v.colors }; else delete slotPayload.manual;
+    var lbl = v.label.trim();
+    if (lbl && lbl !== defaultLabel(s.id, state.entries[code])) slotPayload.label = lbl; else delete slotPayload.label;
+    function merge(old) {
+      var e = old ? JSON.parse(JSON.stringify(old)) : {
+        code: code, showWeight: true,
+        colors: vrichColors(d).map(function (c) { return { color: c.c, sizes: c.sizes.map(function (z) { return z.replace(/^!/, ''); }) }; }),
+        weights: {}
+      };
+      if (!old) e.colorsText = e.colors.map(function (c) { return c.color + ':' + c.sizes.join(' '); }).join('\n');
+      e.fit = v.fit; e.price = v.price.trim().replace(/\$/g, '');
+      var w = Object.assign({}, e.weights || {});
+      v.weights.forEach(function (x) { if (x.s) w[x.s] = x.k; });
+      e.weights = w; e.updatedAt = new Date().toISOString();
+      return e;
+    }
+    if (demo) { state.entries[code] = merge(state.entries[code]); state.slots[s.id] = slotPayload; return Promise.resolve(); }
+    var db = firebase.firestore(), ref = kvc.doc(liveLogKey(code));
+    return ref.get({ source: 'server' }).then(function (snap) {
+      var old = snap.exists ? snap.data().data : null;
+      if (typeof old === 'string') { try { old = JSON.parse(old); } catch (e) { old = null; } }
+      var ts = firebase.firestore.FieldValue.serverTimestamp(), batch = db.batch(), mark = {};
+      mark[code] = new Date().toISOString();
+      batch.set(ref, { data: merge(old), updatedAt: ts });
+      batch.set(kvc.doc('live_log_remote_edits'), { data: mark, updatedAt: ts }, { merge: true });
+      batch.set(kvc.doc('live_overlay_' + s.id), { data: JSON.stringify(slotPayload), updatedAt: new Date() });
+      return batch.commit();
+    });
+  }
+
+  function productEditor(s, card) {
+    var d = state.slots[s.id];
+    var dr = drafts[s.id]; if (!dr || !dr.dirty) dr = drafts[s.id] = { v: derived(s), dirty: false };
+    var v = dr.v, msg = el('div', 'msg', dr.dirty ? 'Not saved yet' : (d.manual ? '✋ Colours/sizes typed by hand (stream only)' : 'Showing Vrich stock + Live Log'));
+    function touch() { dr.dirty = true; msg.textContent = 'Not saved yet'; }
+    var ed = el('div', 'ed'); ed.appendChild(el('h3', null, '✏️ CUSTOMERS SEE — ' + v.code));
+    var r = el('div', 'row2'); r.style.gridTemplateColumns = 'minmax(0,2fr) minmax(0,1fr)';
+    var lblField = field('Label on this card (stream only)', v.label, function (x) { v.label = x; touch(); markChips(); });
+    r.appendChild(lblField);
+    r.appendChild(field('Price — saved in Live Log', v.price, function (x) { v.price = x; touch(); }));
+    ed.appendChild(r);
+    var lchips = el('div', 'chips');
+    function markChips() { lchips.querySelectorAll('.chip').forEach(function (x) { x.classList.toggle('on', x.textContent === v.label.trim()); }); }
+    STD_LABELS.forEach(function (t) {
+      var c = el('button', 'chip', t); c.type = 'button';
+      c.onclick = function () { v.label = t; lblField.querySelector('input').value = t; touch(); markChips(); };
+      lchips.appendChild(c);
+    });
+    ed.appendChild(lchips); markChips();
+    var fitL = el('label'); fitL.appendChild(document.createTextNode('Fit'));
+    var chips = el('div', 'chips');
+    FITS.concat(['']).forEach(function (f) {
+      var c = el('button', 'chip' + (v.fit === f ? ' on' : ''), f || '✕ None'); c.type = 'button';
+      c.onclick = function () { v.fit = f; touch(); chips.querySelectorAll('.chip').forEach(function (x) { x.classList.toggle('on', x === c); }); };
+      chips.appendChild(c);
+    });
+    fitL.appendChild(chips); ed.appendChild(fitL);
+    ed.appendChild(field('Weights (one size per line) — saved in Live Log', weightsToText(v.weights.filter(function (w) { return w.k; })) + (v.weights.some(function (w) { return !w.k; }) ? '\n' + v.weights.filter(function (w) { return !w.k; }).map(function (w) { return w.s + ': '; }).join('\n') : ''),
+      function (x) { v.weights = textToWeights(x); touch(); }, true, 'L: 50-60 · empty sizes are listed so you can fill them in'));
+    ed.appendChild(field('Colours and sizes — stream only (from Vrich stock)', colorsToText(v.colors), function (x) { v.colors = textToColors(x); touch(); }, true, 'ខ្មៅ: L XL 2XL — ! before a size shows it orange, e.g. !4XL. Changing these marks the card ✋ and 🔄 Refresh will skip it.'));
+    var acts = el('div', 'acts');
+    acts.appendChild(button('💾 Save (Live Log + stream)', 'save', function () {
+      msg.textContent = 'Saving…';
+      saveCard(s, v).then(function () { delete drafts[s.id]; msg.textContent = '✅ Saved to Live Log'; render(); }).catch(function (e) { msg.textContent = '❌ ' + e.message; });
+    }));
+    if (d.manual) acts.appendChild(button('↩ Use Vrich stock again', '', function () {
+      var payload = JSON.parse(JSON.stringify(d)); delete payload.manual;
+      write(s.id, payload).then(function () { delete drafts[s.id]; render(); }).catch(function (e) { msg.textContent = '❌ ' + e.message; });
+    }));
+    if (dr.dirty) acts.appendChild(button('Undo changes', '', function () { delete drafts[s.id]; render(); }));
+    acts.appendChild(button('✕ Remove from stream', 'danger', function () {
+      if (!confirm('Remove ' + (d.code || 'this card') + ' from the stream? (Live Log is not changed)')) return;
+      write(s.id, null).then(function () { delete drafts[s.id]; render(); }).catch(function (e) { msg.textContent = '❌ ' + e.message; });
+    }));
+    ed.appendChild(acts); ed.appendChild(msg);
+    card.appendChild(ed);
+  }
+
+  function promoCard() {
+    var d = state.slots.promo || { type: 'promo', show: false, title: '', lines: [] };
+    var card = el('div', 'card'); card.style.setProperty('--accent', 'var(--promo)');
+    var top = el('div', 'top'); top.appendChild(el('span', 'slot', '🎁 GIVEAWAY'));
+    top.appendChild(el('span', 'age' + (d.show ? '' : ' old'), d.show ? 'on stream' : 'hidden'));
+    card.appendChild(top);
+    if (!editing) {
+      if (d.title) card.appendChild(el('div', 'promoTitle', d.title));
+      var pl = el('div', 'promoLines'); (d.lines || []).forEach(function (t) { pl.appendChild(el('div', null, t)); }); card.appendChild(pl);
+      return card;
+    }
+    var dr = drafts.promo; if (!dr || !dr.dirty) dr = drafts.promo = { v: { title: d.title || '', lines: (d.lines || []).slice() }, dirty: false };
+    var v = dr.v, msg = el('div', 'msg', dr.dirty ? 'Not saved yet' : '');
+    function touch() { dr.dirty = true; msg.textContent = 'Not saved yet'; }
+    var ed = el('div', 'ed'); ed.style.borderTop = '0'; ed.style.paddingTop = '0';
+    ed.appendChild(field('Title', v.title, function (x) { v.title = x; touch(); }, false, 'e.g. ថ្ងៃនេះ Giveaway!'));
+    ed.appendChild(field('Lines (one per line)', v.lines.join('\n'), function (x) { v.lines = x.split('\n'); touch(); }, true, 'e.g. ទាយលេខ ២ ខ្ទង់ (00–99) · រង្វាន់: E369 · winning numbers when you reveal them'));
+    var acts = el('div', 'acts');
+    function save(show) {
+      msg.textContent = 'Saving…';
+      var payload = { type: 'promo', show: show, title: v.title.trim(), lines: v.lines.map(function (l) { return l.trim(); }).filter(Boolean), at: new Date().toISOString() };
+      write('promo', payload).then(function () { delete drafts.promo; render(); }).catch(function (e) { msg.textContent = '❌ ' + e.message; });
+    }
+    acts.appendChild(button(d.show ? '💾 Save (stays on stream)' : '🎁 Show on stream', 'save', function () { save(true); }));
+    if (d.show) acts.appendChild(button('Hide from stream', '', function () { save(false); }));
+    ed.appendChild(acts); ed.appendChild(msg); card.appendChild(ed);
+    return card;
+  }
+
+  function productCard(s) {
+    var d = state.slots[s.id], entry = state.entries[String(d.code).toUpperCase()];
+    var colors = (d.colors || []).map(function (c) { return { c: c.c || '—', m: c.sizes || [] }; });
+    var allSizes = {};
+    colors.forEach(function (c) { c.m.forEach(function (z) { allSizes[z.z] = 1; }); });
+    var sizes = Object.keys(allSizes).sort(function (a, b) { return sizeKey(a) - sizeKey(b); });
+
+    var card = el('div', 'card'); card.style.setProperty('--accent', 'var(--' + s.id + ')');
+    var top = el('div', 'top'); top.appendChild(el('span', 'slot', s.name));
+    if (d.manual) top.appendChild(el('span', 'hand-tag', '✋ Sizes typed by hand'));
+    var a = ago(d.at); top.appendChild(el('span', 'age' + (a.old ? ' old' : ''), a.t)); card.appendChild(top);
+
+    var cr = el('div', 'codeRow'); cr.appendChild(el('span', 'code', d.code));
+    cr.appendChild(el('span', 'price', money((entry && entry.price) || d.price))); card.appendChild(cr);
+    var fit = (entry && entry.fit) || '';
+    var meta = el('div', 'meta', (d.label || defaultLabel(s.id, entry)) + ' · ' + colors.length + ' ពណ៌ · ' + sizes.length + ' sizes');
+    if (fit) meta.appendChild(el('span', 'fit', fit));
+    card.appendChild(meta);
+
+    var w = (entry && entry.weights) || {};
+    var inStock = sizes.filter(function (z) { return colors.some(function (c) { return c.m.some(function (x) { return x.z === z && x.remain > 0; }); }); });
+    var missing = inStock.filter(function (z) { return !String(w[z] || '').trim(); });
+    {
+      if (!entry) card.appendChild(el('div', 'warn', '⚠ Not in Live Log — customers see no weight or fit for this code'));
+      else if (missing.length) card.appendChild(el('div', 'warn', '⚠ No weight for ' + missing.join(', ') + ' — fix in Live Log or edit here'));
+    }
+
+    if (colors.length) {
+      var tbl = el('div', 'tbl'); tbl.style.gridTemplateColumns = '50px 84px repeat(' + colors.length + ', minmax(0, 1fr))';
+      tbl.appendChild(el('span', 'h', 'SIZE')); tbl.appendChild(el('span', 'h', 'KG'));
+      colors.forEach(function (c) { tbl.appendChild(el('span', 'h', c.c)); });
+      sizes.forEach(function (z) {
+        tbl.appendChild(el('span', 'sz', z));
+        var kg = String(w[z] || '').trim();
+        tbl.appendChild(el('span', 'kg' + (kg ? '' : ' none'), kg || 'no kg'));
+        colors.forEach(function (c) {
+          var x = null; c.m.forEach(function (y) { if (y.z === z) x = y; });
+          if (!x) { tbl.appendChild(el('span', 'n na', '—')); return; }
+          var n = Number(x.remain) || 0;
+          tbl.appendChild(el('span', 'n' + (n === 0 ? ' out' : n <= 2 ? ' low' : ''), String(n)));
+        });
+      });
+      card.appendChild(tbl);
+    }
+    if (editing) productEditor(s, card);
+    return { card: card, weight: 2 + Math.max(colors.length, 1) };
+  }
+
+  var pending = false;
+  function busyTyping() { var a = document.activeElement; return editing && a && grid.contains(a) && /INPUT|TEXTAREA/.test(a.tagName); }
+  function requestRender() { if (busyTyping()) { pending = true; return; } render(); }
+  document.addEventListener('focusout', function () { if (pending) setTimeout(function () { if (!busyTyping() && pending) { pending = false; render(); } }, 50); });
+
+  function render() {
+    pending = false;
+    var st = state.settings;
+    document.getElementById('v_textSize').textContent = st.textSize;
+    document.getElementById('v_minText').textContent = st.minText;
+    document.getElementById('v_width').textContent = st.width + '/6';
+    document.getElementById('modeBtn').textContent = st.mode === 'text' ? '🅰 Text mode (safe) — tap for Cards' : '🃏 Cards — tap for safe Text mode';
+
+    var filled = SLOTS.filter(function (s) { var d = state.slots[s.id]; return d && d.code; });
+    var promo = state.slots.promo;
+    var showPromo = editing || (promo && promo.show);
+    grid.innerHTML = '';
+    var cols = [];
+    if (showPromo) { grid.appendChild(promoCard()); cols.push(editing ? 3 : 2); }
+    filled.forEach(function (s) { var r = productCard(s); grid.appendChild(r.card); cols.push(r.weight); });
+    if (!filled.length) {
+      grid.appendChild(el('div', 'empty', 'No product on stream yet — admin sends a code from Vrich (📺 VHM Overlay)'));
+      cols.push(3);
+    }
+    grid.style.gridTemplateColumns = cols.map(function (n) { return 'minmax(0, ' + n + 'fr)'; }).join(' ');
+  }
+  setInterval(requestRender, 30000); /* keep the "stock X min ago" labels fresh */
+
+  /* overlay look controls (edit mode) */
+  document.querySelectorAll('#look .sm').forEach(function (b) {
+    b.onclick = function () {
+      var k = b.dataset.k, d = Number(b.dataset.d), st = state.settings, v = Number(st[k]) + d;
+      if (k === 'textSize') v = Math.max(12, Math.min(30, v));
+      if (k === 'minText') v = Math.max(8, Math.min(Number(st.textSize), v));
+      if (k === 'width') v = Math.max(1, Math.min(3, v));
+      var next = JSON.parse(JSON.stringify(st)); next[k] = v; writeSettings(next);
+    };
+  });
+  document.getElementById('modeBtn').onclick = function () {
+    var next = JSON.parse(JSON.stringify(state.settings)); next.mode = next.mode === 'text' ? 'cards' : 'text'; writeSettings(next);
+  };
+  function writeSettings(next) {
+    if (demo) { state.settings = next; render(); return; }
+    kvc.doc('live_overlay_settings').set({ data: JSON.stringify(next), updatedAt: new Date() }).catch(function (e) { alert('Could not save: ' + e.message); });
+  }
+
+  var conn = document.getElementById('conn'), bar = document.getElementById('bar');
+  function setConn(ok, text) { bar.classList.toggle('off', !ok); conn.textContent = text; }
+
+  if (demo) {
+    var t = Date.now();
+    function st(list) { return list.map(function (s) { var p = s.split(':'); return { c: p[0], sizes: p[1].split(' ').map(function (x) { var q = x.split('='); return { z: q[0], remain: Number(q[1]) }; }) }; }); }
+    state.slots = {
+      promo: { type: 'promo', show: true, title: 'ថ្ងៃនេះ Giveaway!', lines: ['ទាយលេខ ២ ខ្ទង់ (00–99)', 'រង្វាន់: E369 ១ ដើម'] },
+      shirt: { code: 'E369', price: '6.60', at: new Date(t - 12 * 60000).toISOString(), colors: st(['ខ្មៅ:L=4 XL=5 2XL=0 3XL=3 4XL=2', 'សាច់:L=3 XL=4 2XL=5 3XL=3 4XL=0', 'កាហ្វេ:L=5 XL=4 2XL=3 3XL=1 4XL=4']) },
+      hand: { code: 'E136', price: '6.40', at: new Date(t).toISOString(), colors: st(['ប្រផេះ:XL=3', 'ដី:XL=2', 'មេឃ:L=4 XL=0', 'ខៀវ:L=3 XL=4']) }
+    };
+    state.entries = {
+      E369: { garmentType: 'អាវលើខ្លួន', fit: 'រាងស្លុីម', price: '6.60', weights: { L: '50-60', XL: '60-70', '2XL': '70-80', '3XL': '80-85', '4XL': '85-90' } },
+      E136: { garmentType: 'អាវលើដៃ', fit: 'រាងរលុង', price: '6.40', weights: { L: '60-70' } }
+    };
+    setConn(true, 'Demo data — edits stay on this page'); render(); return;
+  }
+
+  firebase.initializeApp({
+    apiKey: 'AIzaSyDDQp5_gvuRdX0flKQ3gm3zXJM_SXWUJSE', authDomain: 'vhm-catalog.firebaseapp.com', projectId: 'vhm-catalog',
+    storageBucket: 'vhm-catalog.firebasestorage.app', messagingSenderId: '892196724857', appId: '1:892196724857:web:8ed3f5f056284b63aa34a8'
+  });
+  kvc = firebase.firestore().collection('kv');
+  function parseData(snap) {
+    if (!snap.exists) return null; var v = snap.data().data;
+    if (v == null || v === '') return null;
+    if (typeof v === 'string') { try { return JSON.parse(v); } catch (e) { return null; } }
+    return v;
+  }
+  function onMeta(snap) {
+    var cached = snap.metadata && snap.metadata.fromCache;
+    if (!navigator.onLine || cached) setConn(false, 'Offline — showing the last stock received');
+    else setConn(true, 'Connected');
+  }
+  window.addEventListener('offline', function () { setConn(false, 'Offline — showing the last stock received'); });
+  window.addEventListener('online', function () { setConn(true, 'Connected'); });
+
+  var entryUnsubs = {};
+  function syncEntries() {
+    var want = {};
+    SLOTS.forEach(function (s) { var d = state.slots[s.id]; if (d && d.code) want[String(d.code).toUpperCase()] = 1; });
+    Object.keys(entryUnsubs).forEach(function (c) { if (!want[c]) { entryUnsubs[c](); delete entryUnsubs[c]; delete state.entries[c]; } });
+    Object.keys(want).forEach(function (c) {
+      if (entryUnsubs[c]) return;
+      entryUnsubs[c] = kvc.doc('live_log:' + c.replace(/\//g, '-')).onSnapshot(function (snap) { state.entries[c] = parseData(snap); requestRender(); },
+        function () { setConn(false, 'Could not read Live Log — showing the last data'); });
+    });
+  }
+  ['promo'].concat(SLOTS.map(function (s) { return s.id; })).forEach(function (id) {
+    kvc.doc('live_overlay_' + id).onSnapshot({ includeMetadataChanges: true }, function (snap) {
+      onMeta(snap);
+      var before = JSON.stringify(state.slots[id] || null);
+      state.slots[id] = parseData(snap);
+      if (JSON.stringify(state.slots[id] || null) !== before && drafts[id] && !drafts[id].dirty) delete drafts[id];
+      syncEntries(); requestRender();
+    }, function () { setConn(false, 'Connection problem — showing the last stock received'); });
+  });
+  kvc.doc('live_overlay_settings').onSnapshot(function (snap) {
+    var d = parseData(snap) || {};
+    ['textSize', 'minText', 'width', 'mode'].forEach(function (k) { if (d[k] != null) state.settings[k] = d[k]; });
+    requestRender();
+  }, function () {});
+})();
+</script>
+</body>
+</html>
