@@ -44,6 +44,54 @@
   .w .s { display: inline-block; min-width: 2.6em; }
   .w .k { color: var(--accent); }
   .note { font-size: 0.86em; font-weight: 700; color: #E1E4E1; white-space: normal; max-width: 13em; line-height: 1.35; padding-top: 0.25em; border-top: 1px solid rgba(255,255,255,0.14); }
+  /* "Liquid glass" looks: rounded glass panel, thin bright rim, soft light sheen on top.
+     OBS can't blur the camera behind a Browser Source, so the glass is tinted, not truly frosted.
+     glass = smoked glass (best on white walls)   frost = milky light glass (like the weather widgets) */
+  .glass .card, .frost .card { position: relative; overflow: hidden; border-radius: 18px; border: 1.5px solid rgba(255,255,255,0.55); }
+  .glass .card { background: linear-gradient(165deg, rgba(255,255,255,0.22) 0%, rgba(40,42,41,0.50) 34%, rgba(14,16,15,0.66) 100%);
+                 box-shadow: inset 0 1px 0 rgba(255,255,255,0.75), inset 0 0 12px rgba(255,255,255,0.10), 0 10px 26px rgba(0,0,0,0.30); }
+  .frost .card { background: linear-gradient(165deg, rgba(255,255,255,0.34) 0%, rgba(150,154,152,0.40) 38%, rgba(58,62,60,0.52) 100%);
+                 box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), inset 0 0 16px rgba(255,255,255,0.22), 0 10px 26px rgba(0,0,0,0.22); }
+  .glass .card::before, .frost .card::before { content: ''; position: absolute; left: -30%; top: -55%; width: 160%; height: 85%; pointer-events: none; filter: blur(6px);
+                         background: radial-gradient(ellipse at 50% 100%, rgba(255,255,255,0.20), rgba(255,255,255,0) 62%); }
+  .glass .card > .inner, .frost .card > .inner { position: relative; }
+  .glass .card * { text-shadow: 0 1px 2px rgba(0,0,0,0.5); }
+  .frost .card * { text-shadow: 0 1px 2px rgba(0,0,0,0.55), 0 0 6px rgba(0,0,0,0.45), 0 0 14px rgba(0,0,0,0.25); }
+  .glass .fit, .frost .fit { background: rgba(255,255,255,0.88); color: #171510; text-shadow: none; }
+  .glass .label, .frost .label, .frost .line .dim, .frost .line.dim { color: #fff; }
+  .frost .price, .frost .w .k { color: #FFE7A3; }
+  .glass .weights, .glass .note, .frost .weights, .frost .note { border-top-color: rgba(255,255,255,0.35); }
+  /* ===== V11 material looks: smoked / champagne / espresso / titanium (same layout, surface only) ===== */
+  .lux .card { position: relative; overflow: hidden; border: 0; border-radius: 4px; --hair: rgba(255,240,220,0.13); }
+  .lux .card::before { content: ''; position: absolute; inset: 0; pointer-events: none; background: var(--light); }
+  .lux .card::after { content: ''; position: absolute; inset: 0; pointer-events: none; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); background-size: 160px 160px; opacity: var(--grain); mix-blend-mode: var(--blend); }
+  .lux .card > .inner { position: relative; z-index: 1; }
+  .lux .fit { background: transparent; border: 1px solid var(--fitEdge); color: var(--fitC); font-weight: 500; line-height: 1.45; }
+  .lux .label { font-weight: 500; letter-spacing: 0.02em; }
+  .lux .code { letter-spacing: 0.04em; } .lux .promoTitle { letter-spacing: 0; }
+  .lux .weights, .lux .note { border-top-color: var(--hair); }
+  .lux .w .k { color: var(--kg); } .lux .line .low { color: var(--lowC); }
+  .lux .price { color: inherit; }
+  .lux .label, .lux .note, .lux .line .dim, .lux .line.dim { color: var(--soft); }
+  .s-smoked .card { color: #F4F0E9; --soft: #CEC5B7; --fitC: #E5D3B0; --fitEdge: rgba(229,211,176,0.55); --kg: #E3CFA6; --lowC: #E89A6C; --grain: 0.10; --blend: overlay;
+    text-shadow: 0 1px 1px rgba(0,0,0,0.25);
+    --light: linear-gradient(115deg, rgba(255,240,215,0.07), rgba(255,240,215,0) 45%);
+    background: radial-gradient(130% 90% at 0% 0%, rgba(150,130,108,0.34), rgba(150,130,108,0) 58%), radial-gradient(90% 80% at 100% 100%, rgba(74,64,55,0.45), rgba(74,64,55,0) 65%), radial-gradient(70% 50% at 85% 10%, rgba(120,112,104,0.18), rgba(120,112,104,0) 70%), linear-gradient(168deg, rgba(40,37,34,0.76), rgba(22,21,20,0.84));
+    box-shadow: inset 0 0 0 1px rgba(255,240,220,0.11), inset 0 1px 0 rgba(255,245,230,0.16), 0 12px 30px rgba(24,18,12,0.20), 0 2px 6px rgba(24,18,12,0.14); }
+  .s-champagne .card { color: #1E1B17; --soft: #675D51; --fitC: #5E4E3B; --fitEdge: rgba(94,78,59,0.45); --kg: #75572F; --lowC: #A9502A; --hair: rgba(60,48,36,0.13); --grain: 0.14; --blend: multiply;
+    --light: linear-gradient(115deg, rgba(255,255,255,0.18), rgba(255,255,255,0) 50%);
+    background: radial-gradient(130% 85% at 0% 0%, rgba(255,251,243,0.96), rgba(255,251,243,0) 60%), radial-gradient(110% 80% at 100% 100%, rgba(186,166,140,0.92), rgba(186,166,140,0) 70%), radial-gradient(60% 50% at 90% 15%, rgba(226,206,168,0.45), rgba(226,206,168,0) 70%), linear-gradient(168deg, rgba(234,226,213,0.93), rgba(209,197,180,0.94));
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.42), inset 0 1px 0 rgba(255,255,255,0.70), 0 12px 30px rgba(24,18,12,0.20), 0 2px 6px rgba(24,18,12,0.14); }
+  .s-espresso .card { color: #F6EFE5; --soft: #D4C2AB; --fitC: #E8CC9C; --fitEdge: rgba(232,204,156,0.50); --kg: #E7C995; --lowC: #F0A070; --hair: rgba(255,226,190,0.13); --grain: 0.11; --blend: overlay;
+    text-shadow: 0 1px 1px rgba(0,0,0,0.25);
+    --light: linear-gradient(120deg, rgba(255,214,170,0.09), rgba(255,214,170,0) 42%);
+    background: radial-gradient(120% 90% at 0% 0%, rgba(166,124,88,0.46), rgba(166,124,88,0) 58%), radial-gradient(100% 80% at 100% 100%, rgba(58,38,27,0.55), rgba(58,38,27,0) 65%), radial-gradient(60% 60% at 95% 20%, rgba(96,70,52,0.30), rgba(96,70,52,0) 70%), linear-gradient(168deg, rgba(50,36,28,0.87), rgba(25,19,16,0.92));
+    box-shadow: inset 0 0 0 1px rgba(255,226,190,0.10), inset 0 1px 0 rgba(255,230,200,0.15), 0 12px 30px rgba(24,18,12,0.20), 0 2px 6px rgba(24,18,12,0.14); }
+  .s-titanium .card { color: #FFFFFF; --soft: #E4E6E8; --fitC: #F3E4C6; --fitEdge: rgba(243,228,198,0.60); --kg: #F3DFB6; --lowC: #FFB089; --hair: rgba(255,255,255,0.20); --grain: 0.12; --blend: overlay;
+    text-shadow: 0 1px 2px rgba(20,22,24,0.40);
+    --light: linear-gradient(115deg, rgba(255,246,232,0.12), rgba(255,246,232,0) 48%);
+    background: radial-gradient(130% 90% at 0% 0%, rgba(240,232,220,0.42), rgba(240,232,220,0) 58%), radial-gradient(100% 80% at 100% 100%, rgba(84,90,96,0.55), rgba(84,90,96,0) 68%), radial-gradient(60% 50% at 90% 12%, rgba(214,196,170,0.22), rgba(214,196,170,0) 70%), linear-gradient(168deg, rgba(128,133,138,0.66), rgba(70,75,80,0.76));
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.22), inset 0 1px 0 rgba(255,255,255,0.38), 0 12px 30px rgba(24,18,12,0.20), 0 2px 6px rgba(24,18,12,0.14); }
   /* safe text mode: plain look only — lines still fit by shrinking, never wrap or spill */
   .text .card { border-left: 0; box-shadow: none; border-radius: 6px; }
   .text .inner { gap: 0.1em; }
@@ -217,6 +265,11 @@
     var models = SLOTS.filter(function (s) { return !onlySlot || s.id === onlySlot; }).map(model).filter(Boolean)
       .filter(function (m) { return dropped.indexOf(m.key) < 0; });
     stage.classList.toggle('text', st.mode === 'text');
+    stage.classList.toggle('glass', st.style === 'glass' && st.mode !== 'text');
+    var LUX = ['smoked', 'champagne', 'espresso', 'titanium'], luxOn = LUX.indexOf(st.style) >= 0 && st.mode !== 'text';
+    stage.classList.toggle('lux', luxOn);
+    LUX.forEach(function (k) { stage.classList.toggle('s-' + k, luxOn && st.style === k); });
+    stage.classList.toggle('frost', st.style === 'frost' && st.mode !== 'text');
     col.style.right = SAFE + 'px';
     col.style.width = (onlySlot ? 540 - SAFE * 2 : Math.round((540 - CROP * 2) * st.width / 6) - GAP) + 'px';
     if (onlySlot) { col.style.right = 'auto'; col.style.left = SAFE + 'px'; col.style.top = SAFE + 'px'; col.style.alignItems = 'flex-start'; }
@@ -272,6 +325,8 @@
       R295: { garmentType: 'ខោលើខ្លួន', fit: 'រាងធម្មតា', price: '8.80', weights: { S: '50-60', M: '60-70', L: '70-80', XL: '80-85' } },
       E136: { garmentType: 'អាវលើដៃ', fit: 'រាងរលុង', price: '6.40', weights: { L: '60-70', XL: '70-80', '3XL': '85-90' } }
     };
+    ['style', 'mode'].forEach(function (k) { if (params.get(k)) state.settings[k] = params.get(k); });
+    ['textSize', 'width'].forEach(function (k) { if (params.get(k)) state.settings[k] = Number(params.get(k)); });
     render();
     return;
   }
@@ -312,7 +367,7 @@
   kvc.doc('live_overlay_guides').onSnapshot(function (snap) { state.guides = parseData(snap) || {}; rerender(); }, function () {});
   kvc.doc('live_overlay_settings').onSnapshot(function (snap) {
     var d = parseData(snap) || {};
-    ['textSize', 'minText', 'width', 'mode'].forEach(function (k) { if (d[k] != null) state.settings[k] = d[k]; });
+    ['textSize', 'minText', 'width', 'mode', 'style'].forEach(function (k) { if (d[k] != null) state.settings[k] = d[k]; });
     rerender();
   }, function (err) { console.warn('Settings listener failed — using the last settings', err); });
 })();

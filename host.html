@@ -116,6 +116,7 @@
   <span class="grp">Smallest <button class="sm" data-k="minText" data-d="-1">−</button><b id="v_minText">12</b><button class="sm" data-k="minText" data-d="1">+</button></span>
   <span class="grp">Width <button class="sm" data-k="width" data-d="-1">−</button><b id="v_width">2/6</b><button class="sm" data-k="width" data-d="1">+</button></span>
   <button class="tbtn" id="modeBtn">🃏 Cards</button>
+  <button class="tbtn" id="styleBtn">◼ Style: Solid</button>
   <button class="tbtn" id="popsBtn">📣 Thank-you pop-ups: On</button>
   <button class="tbtn" id="giveBtn">🎁 Giveaway</button>
   <button class="tbtn" id="guideBtn">📏 Size guides</button>
@@ -137,7 +138,7 @@
   ];
   var params = new URLSearchParams(location.search);
   var demo = params.get('demo') === '1';
-  var state = { guides: {}, slots: {}, entries: {}, settings: { textSize: 20, minText: 12, width: 2, mode: 'cards', pops: true } };
+  var state = { guides: {}, slots: {}, entries: {}, settings: { textSize: 20, minText: 12, width: 2, mode: 'cards', pops: true, style: 'solid' } };
   var drafts = {};
   var grid = document.getElementById('grid');
 
@@ -527,6 +528,8 @@
     document.getElementById('v_minText').textContent = st.minText;
     document.getElementById('v_width').textContent = st.width + '/6';
     document.getElementById('modeBtn').textContent = st.mode === 'text' ? '🅰 Text mode (safe) — tap for Cards' : '🃏 Cards — tap for safe Text mode';
+    var STYLE_NAME = { solid: '◼ Solid', smoked: 'A Smoked Glass', champagne: 'B Champagne Stone', espresso: 'C Ambient Espresso', titanium: 'D Frosted Titanium', glass: '💎 Glass', frost: '❄️ Frost' };
+    document.getElementById('styleBtn').textContent = 'Style: ' + (STYLE_NAME[st.style] || STYLE_NAME.solid) + ' — tap to change';
     var pb = document.getElementById('popsBtn');
     pb.textContent = st.pops === false ? '📣 Thank-you pop-ups: Off — tap to turn on' : '📣 Thank-you pop-ups: On — tap to turn off';
     pb.classList.toggle('on', st.pops !== false);
@@ -563,6 +566,10 @@
   });
   document.getElementById('guideBtn').onclick = function () { guidesOpen = !guidesOpen; store('vhm_host_guides_open', guidesOpen ? '1' : null); render(); };
   document.getElementById('giveBtn').onclick = function () { promoOpen = !promoOpen; store('vhm_host_promo_open', promoOpen ? '1' : null); render(); };
+  document.getElementById('styleBtn').onclick = function () {
+    var order = ['solid', 'smoked', 'champagne', 'espresso', 'titanium', 'glass', 'frost'], next = JSON.parse(JSON.stringify(state.settings));
+    next.style = order[(order.indexOf(next.style || 'solid') + 1) % order.length]; writeSettings(next);
+  };
   document.getElementById('popsBtn').onclick = function () {
     var next = JSON.parse(JSON.stringify(state.settings)); next.pops = next.pops === false; writeSettings(next);
   };
@@ -654,7 +661,7 @@
   kvc.doc('live_overlay_guides').onSnapshot(function (snap) { state.guides = parseData(snap) || {}; requestRender(); }, function () {});
   kvc.doc('live_overlay_settings').onSnapshot(function (snap) {
     var d = parseData(snap) || {};
-    ['textSize', 'minText', 'width', 'mode', 'pops'].forEach(function (k) { if (d[k] != null) state.settings[k] = d[k]; });
+    ['textSize', 'minText', 'width', 'mode', 'pops', 'style'].forEach(function (k) { if (d[k] != null) state.settings[k] = d[k]; });
     requestRender();
   }, function () {});
 })();
