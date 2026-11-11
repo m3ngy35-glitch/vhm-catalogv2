@@ -634,6 +634,23 @@
       if ((prev && prev.code) !== (now && now.code)) render(); else requestRender();
     }, function () { setConn(false, 'Connection problem — showing the last stock received'); });
   });
+  /* Is Live Log recording this live for VHM Inventory? (Start live writes kv/live_overlay_session, End live clears it) */
+  var rec = { session: null, shown: 0 };
+  function showRec() {
+    var note = document.getElementById('note');
+    var onStream = SLOTS.some(function (s) { var d = state.slots[s.id]; return d && d.code; });
+    if (rec.session && rec.session.startedAt) {
+      var t = new Date(rec.session.startedAt);
+      note.textContent = '⏺ Live Log recording since ' + String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0') + ' · ' + rec.shown + ' codes sent to stream — press End live in Live Log after the live';
+      note.style.color = '';
+    } else if (onStream) {
+      note.textContent = '⚠ Live Log not started — press ⏺ Start live in Live Log, then End live after, so VHM Inventory gets the codes (' + rec.shown + ' waiting)';
+      note.style.color = 'var(--warnText)';
+    } else { note.textContent = 'Stock changes only when an admin sends it from Vrich'; note.style.color = ''; }
+  }
+  kvc.doc('live_overlay_session').onSnapshot(function (snap) { rec.session = snap.exists ? parseData(snap) : null; showRec(); }, function () {});
+  kvc.doc('live_overlay_shown').onSnapshot(function (snap) { var c = snap.exists && snap.data().codes; rec.shown = c && typeof c === 'object' ? Object.keys(c).length : 0; showRec(); }, function () {});
+  setInterval(showRec, 30000);
   kvc.doc('live_overlay_guides').onSnapshot(function (snap) { state.guides = parseData(snap) || {}; requestRender(); }, function () {});
   kvc.doc('live_overlay_settings').onSnapshot(function (snap) {
     var d = parseData(snap) || {};

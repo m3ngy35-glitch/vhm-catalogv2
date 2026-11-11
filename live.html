@@ -1776,6 +1776,8 @@ document.getElementById('saveGarmentTypeBtn').addEventListener('click', ()=>{
     const id = d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()) + '_' + pad(d.getHours()) + pad(d.getMinutes());
     store({ v: 1, id, startedAt: d.toISOString(), by: who(), codes: {} });
     lastErr = ''; render();
+    // let the host screen show that recording is on (one small write)
+    try{ firestoreDb().collection('kv').doc('live_overlay_session').set({ data: { id, startedAt: d.toISOString(), by: who() }, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }); }catch(e){}
   }
   async function end(){
     const s = load(); if(!s || sending) return;
@@ -1799,6 +1801,26 @@ document.getElementById('saveGarmentTypeBtn').addEventListener('click', ()=>{
           remoteCodes.push(code);
         }
       }catch(e){ console.warn('Host-screen edits not merged this time:', e); }
+      // Codes sent to the stream from Vrich (📺 VHM Overlay) are noted in kv/live_overlay_shown;
+      // add them to this live so VHM Inventory sees everything that was on stream.
+      let overlayShown = 0;
+      try{
+        const os = await withTimeout(firestoreDb().collection('kv').doc('live_overlay_shown').get({source:'server'}), 15000, 'Timed out reading stream codes');
+        const om = os.exists && os.data().codes && typeof os.data().codes === 'object' ? os.data().codes : {};
+        const byCode = {};
+        record.codes.forEach(c => { byCode[c.code] = c; });
+        Object.keys(om).forEach(k => {
+          const code = String(k).trim().toUpperCase(), o = om[k] || {};
+          const first = String(o.first || record.startedAt), last = String(o.last || first), n = Number(o.n) || 1;
+          if(byCode[code]){
+            const c = byCode[code];
+            if(first < c.first) c.first = first;
+            if(last > c.last) c.last = last;
+            c.n += n;
+          } else { byCode[code] = { code, first, last, n }; overlayShown++; }
+        });
+        record.codes = Object.keys(byCode).map(k => byCode[k]).sort((a,b) => a.first.localeCompare(b.first));
+      }catch(e){ console.warn('Stream codes not merged this time:', e); }
       // Include only actually changed guide entries in live_last so Inventory can
       // refresh the status and weights with one read. The full compact guide
       // snapshot is also replaced in this same atomic commit for new devices.
@@ -1814,6 +1836,8 @@ document.getElementById('saveGarmentTypeBtn').addEventListener('click', ()=>{
       batch.set(kv.doc('live_last'), { data: record, updatedAt: serverTime });
       if(hasGuideChanges) batch.set(kv.doc(LIVE_GUIDES_DOC), { data: encodedGuides, updatedAt: serverTime });
       if(remoteCodes.length) batch.set(kv.doc('live_log_remote_edits'), { data: {}, updatedAt: serverTime });
+      batch.set(kv.doc('live_overlay_shown'), { codes: {}, updatedAt: serverTime });   // start the next live empty
+      batch.set(kv.doc('live_overlay_session'), { data: null, updatedAt: serverTime });
       await withTimeout(batch.commit(), 25000, 'Timed out after 25s');
       if(guidePayload){ try{ localStorage.setItem(LIVE_GUIDES_HASH_KEY, guidePayload.hash); }catch(e){} }
       clearLiveGuidePending();

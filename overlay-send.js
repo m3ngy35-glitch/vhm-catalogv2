@@ -32,19 +32,21 @@
   /* One Vrich row → base code, colour, size.
      Shirts: "E100 អាវ ខ្មៅ 2XL" → E100 / ខ្មៅ / 2XL.
      Pants listed one size per code: "AW32 ខោ" → AW / (no colour) / 32, so AW32 + AW34 become one card "AW" with sizes 32 34. */
-  var TYPEW = /^(អាវ|ខោ|ឈុត|ស្បែកជើង|មួក)/;
-  var SIZEW = /^(XXS|XS|S|M|L|XL|XXL|XXXL|[2-6]XL|F|FREE|FS|OS|\d{2}(\.\d)?)$/i;
+  var TYPEW = /^(អាវ|ខោ|ឈុត|ស្បែកជើង|មួក|ខ្សែក្រវ៉ាត់|ខ្សែ|វ៉ែនតា|ម៉ាស់|កាបូប|ស្រោម)/;
+  var SIZEW = /^(XXS|XS|S|M|L|XL|XXL|XXXL|[2-6]XL|F|FREE|FS|OS|\d{2,3}(\.\d)?(CM)?)$/i;
   function splitRow(code, tokens) {
     code = String(code || '').trim().toUpperCase();
-    tokens = (tokens || []).slice();
+    tokens = (tokens || []).slice(); var tokens0 = tokens.slice();
     var z = '';
-    if (tokens.length && SIZEW.test(tokens[tokens.length - 1])) z = tokens.pop().toUpperCase();
+    if (tokens.length && SIZEW.test(tokens[tokens.length - 1])) z = tokens.pop().toUpperCase().replace(/(\d)CM$/, '$1');
     var pants = tokens.some(function (t) { return /^ខោ/.test(t); });
     var cut = !z && code.match(/^([A-Z][A-Z0-9-]*?[A-Z])(2[4-9]|3\d|4[0-6])$/);
-    if (cut && (pants || cut[1].replace(/[^A-Z]/g, '').length >= 2)) { code = cut[1]; z = cut[2]; }
+    var notPants = tokens.some(function (t) { return TYPEW.test(t) && !/^ខោ/.test(t); }); /* shirts, belts, glasses…: never cut the code */
+    if (cut && !notPants && (pants || cut[1].replace(/[^A-Z]/g, '').length >= 2)) { code = cut[1]; z = cut[2]; }
     if (tokens.length > 1) tokens.shift();            /* first word is the type, as Send stock reads it */
     var c = tokens.filter(function (t) { return !TYPEW.test(t); }).join(' ');
-    return { code: code, c: c, z: z || '—' };
+    var type = (tokens0.filter(function (t) { return TYPEW.test(t); })[0]) || '';
+    return { code: code, c: c, z: z || '—', type: type };
   }
 
   startThanks();
@@ -156,7 +158,7 @@
     var parts = line.split(/\s+/), rawCode = parts.shift();
     if (!rawCode) continue;
     var row = splitRow(rawCode, parts), code = row.code, size = row.z, color = row.c;
-    if (!codes[code]) { codes[code] = { code: code, price: m[2], colors: [] }; order.push(code); }
+    if (!codes[code]) { codes[code] = { code: code, price: m[2], type: row.type, colors: [] }; order.push(code); }
     var e = codes[code], col = null;
     for (var i = 0; i < e.colors.length; i++) if (e.colors[i].c === color) col = e.colors[i];
     if (!col) { col = { c: color, sizes: [] }; e.colors.push(col); }
@@ -164,6 +166,22 @@
   }
   if (!order.length) { toast('អានស្តុកមិនបាន - no stock rows recognised', '#E24B4A'); return; }
 
+  /* Every code sent to a stream slot is also noted in kv/live_overlay_shown (code → first/last/n),
+     so Live Log's End live can include it in the live record that VHM Inventory reads. */
+  function recordShown(code) {
+    var url = API + 'live_overlay_shown' + AK;
+    return fetch(url).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }).then(function (j) {
+      var f = j && j.fields && j.fields.codes && j.fields.codes.mapValue && j.fields.codes.mapValue.fields;
+      var cur = f && f[code] && f[code].mapValue && f[code].mapValue.fields;
+      var now = new Date().toISOString();
+      var first = cur && cur.first && cur.first.stringValue ? cur.first.stringValue : now;
+      var n = cur && cur.n ? Number(cur.n.integerValue || 0) : 0;
+      var body = { fields: { codes: { mapValue: { fields: {} } } } };
+      body.fields.codes.mapValue.fields[code] = { mapValue: { fields: { first: { stringValue: first }, last: { stringValue: now }, n: { integerValue: String(n + 1) } } } };
+      var mask = 'updateMask.fieldPaths=' + encodeURIComponent('codes.`' + code.replace(/`/g, '') + '`');
+      return fetch(url + '&' + mask, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    }).catch(function () { /* the stream still updates; only the Inventory list misses this one */ });
+  }
   function put(slot, payload) {
     return fetch(API + 'live_overlay_' + slot + AK, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
@@ -175,7 +193,7 @@
       try { var s = j && j.fields && j.fields.data && j.fields.data.stringValue; return s ? JSON.parse(s) : null; } catch (x) { return null; }
     }).catch(function () { return null; });
   }
-  function payloadFor(code) { var e = codes[code]; return { code: e.code, price: e.price, colors: e.colors, at: new Date().toISOString() }; }
+  function payloadFor(code) { var e = codes[code]; return { code: e.code, price: e.price, type: e.type || '', colors: e.colors, at: new Date().toISOString() }; }
   /* Live Log entry check (read only) */
   function dec(v) {
     if (!v) return null;
@@ -292,7 +310,7 @@
       SLOTS.forEach(function (s) {
         var b = btn('→ ' + s.km + '  (' + s.en + ')', '#1D6E52', function () {
           busy(b, 'Sending…');
-          put(s.id, payloadFor(picked)).then(function () { toast('✅ ' + picked + ' → ' + s.km); P.remove(); })
+          put(s.id, payloadFor(picked)).then(function () { recordShown(picked); toast('✅ ' + picked + ' → ' + s.km); P.remove(); })
             .catch(function (err) { toast('❌ ' + err.message, '#E24B4A'); render(); });
         });
         P.appendChild(b);
