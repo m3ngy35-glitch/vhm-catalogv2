@@ -111,6 +111,7 @@
   <span class="grp">Width <button class="sm" data-k="width" data-d="-1">−</button><b id="v_width">2/6</b><button class="sm" data-k="width" data-d="1">+</button></span>
   <button class="tbtn" id="modeBtn">🃏 Cards</button>
   <button class="tbtn" id="popsBtn">📣 Thank-you pop-ups: On</button>
+  <button class="tbtn" id="giveBtn">🎁 Giveaway</button>
 </div>
 <div id="grid"></div>
 <div class="legend"><span><b>5</b> pieces left</span><span class="l"><b style="color:inherit">2</b> only 1–2 left</span><span><s>0</s> sold out</span><span>— size not in this colour</span><span>✋ sizes typed by hand (🔄 Refresh won't overwrite them)</span></div>
@@ -139,6 +140,7 @@
   /* theme + edit mode: remembered on this computer */
   var theme = params.get('theme') || load('vhm_host_theme') || 'dark';
   var editing = params.get('edit') === '1' || load('vhm_host_edit') === '1';
+  var promoOpen = load('vhm_host_promo_open') === '1';  /* giveaway panel hidden unless opened */
   var themeBtn = document.getElementById('theme'), editBtn = document.getElementById('editBtn');
   function applyChrome() {
     document.body.classList.toggle('light', theme === 'light');
@@ -300,6 +302,12 @@
     var card = el('div', 'card'); card.style.setProperty('--accent', 'var(--promo)');
     var top = el('div', 'top'); top.appendChild(el('span', 'slot', '🎁 GIVEAWAY'));
     top.appendChild(el('span', 'age' + (d.show ? '' : ' old'), d.show ? 'on stream' : 'hidden'));
+    if (editing) {
+      var hide = el('button', 'xbtn', '▾'); hide.type = 'button'; hide.title = 'Hide this panel (the giveaway on stream is not changed)';
+      hide.style.borderColor = 'var(--line)'; hide.style.color = 'var(--sub)';
+      hide.onclick = function () { promoOpen = false; store('vhm_host_promo_open', null); render(); };
+      top.appendChild(hide);
+    }
     card.appendChild(top);
     if (!editing) {
       if (d.title) card.appendChild(el('div', 'promoTitle', d.title));
@@ -424,7 +432,10 @@
 
     var filled = SLOTS.filter(function (s) { var d = state.slots[s.id]; return d && d.code; });
     var promo = state.slots.promo;
-    var showPromo = editing || (promo && promo.show);
+    var gb = document.getElementById('giveBtn');
+    gb.textContent = (promoOpen ? '🎁 Giveaway panel: open' : '🎁 Giveaway panel: hidden') + (promo && promo.show ? ' · on stream' : '');
+    gb.classList.toggle('on', !!(promo && promo.show));
+    var showPromo = editing ? promoOpen : !!(promo && promo.show);
     grid.innerHTML = '';
     var cols = [];
     if (showPromo) { grid.appendChild(promoCard()); cols.push(editing ? 3 : 2); }
@@ -447,6 +458,7 @@
       var next = JSON.parse(JSON.stringify(st)); next[k] = v; writeSettings(next);
     };
   });
+  document.getElementById('giveBtn').onclick = function () { promoOpen = !promoOpen; store('vhm_host_promo_open', promoOpen ? '1' : null); render(); };
   document.getElementById('popsBtn').onclick = function () {
     var next = JSON.parse(JSON.stringify(state.settings)); next.pops = next.pops === false; writeSettings(next);
   };
