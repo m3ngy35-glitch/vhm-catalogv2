@@ -92,6 +92,12 @@
   .kgin.none { background: var(--warnBg); color: var(--warnText); }
   .kgin:focus, .pin:focus { outline: 2px solid var(--accent); border-style: solid; }
   .saving { opacity: .6; } .saved { outline: 2px solid var(--pants) !important; } .failed { outline: 2px solid var(--bad) !important; }
+  .kg.guide { color: var(--sub); font-style: italic; }
+  .kgin::placeholder { color: var(--sub); font-style: italic; opacity: .8; }
+  .gh { margin: 6px 0 0; font-size: 16px; color: var(--sub); }
+  .notel { display: flex; flex-direction: column; gap: 3px; font-size: 14px; color: var(--sub); font-weight: 600; }
+  .notein { font: 600 17px 'Kantumruy Pro', system-ui, sans-serif; color: var(--text); background: var(--field); border: 1px dashed var(--line); border-radius: 8px; padding: 7px 10px; }
+  .notev { font-size: 17px; font-weight: 600; color: var(--sub); }
   .legend { display: flex; gap: 22px; font-size: 16px; color: var(--sub); flex-wrap: wrap; }
   .legend b { color: var(--text); } .legend .l { color: var(--lowText); }
 </style>
@@ -112,6 +118,7 @@
   <button class="tbtn" id="modeBtn">🃏 Cards</button>
   <button class="tbtn" id="popsBtn">📣 Thank-you pop-ups: On</button>
   <button class="tbtn" id="giveBtn">🎁 Giveaway</button>
+  <button class="tbtn" id="guideBtn">📏 Size guides</button>
 </div>
 <div id="grid"></div>
 <div class="legend"><span><b>5</b> pieces left</span><span class="l"><b style="color:inherit">2</b> only 1–2 left</span><span><s>0</s> sold out</span><span>— size not in this colour</span><span>✋ sizes typed by hand (🔄 Refresh won't overwrite them)</span></div>
@@ -130,7 +137,7 @@
   ];
   var params = new URLSearchParams(location.search);
   var demo = params.get('demo') === '1';
-  var state = { slots: {}, entries: {}, settings: { textSize: 20, minText: 12, width: 2, mode: 'cards', pops: true } };
+  var state = { guides: {}, slots: {}, entries: {}, settings: { textSize: 20, minText: 12, width: 2, mode: 'cards', pops: true } };
   var drafts = {};
   var grid = document.getElementById('grid');
 
@@ -141,6 +148,7 @@
   var theme = params.get('theme') || load('vhm_host_theme') || 'dark';
   var editing = params.get('edit') === '1' || load('vhm_host_edit') === '1';
   var promoOpen = load('vhm_host_promo_open') === '1';  /* giveaway panel hidden unless opened */
+  var guidesOpen = load('vhm_host_guides_open') === '1';
   var themeBtn = document.getElementById('theme'), editBtn = document.getElementById('editBtn');
   function applyChrome() {
     document.body.classList.toggle('light', theme === 'light');
@@ -163,6 +171,41 @@
   }
 
   /* ---------- what customers see (same rules as overlay.html) ---------- */
+  /* ---------- kinds: shirt & pants show weights, belts show length in cm, glasses/masks show colours only ----------
+     Each code's kind is set on the host screen (Live Log "kind"); if not set it is guessed from the Vrich type word and sizes. */
+  var KINDS = {
+    shirt:   { t: 'អាវ · S–4XL',        kg: true },
+    pants:   { t: 'ខោ · ចង្កេះ',          kg: true, optional: true },  /* waist sizes: weight only if that code has its own; never a guide or a warning */
+    belt:    { t: 'ខ្សែក្រវ៉ាត់ · cm',   kg: false, unit: 'cm' },
+    glasses: { t: 'វ៉ែនតា · no size',     kg: false, nosize: true },
+    mask:    { t: 'ម៉ាស់ · no size',      kg: false, nosize: true },
+    other:   { t: 'Other · no size',      kg: false, nosize: true }
+  };
+  function guessKind(d, entry) {
+    if (entry && KINDS[entry.kind]) return entry.kind;
+    var t = [(entry && entry.garmentType) || '', (d && d.type) || '', (d && d.label) || ''].join(' ');
+    if (/ខ្សែក្រវ៉ាត់|ខ្សែ|belt/i.test(t)) return 'belt';
+    if (/វ៉ែនតា|glass/i.test(t)) return 'glasses';
+    if (/ម៉ាស់|mask/i.test(t)) return 'mask';
+    var zs = [];
+    ((d && d.colors) || []).forEach(function (c) { (c.sizes || []).forEach(function (s) { zs.push(String(s.z || '')); }); });
+    var real = zs.filter(function (z) { return z && z !== '—' && !/^(F|FREE|FS|OS)$/i.test(z); });
+    if (zs.length && !real.length) return 'other';
+    if (real.length && real.every(function (z) { return /^\d+(\.\d)?(CM)?$/i.test(z); })) {
+      return Math.max.apply(null, real.map(parseFloat)) >= 60 ? 'belt' : 'pants';
+    }
+    if (/ខោ/.test(t)) return 'pants';
+    return 'shirt';
+  }
+  var KIND_LABEL = { belt: 'ខ្សែក្រវ៉ាត់', glasses: 'វ៉ែនតា', mask: 'ម៉ាស់' };
+  function cardLabel(slotId, d, entry) {
+    if (d && d.label) return d.label;
+    var gt = String((entry && entry.garmentType) || '').trim(), k = guessKind(d, entry);
+    if (KIND_LABEL[k]) return gt && !/^(អាវ|ខោ)លើ/.test(gt) ? gt : KIND_LABEL[k];
+    return defaultLabel(slotId, entry);
+  }
+  function showSize(z, kind) { return kind === 'belt' && /^\d+(\.\d)?$/.test(z) ? z + 'cm' : String(z).replace(/CM$/i, 'cm'); }
+
   var STD_LABELS = ['អាវលើខ្លួន', 'ខោលើខ្លួន', 'អាវលើដៃ', 'ខោលើដៃ'];
   /* label shown on a card: typed on the card > based on the slot (worn / in hand) and the garment kind in Live Log */
   function defaultLabel(slotId, entry) {
@@ -188,7 +231,7 @@
     var w = entry.weights || {};
     var weights = Object.keys(all).sort(function (a, b) { return sizeKey(a) - sizeKey(b); })
       .map(function (s) { return { s: s, k: String(w[s] || '').trim() }; });
-    return { label: d.label || defaultLabel(slot.id, entry), code: d.code || '', price: String(entry.price || d.price || '').replace(/\$/g, ''), fit: entry.fit || '', colors: colors, weights: weights };
+    return { label: cardLabel(slot.id, d, entry), code: d.code || '', price: String(entry.price || d.price || '').replace(/\$/g, ''), fit: entry.fit || '', colors: colors, weights: weights };
   }
   function colorsToText(cs) { return cs.map(function (c) { return (c.c ? c.c + ': ' : '') + c.sizes.join(' '); }).join('\n'); }
   function weightsToText(ws) { return ws.map(function (w) { return w.s + ': ' + w.k; }).join('\n'); }
@@ -241,7 +284,7 @@
   /* ---------- inline editing (edit mode): every change saves by itself ----------
      Price, fit and weights → that code's Live Log entry (permanent, every future live).
      Label → this card only (stream). Nothing to press "Save". */
-  var TYPEP = /^(អាវ|ខោ|ឈុត|ស្បែកជើង|មួក)/;
+  var TYPEP = /^(អាវ|ខោ|ឈុត|ស្បែកជើង|មួក|ខ្សែក្រវ៉ាត់|ខ្សែ|វ៉ែនតា|ម៉ាស់|កាបូប|ស្រោម)/;
   function colorName(c) { return TYPEP.test(c || '') ? '' : (c || ''); }
   function saveEntry(s, change) {
     var d = state.slots[s.id], code = String(d.code).toUpperCase();
@@ -271,7 +314,8 @@
   function saveLabel(s, lbl) {
     var d = state.slots[s.id], payload = JSON.parse(JSON.stringify(d));
     lbl = String(lbl || '').trim();
-    if (lbl && lbl !== defaultLabel(s.id, state.entries[String(d.code).toUpperCase()])) payload.label = lbl; else delete payload.label;
+    var dd = JSON.parse(JSON.stringify(d)); delete dd.label;
+    if (lbl && lbl !== cardLabel(s.id, dd, state.entries[String(d.code).toUpperCase()])) payload.label = lbl; else delete payload.label;
     return write(s.id, payload);
   }
   function flash(input, ok) {
@@ -297,6 +341,33 @@
     return sel;
   }
 
+  var GUIDE_SIZES = { shirt: ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL'] };
+  function saveGuide(kind, size, v) {
+    var g = JSON.parse(JSON.stringify(state.guides || {}));
+    g[kind] = g[kind] || {};
+    if (v) g[kind][size] = v.replace(/\s*kg$/i, ''); else delete g[kind][size];
+    if (demo) { state.guides = g; render(); return Promise.resolve(); }
+    return kvc.doc('live_overlay_guides').set({ data: JSON.stringify(g), updatedAt: new Date() });
+  }
+  function guidesCard() {
+    var card = el('div', 'card'); card.style.setProperty('--accent', 'var(--sub)');
+    var top = el('div', 'top'); top.appendChild(el('span', 'slot', '📏 SIZE GUIDES'));
+    var hide = el('button', 'xbtn', '▾'); hide.type = 'button'; hide.style.borderColor = 'var(--line)'; hide.style.color = 'var(--sub)';
+    hide.onclick = function () { guidesOpen = false; store('vhm_host_guides_open', null); render(); };
+    top.appendChild(hide); card.appendChild(top);
+    card.appendChild(el('div', 'meta', 'Used for any code with no weight of its own. A code\'s own weights always win.'));
+    ['shirt'].forEach(function (k) {
+      card.appendChild(el('h3', 'gh', k === 'shirt' ? 'អាវ (S–4XL)' : 'ខោ (ចង្កេះ 27–40)'));
+      var t = el('div', 'tbl'); t.style.gridTemplateColumns = '50px minmax(0, 1fr)';
+      var g = (state.guides && state.guides[k]) || {};
+      GUIDE_SIZES[k].forEach(function (z) {
+        t.appendChild(el('span', 'sz', z));
+        t.appendChild(editable(g[z] || '', 'kgin', 'kg', function (v) { return saveGuide(k, z, v); }));
+      });
+      card.appendChild(t);
+    });
+    return card;
+  }
   function promoCard() {
     var d = state.slots.promo || { type: 'promo', show: false, title: '', lines: [] };
     var card = el('div', 'card'); card.style.setProperty('--accent', 'var(--promo)');
@@ -338,9 +409,16 @@
     var allSizes = {};
     colors.forEach(function (c) { c.m.forEach(function (z) { allSizes[z.z] = 1; }); });
     var sizes = Object.keys(allSizes).sort(function (a, b) { return sizeKey(a) - sizeKey(b); });
-    var label = d.label || defaultLabel(s.id, entry);
+    var label = cardLabel(s.id, d, entry);
     var fit = (entry && entry.fit) || '';
     var price = String((entry && entry.price) || d.price || '').replace(/\$/g, '');
+    var kind = guessKind(d, entry), K = KINDS[kind], guide = K.optional ? {} : ((state.guides && state.guides[kind]) || {});
+    if (K.optional) {  /* pants: show the KG column only for letter sizes (S–XL) or when this code already has weights */
+      var hasW = Object.keys((entry && entry.weights) || {}).some(function (z) { return String(entry.weights[z] || '').trim(); });
+      var letters = (d.colors || []).some(function (c) { return (c.sizes || []).some(function (x) { return /[A-Z]/i.test(x.z) && x.z !== '—'; }); });
+      K = { t: K.t, kg: hasW || letters, optional: true };
+    }
+    var note = String((entry && entry.note) || '').trim();
 
     var card = el('div', 'card'); card.style.setProperty('--accent', 'var(--' + s.id + ')'); card.dataset.slot = s.id;
     var top = el('div', 'top'); top.appendChild(el('span', 'slot', s.name));
@@ -369,39 +447,62 @@
         if (v === '__other') { var t = prompt('Label for this card', label); if (!t) { render(); return Promise.resolve(); } v = t; }
         return saveLabel(s, v);
       }));
-      meta.appendChild(picker([{ v: '', t: 'No fit' }].concat(FITS.map(function (f) { return { v: f, t: f }; })), fit,
+      if (K.kg || fit) meta.appendChild(picker([{ v: '', t: 'No fit' }].concat(FITS.map(function (f) { return { v: f, t: f }; })), fit,
         function (v) { return saveEntry(s, function (e) { e.fit = v; }); }));
+      var setKind = (entry && KINDS[entry.kind]) ? entry.kind : '';
+      meta.appendChild(picker([{ v: '', t: 'Auto: ' + KINDS[kind].t }].concat(Object.keys(KINDS).map(function (k) { return { v: k, t: KINDS[k].t }; })), setKind,
+        function (v) { return saveEntry(s, function (e) { if (v) e.kind = v; else delete e.kind; }); }));
       if (d.manual) {
         var back = el('button', 'act', '↩ Use Vrich stock'); back.type = 'button';
         back.onclick = function () { var p = JSON.parse(JSON.stringify(d)); delete p.manual; write(s.id, p).catch(function (e) { alert(e.message); }); };
         meta.appendChild(back);
       }
     } else {
-      meta.textContent = label + ' · ' + colors.length + ' ពណ៌ · ' + sizes.length + ' sizes';
+      var kw = KINDS[kind].t.split(' · ')[0];
+      meta.textContent = label + (label.indexOf(kw) >= 0 ? '' : ' · ' + kw) + ' · ' + colors.length + ' ពណ៌' + (K.nosize ? '' : ' · ' + sizes.length + (kind === 'belt' ? ' lengths' : ' sizes'));
       if (fit) meta.appendChild(el('span', 'fit', fit));
     }
     card.appendChild(meta);
+    if (editing) {
+      var nl = el('label', 'notel'); nl.appendChild(document.createTextNode('📝 Note on stream'));
+      nl.appendChild(editable(note, 'notein', K.nosize ? 'e.g. ទំហំតែមួយ · Free size' : (kind === 'belt' ? 'e.g. ប្រវែង 110cm = ចង្កេះ 28–32' : 'e.g. ចង្កេះ 29 = 74cm'),
+        function (v) { return saveEntry(s, function (e) { if (v) e.note = v; else delete e.note; }); }));
+      card.appendChild(nl);
+    } else if (note) card.appendChild(el('div', 'notev', '📝 ' + note));
 
     var w = (entry && entry.weights) || {};
     var inStock = sizes.filter(function (z) { return colors.some(function (c) { return c.m.some(function (x) { return x.z === z && x.remain > 0; }); }); });
-    var missing = inStock.filter(function (z) { return !String(w[z] || '').trim(); });
+    var missing = (!K.kg || K.optional) ? [] : inStock.filter(function (z) { return !String(w[z] || guide[z] || '').trim(); });
     var wStock = {}; inStock.forEach(function (z) { if (w[z]) wStock[z] = w[z]; });
-    if (!entry) card.appendChild(el('div', 'warn', editing ? '⚠ Not in Live Log — type the weights below and it is added' : '⚠ Not in Live Log — customers see no weight or fit'));
+    if (!entry && K.kg && missing.length) card.appendChild(el('div', 'warn', editing ? '⚠ Not in Live Log — type the weights below and it is added' : '⚠ Not in Live Log — customers see no weight or fit'));
     else if (missing.length) card.appendChild(el('div', 'warn', '⚠ No weight for ' + missing.join(', ') + (editing ? ' — type it in the KG column' : '')));
     var wi = weightIssues(wStock); if (entry && wi.length) card.appendChild(el('div', 'warn', '⚠ Check weights: ' + wi.join(' · ')));
 
-    if (colors.length) {
-      var tbl = el('div', 'tbl'); tbl.style.gridTemplateColumns = '50px ' + (editing ? '104px' : '84px') + ' repeat(' + colors.length + ', minmax(0, 1fr))';
-      tbl.appendChild(el('span', 'h', 'SIZE')); tbl.appendChild(el('span', 'h', editing ? 'KG ✏️' : 'KG'));
+    if (colors.length && K.nosize) {
+      /* glasses, masks…: pieces left per colour */
+      var nt = el('div', 'tbl'); nt.style.gridTemplateColumns = '70px repeat(' + colors.length + ', minmax(0, 1fr))';
+      nt.appendChild(el('span', 'h', ''));
+      colors.forEach(function (c) { nt.appendChild(el('span', 'h', c.c || 'stock')); });
+      nt.appendChild(el('span', 'sz', 'pcs'));
+      colors.forEach(function (c) {
+        var n = c.m.reduce(function (a, x) { return a + (Number(x.remain) || 0); }, 0);
+        nt.appendChild(el('span', 'n' + (n === 0 ? ' out' : n <= 2 ? ' low' : ''), String(n)));
+      });
+      card.appendChild(nt);
+    } else if (colors.length) {
+      var kcol = K.kg ? (editing ? '104px ' : '84px ') : '';
+      var tbl = el('div', 'tbl'); tbl.style.gridTemplateColumns = (kind === 'belt' ? '74px ' : '50px ') + kcol + 'repeat(' + colors.length + ', minmax(0, 1fr))';
+      tbl.appendChild(el('span', 'h', kind === 'belt' ? 'LENGTH' : 'SIZE')); if (K.kg) tbl.appendChild(el('span', 'h', editing ? 'KG ✏️' : 'KG'));
       colors.forEach(function (c) { tbl.appendChild(el('span', 'h', c.c || 'stock')); });
       sizes.forEach(function (z) {
-        tbl.appendChild(el('span', 'sz', z));
-        var kg = String(w[z] || '').trim();
-        if (editing) {
-          tbl.appendChild(editable(kg, 'kgin' + (kg ? '' : ' none'), 'kg?', function (v) {
+        tbl.appendChild(el('span', 'sz', showSize(z, kind)));
+        var kg = String(w[z] || '').trim(), gk = String(guide[z] || '').trim();
+        if (!K.kg) { /* belts: the size is the length, no weight column */ }
+        else if (editing) {
+          tbl.appendChild(editable(kg, 'kgin' + (kg || gk ? '' : ' none'), gk ? gk : 'kg?', function (v) {
             return saveEntry(s, function (e) { if (v) e.weights[z] = v.replace(/\s*kg$/i, ''); else delete e.weights[z]; });
           }));
-        } else tbl.appendChild(el('span', 'kg' + (kg ? '' : ' none'), kg || 'no kg'));
+        } else tbl.appendChild(el('span', 'kg' + (kg ? '' : gk ? ' guide' : ' none'), kg || (gk ? gk : 'no kg')));
         colors.forEach(function (c) {
           var x = null; c.m.forEach(function (y) { if (y.z === z) x = y; });
           if (!x) { tbl.appendChild(el('span', 'n na', '—')); return; }
@@ -436,8 +537,10 @@
     gb.textContent = (promoOpen ? '🎁 Giveaway panel: open' : '🎁 Giveaway panel: hidden') + (promo && promo.show ? ' · on stream' : '');
     gb.classList.toggle('on', !!(promo && promo.show));
     var showPromo = editing ? promoOpen : !!(promo && promo.show);
+    document.getElementById('guideBtn').textContent = guidesOpen ? '📏 Size guides: open' : '📏 Size guides';
     grid.innerHTML = '';
     var cols = [];
+    if (editing && guidesOpen) { grid.appendChild(guidesCard()); cols.push(2); }
     if (showPromo) { grid.appendChild(promoCard()); cols.push(editing ? 3 : 2); }
     filled.forEach(function (s) { var r = productCard(s); grid.appendChild(r.card); cols.push(r.weight); });
     if (!filled.length) {
@@ -458,6 +561,7 @@
       var next = JSON.parse(JSON.stringify(st)); next[k] = v; writeSettings(next);
     };
   });
+  document.getElementById('guideBtn').onclick = function () { guidesOpen = !guidesOpen; store('vhm_host_guides_open', guidesOpen ? '1' : null); render(); };
   document.getElementById('giveBtn').onclick = function () { promoOpen = !promoOpen; store('vhm_host_promo_open', promoOpen ? '1' : null); render(); };
   document.getElementById('popsBtn').onclick = function () {
     var next = JSON.parse(JSON.stringify(state.settings)); next.pops = next.pops === false; writeSettings(next);
@@ -530,6 +634,7 @@
       if ((prev && prev.code) !== (now && now.code)) render(); else requestRender();
     }, function () { setConn(false, 'Connection problem — showing the last stock received'); });
   });
+  kvc.doc('live_overlay_guides').onSnapshot(function (snap) { state.guides = parseData(snap) || {}; requestRender(); }, function () {});
   kvc.doc('live_overlay_settings').onSnapshot(function (snap) {
     var d = parseData(snap) || {};
     ['textSize', 'minText', 'width', 'mode', 'pops'].forEach(function (k) { if (d[k] != null) state.settings[k] = d[k]; });

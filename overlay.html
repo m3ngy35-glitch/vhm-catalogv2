@@ -37,10 +37,13 @@
   .line .c { margin-right: 0.55em; white-space: nowrap; word-break: keep-all; }
   .line .z { margin-right: 0.5em; }
   .line .low { color: var(--low); }
+  .line .dim, .line.dim { color: #C9CEC9; font-weight: 500; }
+  .line.small { font-size: 0.86em; line-height: 1.3; }
   .weights { display: flex; flex-direction: column; padding-top: 0.3em; border-top: 1px solid rgba(255,255,255,0.14); }
   .w { white-space: nowrap; font-weight: 700; line-height: 1.5; }
   .w .s { display: inline-block; min-width: 2.6em; }
   .w .k { color: var(--accent); }
+  .note { font-size: 0.86em; font-weight: 700; color: #E1E4E1; white-space: normal; max-width: 13em; line-height: 1.35; padding-top: 0.25em; border-top: 1px solid rgba(255,255,255,0.14); }
   /* safe text mode: plain look only — lines still fit by shrinking, never wrap or spill */
   .text .card { border-left: 0; box-shadow: none; border-radius: 6px; }
   .text .inner { gap: 0.1em; }
@@ -81,7 +84,7 @@
   window.addEventListener('resize', function () { fitStage(); layout(); });
   fitStage();
 
-  var state = { slots: {}, entries: {}, settings: { textSize: 20, minText: 12, width: 2, mode: 'cards' } };
+  var state = { guides: {}, slots: {}, entries: {}, settings: { textSize: 20, minText: 12, width: 2, mode: 'cards' } };
 
   function sizeKey(s) { var i = ORDER.indexOf(s); if (i >= 0) return i; var n = parseFloat(s); return isNaN(n) ? 999 : 100 + n; }
   function kg(v) { v = String(v || '').trim(); if (!v) return ''; return /kg/i.test(v) ? v : v + 'kg'; }
@@ -98,6 +101,41 @@
     if (slotId === 'pants') return 'ខោលើខ្លួន';
     return pants ? 'ខោលើដៃ' : 'អាវលើដៃ';
   }
+  /* ---------- kinds: shirt & pants show weights, belts show length in cm, glasses/masks show colours only ----------
+     Each code's kind is set on the host screen (Live Log "kind"); if not set it is guessed from the Vrich type word and sizes. */
+  var KINDS = {
+    shirt:   { t: 'អាវ · S–4XL',        kg: true },
+    pants:   { t: 'ខោ · ចង្កេះ',          kg: true, optional: true },  /* waist sizes: weight only if that code has its own; never a guide or a warning */
+    belt:    { t: 'ខ្សែក្រវ៉ាត់ · cm',   kg: false, unit: 'cm' },
+    glasses: { t: 'វ៉ែនតា · no size',     kg: false, nosize: true },
+    mask:    { t: 'ម៉ាស់ · no size',      kg: false, nosize: true },
+    other:   { t: 'Other · no size',      kg: false, nosize: true }
+  };
+  function guessKind(d, entry) {
+    if (entry && KINDS[entry.kind]) return entry.kind;
+    var t = [(entry && entry.garmentType) || '', (d && d.type) || '', (d && d.label) || ''].join(' ');
+    if (/ខ្សែក្រវ៉ាត់|ខ្សែ|belt/i.test(t)) return 'belt';
+    if (/វ៉ែនតា|glass/i.test(t)) return 'glasses';
+    if (/ម៉ាស់|mask/i.test(t)) return 'mask';
+    var zs = [];
+    ((d && d.colors) || []).forEach(function (c) { (c.sizes || []).forEach(function (s) { zs.push(String(s.z || '')); }); });
+    var real = zs.filter(function (z) { return z && z !== '—' && !/^(F|FREE|FS|OS)$/i.test(z); });
+    if (zs.length && !real.length) return 'other';
+    if (real.length && real.every(function (z) { return /^\d+(\.\d)?(CM)?$/i.test(z); })) {
+      return Math.max.apply(null, real.map(parseFloat)) >= 60 ? 'belt' : 'pants';
+    }
+    if (/ខោ/.test(t)) return 'pants';
+    return 'shirt';
+  }
+  var KIND_LABEL = { belt: 'ខ្សែក្រវ៉ាត់', glasses: 'វ៉ែនតា', mask: 'ម៉ាស់' };
+  function cardLabel(slotId, d, entry) {
+    if (d && d.label) return d.label;
+    var gt = String((entry && entry.garmentType) || '').trim(), k = guessKind(d, entry);
+    if (KIND_LABEL[k]) return gt && !/^(អាវ|ខោ)លើ/.test(gt) ? gt : KIND_LABEL[k];
+    return defaultLabel(slotId, entry);
+  }
+  function showSize(z, kind) { return kind === 'belt' && /^\d+(\.\d)?$/.test(z) ? z + 'cm' : String(z).replace(/CM$/i, 'cm'); }
+
   /* merge one slot's Vrich stock with its Live Log entry */
   function model(slot) {
     var d = state.slots[slot.id];
@@ -107,24 +145,28 @@
     }
     if (!d || !d.code) return null;
     var entry = state.entries[String(d.code).toUpperCase()] || {};
+    var kind = guessKind(d, entry), K = KINDS[kind];
     var colors = (d.manual && d.manual.colors)
       /* colours/sizes typed by hand on the host screen (stream only); everything else still comes from Live Log */
       ? d.manual.colors.map(function (c) { return { c: c.c, sizes: (c.sizes || []).map(function (z) { var low = z.charAt(0) === '!'; return { z: low ? z.slice(1) : z, low: low }; }) }; })
       : (d.colors || []).map(function (c) {
-      var sizes = (c.sizes || []).filter(function (s) { return s.remain > 0; })
-        .sort(function (a, b) { return sizeKey(a.z) - sizeKey(b.z); })
+      var inStock = (c.sizes || []).filter(function (s) { return s.remain > 0; });
+      var total = inStock.reduce(function (a, s) { return a + (Number(s.remain) || 0); }, 0);
+      var sizes = inStock.sort(function (a, b) { return sizeKey(a.z) - sizeKey(b.z); })
         .map(function (s) { return { z: s.z, low: s.remain <= 2 }; });
-      return { c: /^(អាវ|ខោ|ឈុត|ស្បែកជើង|មួក)/.test(c.c || '') ? '' : (c.c || ''), sizes: sizes };
+      return { c: /^(អាវ|ខោ|ឈុត|ស្បែកជើង|មួក|ខ្សែក្រវ៉ាត់|ខ្សែ|វ៉ែនតា|ម៉ាស់|កាបូប|ស្រោម)/.test(c.c || '') ? '' : (c.c || ''), sizes: sizes, low: total <= 2 };
     }).filter(function (c) { return c.sizes.length; });
     var all = {}; colors.forEach(function (c) { c.sizes.forEach(function (s) { all[s.z] = 1; }); });
-    var weights = entry.weights || {};
-    var sizes = Object.keys(all).sort(function (a, b) { return sizeKey(a) - sizeKey(b); })
-      .map(function (s) { return { s: s, k: kg(weights[s]) }; }).filter(function (x) { return x.k; });
+    var weights = entry.weights || {}, guide = K.optional ? {} : ((state.guides && state.guides[kind]) || {});
+    var sizes = !K.kg ? [] : Object.keys(all).sort(function (a, b) { return sizeKey(a) - sizeKey(b); })
+      .map(function (s) { return { s: s, k: kg(weights[s] || guide[s]) }; }).filter(function (x) { return x.k; });
+    if (K.nosize) colors = colors.map(function (c) { return { c: c.c, sizes: [], low: c.low }; });
+    else colors.forEach(function (c) { c.sizes.forEach(function (s) { s.z = showSize(s.z, kind); }); });
     return {
-      key: slot.id, at: d.at || '', code: d.code,
-      label: d.label || defaultLabel(slot.id, entry),
+      key: slot.id, at: d.at || '', code: d.code, kind: kind, nosize: !!K.nosize,
+      label: cardLabel(slot.id, d, entry),
       fit: entry.fit || '', price: money(entry.price || d.price),
-      colors: colors, sizes: sizes
+      colors: colors, sizes: sizes, note: String(entry.note || '').trim()
     };
   }
 
@@ -143,17 +185,28 @@
     var cr = el('div', 'codeRow'); cr.appendChild(el('span', 'code', m.code)); cr.appendChild(el('span', 'price', m.price)); inner.appendChild(cr);
     var lines = el('div');
     if (!m.colors.length) lines.appendChild(el('div', 'line', 'អស់ស្តុក'));
-    m.colors.forEach(function (c) {
+    if (m.nosize && m.colors.length) {
+      /* glasses, masks…: just the colours in stock, on one line (orange = last pieces) */
+      var one = el('div', 'line');
+      m.colors.forEach(function (c) { one.appendChild(el('span', 'z' + (c.low ? ' low' : ''), c.c || 'មានស្តុក')); });
+      lines.appendChild(one);
+    } else {
+      if (m.kind === 'pants' && m.colors.some(function (c) { return c.c; })) lines.appendChild(el('div', 'line dim small', 'ចង្កេះ'));
+      m.colors.forEach(function (c) {
       var ln = el('div', 'line'); if (c.c) ln.appendChild(el('span', 'c', c.c));
+      else if (m.kind === 'pants') ln.appendChild(el('span', 'c dim', 'ចង្កេះ')); /* no colour in Vrich: say what the numbers are */
+      else if (m.kind === 'belt') ln.appendChild(el('span', 'c dim', 'ប្រវែង'));
       c.sizes.forEach(function (s) { ln.appendChild(el('span', 'z' + (s.low ? ' low' : ''), s.z)); });
       lines.appendChild(ln);
-    });
+      });
+    }
     inner.appendChild(lines);
     if (m.sizes.length) {
       var w = el('div', 'weights');
       m.sizes.forEach(function (x) { var r = el('div', 'w'); r.appendChild(el('span', 's', x.s)); r.appendChild(el('span', 'k', x.k)); w.appendChild(r); });
       inner.appendChild(w);
     }
+    if (m.note) inner.appendChild(el('div', 'note', m.note));
     card.dataset.key = m.key; card.dataset.at = m.at;
     return card;
   }
@@ -256,6 +309,7 @@
       state.slots[s.id] = parseData(snap); syncEntryListeners(); rerender();
     }, function (err) { console.warn('Slot ' + s.id + ' listener failed — keeping the last cards on screen', err); });
   });
+  kvc.doc('live_overlay_guides').onSnapshot(function (snap) { state.guides = parseData(snap) || {}; rerender(); }, function () {});
   kvc.doc('live_overlay_settings').onSnapshot(function (snap) {
     var d = parseData(snap) || {};
     ['textSize', 'minText', 'width', 'mode'].forEach(function (k) { if (d[k] != null) state.settings[k] = d[k]; });
