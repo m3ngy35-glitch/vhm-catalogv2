@@ -34,16 +34,17 @@
   .card[data-promo] .inner { width: auto; max-width: 100%; }
   .card[data-promo] .line, .card[data-promo] .promoTitle { white-space: normal; overflow-wrap: anywhere; }
   .line { white-space: nowrap; font-weight: 700; line-height: 1.5; }
-  .line .c { margin-right: 0.55em; white-space: nowrap; word-break: keep-all; }
+  .line .c { margin-right: 0.55em; }
   .line .z { margin-right: 0.5em; }
   .line .low { color: var(--low); }
   .weights { display: flex; flex-direction: column; padding-top: 0.3em; border-top: 1px solid rgba(255,255,255,0.14); }
   .w { white-space: nowrap; font-weight: 700; line-height: 1.5; }
   .w .s { display: inline-block; min-width: 2.6em; }
   .w .k { color: var(--accent); }
-  /* safe text mode: plain look only — lines still fit by shrinking, never wrap or spill */
-  .text .card { border-left: 0; box-shadow: none; border-radius: 6px; }
-  .text .inner { gap: 0.1em; }
+  /* safe text mode: plain lines, wraps instead of resizing */
+  .text .card { max-width: 100%; border-left: 0; box-shadow: none; border-radius: 6px; }
+  .text .inner { width: auto; max-width: 100%; gap: 0.1em; }
+  .text .line, .text .w { white-space: normal; }
   .text .head, .text .codeRow { justify-content: flex-start; }
   .text .code { font-size: 1.1em; }
 </style>
@@ -170,10 +171,10 @@
   }
 
   /* V8 rules: shrink only cards that are too wide; keep the newest cards at their best size,
-     hide the oldest if more than 2 do not fit. Text mode uses the same fitting, only a plainer look. */
+     hide the oldest if more than 2 do not fit; text mode just wraps at the set size. */
   function layout() {
     var st = state.settings; var cards = Array.prototype.slice.call(col.children);
-    if (!cards.length) return;
+    if (!cards.length || st.mode === 'text') return;
     var base = Number(st.textSize) || 20, MIN = Math.min(base, Number(st.minText) || 12);
     var wLimit = parseFloat(col.style.width);
     cards.forEach(function (card) {
