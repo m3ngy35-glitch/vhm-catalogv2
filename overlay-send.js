@@ -22,6 +22,113 @@
     setTimeout(function () { n.remove(); }, 3000);
   }
 
+
+  /* ---------- 📣 Auto thank-you: starts once per Vrich tab, runs until the tab closes or ⏹ ----------
+     Every 20 s: reads which codes are on stream, asks Vrich (the same request the Sale page makes)
+     for the orders of those products only, and sends NEW orders (short Facebook name + code/colour/size)
+     to kv/live_overlay_thanks. Orders that existed before it started are never thanked.
+     Read only in Vrich. Turned on/off for the stream from the host screen (settings.pops). */
+
+  /* One Vrich row → base code, colour, size.
+     Shirts: "E100 អាវ ខ្មៅ 2XL" → E100 / ខ្មៅ / 2XL.
+     Pants listed one size per code: "AW32 ខោ" → AW / (no colour) / 32, so AW32 + AW34 become one card "AW" with sizes 32 34. */
+  var TYPEW = /^(អាវ|ខោ|ឈុត|ស្បែកជើង|មួក)/;
+  var SIZEW = /^(XXS|XS|S|M|L|XL|XXL|XXXL|[2-6]XL|F|FREE|FS|OS|\d{2}(\.\d)?)$/i;
+  function splitRow(code, tokens) {
+    code = String(code || '').trim().toUpperCase();
+    tokens = (tokens || []).slice();
+    var z = '';
+    if (tokens.length && SIZEW.test(tokens[tokens.length - 1])) z = tokens.pop().toUpperCase();
+    var pants = tokens.some(function (t) { return /^ខោ/.test(t); });
+    var cut = !z && code.match(/^([A-Z][A-Z0-9-]*?[A-Z])(2[4-9]|3\d|4[0-6])$/);
+    if (cut && (pants || cut[1].replace(/[^A-Z]/g, '').length >= 2)) { code = cut[1]; z = cut[2]; }
+    if (tokens.length > 1) tokens.shift();            /* first word is the type, as Send stock reads it */
+    var c = tokens.filter(function (t) { return !TYPEW.test(t); }).join(' ');
+    return { code: code, c: c, z: z || '—' };
+  }
+
+  /* startThanks();  — auto thank-you: switched on once its look is chosen */
+  function startThanks() {
+    if (window.__vhmThanks && window.__vhmThanks.alive) return;
+    var W = window.__vhmThanks = { alive: true, sent: 0, seen: {}, primed: {}, counts: {}, lastFetch: {}, recent: [] };
+    var badge = document.createElement('div');
+    badge.id = 'vhm-thanks-badge';
+    badge.style.cssText = 'position:fixed;left:12px;bottom:12px;z-index:999998;background:#151816;color:#fff;font:600 13px system-ui,sans-serif;padding:7px 8px 7px 12px;border-radius:999px;box-shadow:0 4px 14px rgba(0,0,0,.3);display:flex;gap:8px;align-items:center';
+    document.body.appendChild(badge);
+    function paint(state) {
+      badge.innerHTML = '';
+      var t = document.createElement('span'); t.textContent = '📣 Auto thank-you · ' + state + ' · ' + W.sent + ' sent';
+      var x = document.createElement('button'); x.type = 'button'; x.textContent = '⏹'; x.title = 'Stop auto thank-you in this tab';
+      x.style.cssText = 'background:#3A2424;border:0;border-radius:999px;color:#fff;cursor:pointer;font-size:12px;padding:3px 7px';
+      x.onclick = function () { W.alive = false; clearInterval(W.timer); badge.remove(); };
+      badge.appendChild(t); badge.appendChild(x);
+    }
+    function jget(k) {
+      return fetch(API + k + AK).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+        try { var v = j && j.fields && j.fields.data && j.fields.data.stringValue; return v ? JSON.parse(v) : null; } catch (e) { return null; }
+      }).catch(function () { return null; });
+    }
+    function shortName(n) {
+      var p = String(n || '').trim().split(/\s+/).filter(Boolean);
+      if (!p.length) return '';
+      return p.length > 1 ? p[0] + ' ' + p[1].charAt(0) + '.' : p[0];
+    }
+    function parseDesc(code, desc) { return splitRow(code, String(desc || '').trim().split(/\s+/).filter(Boolean)); }
+    function products() {
+      var out = [], $ = window.jQuery;
+      document.querySelectorAll('.monitor-item:not(.dummy)').forEach(function (li) {
+        var id = li.getAttribute('data-id');
+        var code = ($ && $(li).data('code')) || li.getAttribute('data-code');
+        var desc = ($ && $(li).data('description')) || li.getAttribute('data-description');
+        var cnt = $ ? $(li).data('details_count') : null;
+        if (cnt == null) cnt = li.getAttribute('data-details_count');
+        if (id && code) { var sr = parseDesc(code, desc); out.push({ id: id, code: sr.code, c: sr.c, z: sr.z, cnt: String(cnt) }); }
+      });
+      return out;
+    }
+    function tick() {
+      if (!W.alive) return;
+      jget('live_overlay_settings').then(function (st) {
+        if (st && st.pops === false) { paint('off (host screen)'); return; }
+        return Promise.all(SLOTS.map(function (s) { return jget('live_overlay_' + s.id); })).then(function (slots) {
+          var codes = {};
+          slots.forEach(function (d) { if (d && d.code) codes[String(d.code).toUpperCase()] = 1; });
+          if (!Object.keys(codes).length) { paint('waiting for a code on stream'); return; }
+          var now = Date.now();
+          var due = products().filter(function (it) {
+            return codes[it.code] && (!W.primed[it.id] || W.counts[it.id] !== it.cnt || now - (W.lastFetch[it.id] || 0) > 60000);
+          });
+          return Promise.all(due.map(function (it) {
+            return fetch('/order/getProduct/' + it.id, { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (data) {
+              W.lastFetch[it.id] = now; W.counts[it.id] = it.cnt;
+              if (!data || !data.details) return [];
+              var dc = { c: it.c, z: it.z }, fresh = [], first = !W.primed[it.id];
+              data.details.forEach(function (d) {
+                var key = String(d.id || d.order_id);
+                if (W.seen[key]) return;
+                W.seen[key] = 1;
+                if (first) return;                       /* already there before we started watching */
+                if (d.status === 'S' || !d.facebook_name) return;  /* waiting-list entries are not orders */
+                fresh.push({ id: key, name: shortName(d.facebook_name), code: it.code, c: dc.c, z: dc.z, at: new Date().toISOString() });
+              });
+              W.primed[it.id] = true;
+              return fresh;
+            }).catch(function () { return []; });
+          })).then(function (groups) {
+            var fresh = [].concat.apply([], groups);
+            paint('on');
+            if (!fresh.length) return;
+            W.recent = W.recent.concat(fresh).slice(-12);
+            return put('thanks', { items: W.recent, at: new Date().toISOString() }).then(function () { W.sent += fresh.length; paint('on'); });
+          });
+        });
+      }).catch(function () { paint('connection problem — retrying'); });
+    }
+    paint('starting');
+    tick();
+    W.timer = setInterval(tick, 20000);
+  }
+
   /* 1. Collect rows — same selectors as Send stock */
   var lines = [];
   document.querySelectorAll('.monitor-item:not(.dummy)').forEach(function (li) {
@@ -46,12 +153,9 @@
     var ls = m[1].split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
     var line = (ls.length ? ls[ls.length - 1] : '').replace(/^\*+\s*/, '').replace(/!/g, '').trim();
     if (!line) continue;
-    var parts = line.split(/\s+/), code = parts.shift();
-    if (!code) continue;
-    var size = parts.length ? parts.pop() : '';
-    if (parts.length > 1) parts.shift();
-    var color = parts.join(' ');
-    if (/^(អាវ|ខោ|ឈុត|អាវក្រៅ|ខោខ្លី|ខោជើងវែង|ស្បែកជើង|មួក)$/.test(color)) color = ''; /* no colour in Vrich: the word left is the garment type */
+    var parts = line.split(/\s+/), rawCode = parts.shift();
+    if (!rawCode) continue;
+    var row = splitRow(rawCode, parts), code = row.code, size = row.z, color = row.c;
     if (!codes[code]) { codes[code] = { code: code, price: m[2], colors: [] }; order.push(code); }
     var e = codes[code], col = null;
     for (var i = 0; i < e.colors.length; i++) if (e.colors[i].c === color) col = e.colors[i];
@@ -114,7 +218,7 @@
       return { bad: true, html: '⚠ Check weights in Live Log:<br>' + issues.join('<br>') };
     }).catch(function () { return { bad: true, html: '⚠ Could not read Live Log — check the connection' }; });
   }
-  var DEF = { textSize: 20, minText: 12, width: 2, mode: 'cards' };
+  var DEF = { textSize: 20, minText: 12, width: 2, mode: 'cards', pops: true };
   function getSettings() { return getSlot('settings').then(function (d) { var o = {}; for (var k in DEF) o[k] = d && d[k] != null ? d[k] : DEF[k]; return o; }); }
   function setSettings(o) { return put('settings', o); }
 
