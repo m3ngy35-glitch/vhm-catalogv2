@@ -47,7 +47,7 @@
     return { code: code, c: c, z: z || '—' };
   }
 
-  /* startThanks();  — auto thank-you: switched on once its look is chosen */
+  startThanks();
   function startThanks() {
     if (window.__vhmThanks && window.__vhmThanks.alive) return;
     var W = window.__vhmThanks = { alive: true, sent: 0, seen: {}, primed: {}, counts: {}, lastFetch: {}, recent: [] };
@@ -109,7 +109,7 @@
                 W.seen[key] = 1;
                 if (first) return;                       /* already there before we started watching */
                 if (d.status === 'S' || !d.facebook_name) return;  /* waiting-list entries are not orders */
-                fresh.push({ id: key, name: shortName(d.facebook_name), code: it.code, c: dc.c, z: dc.z, at: new Date().toISOString() });
+                fresh.push({ id: key, name: String(d.facebook_name).trim(), comment: String(d.comment || '').replace(/\s+/g, ' ').trim().slice(0, 60), code: it.code, c: dc.c, z: dc.z, at: new Date().toISOString() });
               });
               W.primed[it.id] = true;
               return fresh;

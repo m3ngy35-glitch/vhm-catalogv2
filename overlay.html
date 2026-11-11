@@ -34,17 +34,16 @@
   .card[data-promo] .inner { width: auto; max-width: 100%; }
   .card[data-promo] .line, .card[data-promo] .promoTitle { white-space: normal; overflow-wrap: anywhere; }
   .line { white-space: nowrap; font-weight: 700; line-height: 1.5; }
-  .line .c { margin-right: 0.55em; }
+  .line .c { margin-right: 0.55em; white-space: nowrap; word-break: keep-all; }
   .line .z { margin-right: 0.5em; }
   .line .low { color: var(--low); }
   .weights { display: flex; flex-direction: column; padding-top: 0.3em; border-top: 1px solid rgba(255,255,255,0.14); }
   .w { white-space: nowrap; font-weight: 700; line-height: 1.5; }
   .w .s { display: inline-block; min-width: 2.6em; }
   .w .k { color: var(--accent); }
-  /* safe text mode: plain lines, wraps instead of resizing */
-  .text .card { max-width: 100%; border-left: 0; box-shadow: none; border-radius: 6px; }
-  .text .inner { width: auto; max-width: 100%; gap: 0.1em; }
-  .text .line, .text .w { white-space: normal; }
+  /* safe text mode: plain look only — lines still fit by shrinking, never wrap or spill */
+  .text .card { border-left: 0; box-shadow: none; border-radius: 6px; }
+  .text .inner { gap: 0.1em; }
   .text .head, .text .codeRow { justify-content: flex-start; }
   .text .code { font-size: 1.1em; }
 </style>
@@ -56,7 +55,10 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 <script>
 (function () {
-  var ACCENT = '#F1D88E', LOW = '#FF9F43', SAFE = 22, TOP = 134, BOTTOM_KEEP = 88;
+  var ACCENT = '#F1D88E', LOW = '#FF9F43', TOP = 134, BOTTOM_KEEP = 88;
+  /* Facebook fills tall phones (19.5:9) with this 9:16 video and cuts about 9% off each side
+     (48 of 540 units). Cards stay inside what phones really show, plus a small gap. */
+  var CROP = 48, GAP = 8, SAFE = CROP + GAP;
   var ORDER = ['XS','S','M','L','XL','2XL','3XL','4XL','5XL'];
   var SLOTS = [
     { id: 'promo', label: '' },
@@ -112,7 +114,7 @@
       var sizes = (c.sizes || []).filter(function (s) { return s.remain > 0; })
         .sort(function (a, b) { return sizeKey(a.z) - sizeKey(b.z); })
         .map(function (s) { return { z: s.z, low: s.remain <= 2 }; });
-      return { c: /^(អាវ|ខោ|ឈុត|អាវក្រៅ|ខោខ្លី|ខោជើងវែង|ស្បែកជើង|មួក)$/.test(c.c || '') ? '' : (c.c || ''), sizes: sizes };
+      return { c: /^(អាវ|ខោ|ឈុត|ស្បែកជើង|មួក)/.test(c.c || '') ? '' : (c.c || ''), sizes: sizes };
     }).filter(function (c) { return c.sizes.length; });
     var all = {}; colors.forEach(function (c) { c.sizes.forEach(function (s) { all[s.z] = 1; }); });
     var weights = entry.weights || {};
@@ -163,7 +165,7 @@
       .filter(function (m) { return dropped.indexOf(m.key) < 0; });
     stage.classList.toggle('text', st.mode === 'text');
     col.style.right = SAFE + 'px';
-    col.style.width = (onlySlot ? 540 - SAFE * 2 : Math.round(540 * st.width / 6) - SAFE) + 'px';
+    col.style.width = (onlySlot ? 540 - SAFE * 2 : Math.round((540 - CROP * 2) * st.width / 6) - GAP) + 'px';
     if (onlySlot) { col.style.right = 'auto'; col.style.left = SAFE + 'px'; col.style.top = SAFE + 'px'; col.style.alignItems = 'flex-start'; }
     col.innerHTML = '';
     models.forEach(function (m) { var c = cardEl(m); c.style.fontSize = st.textSize + 'px'; col.appendChild(c); });
@@ -171,29 +173,33 @@
   }
 
   /* V8 rules: shrink only cards that are too wide; keep the newest cards at their best size,
-     hide the oldest if more than 2 do not fit; text mode just wraps at the set size. */
+     hide the oldest if more than 2 do not fit. Text mode uses the same fitting, only a plainer look. */
   function layout() {
     var st = state.settings; var cards = Array.prototype.slice.call(col.children);
-    if (!cards.length || st.mode === 'text') return;
+    if (!cards.length) return;
     var base = Number(st.textSize) || 20, MIN = Math.min(base, Number(st.minText) || 12);
     var wLimit = parseFloat(col.style.width);
+    /* ONE text size for every card on screen, so the code (big = 1.35×) and the lines (normal = 1×)
+       always match between cards. It is the set Text size, unless the longest line on any card would
+       not fit the width — then all cards go down together (never below Smallest). */
+    var shared = base;
     cards.forEach(function (card) {
-      if (card.dataset.promo) { card.style.fontSize = base + 'px'; return; } /* giveaway text wraps instead of shrinking */
-      var inner = card.firstChild, head = inner.firstChild; card.style.fontSize = base + 'px';
+      card.style.fontSize = base + 'px';
+      if (card.dataset.promo) return;  /* giveaway text wraps instead */
+      var inner = card.firstChild, head = inner.firstChild;
       head.style.display = 'none'; var natural = inner.scrollWidth; head.style.display = '';
-      var px = Math.max(MIN, Math.min(base, (wLimit - 3) / (natural / base + 1.45)));
-      card.style.fontSize = px.toFixed(1) + 'px';
+      shared = Math.min(shared, (wLimit - 3) / (natural / base + 1.45));
     });
+    shared = Math.max(MIN, shared);
+    function apply(px) { cards.forEach(function (card) { card.style.fontSize = px.toFixed(1) + 'px'; }); }
+    apply(shared);
     if (onlySlot) return;
     var availH = 960 - TOP - BOTTOM_KEEP, H = col.offsetHeight;
     if (H > availH && cards.length > 2) {
       var oldest = cards.filter(function (c) { return !c.dataset.promo; }).sort(function (a, b) { return String(a.dataset.at).localeCompare(String(b.dataset.at)); })[0];
       dropped.push(oldest.dataset.key); render(); return;
     }
-    if (H > availH) {
-      var f = availH / H;
-      cards.forEach(function (card) { card.style.fontSize = Math.max(MIN, parseFloat(card.style.fontSize) * f).toFixed(1) + 'px'; });
-    }
+    if (H > availH) apply(Math.max(MIN, shared * availH / H));
   }
   function rerender() { dropped = []; render(); }
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { layout(); });
