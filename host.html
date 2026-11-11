@@ -83,6 +83,15 @@
   .act.save { background: var(--save); color: #fff; }
   .act.danger { background: transparent; border: 1px solid var(--bad); color: var(--bad); }
   .msg { font-size: 14px; color: var(--sub); min-height: 18px; }
+  .xbtn { min-width: 34px; min-height: 34px; border-radius: 8px; border: 1px solid var(--bad); background: transparent; color: var(--bad); font-weight: 700; cursor: pointer; }
+  .pwrap { display: inline-flex; align-items: baseline; gap: 2px; }
+  .pin { width: 96px; font: 700 26px 'Space Grotesk', sans-serif; color: var(--accent); background: var(--field); border: 1px dashed var(--line); border-radius: 8px; padding: 2px 8px; }
+  .pick { font: 700 17px 'Kantumruy Pro', system-ui, sans-serif; color: var(--text); background: var(--field); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; margin-right: 8px; min-height: 40px; }
+  .meta .act { min-height: 40px; }
+  .kgin { width: 100%; box-sizing: border-box; text-align: center; padding: 8px 2px; border-radius: 8px; border: 1px dashed var(--line); background: var(--wBg); color: var(--text); font: 700 20px 'Space Grotesk', sans-serif; }
+  .kgin.none { background: var(--warnBg); color: var(--warnText); }
+  .kgin:focus, .pin:focus { outline: 2px solid var(--accent); border-style: solid; }
+  .saving { opacity: .6; } .saved { outline: 2px solid var(--pants) !important; } .failed { outline: 2px solid var(--bad) !important; }
   .legend { display: flex; gap: 22px; font-size: 16px; color: var(--sub); flex-wrap: wrap; }
   .legend b { color: var(--text); } .legend .l { color: var(--lowText); }
 </style>
@@ -101,6 +110,7 @@
   <span class="grp">Smallest <button class="sm" data-k="minText" data-d="-1">−</button><b id="v_minText">12</b><button class="sm" data-k="minText" data-d="1">+</button></span>
   <span class="grp">Width <button class="sm" data-k="width" data-d="-1">−</button><b id="v_width">2/6</b><button class="sm" data-k="width" data-d="1">+</button></span>
   <button class="tbtn" id="modeBtn">🃏 Cards</button>
+  <button class="tbtn" id="popsBtn">📣 Thank-you pop-ups: On</button>
 </div>
 <div id="grid"></div>
 <div class="legend"><span><b>5</b> pieces left</span><span class="l"><b style="color:inherit">2</b> only 1–2 left</span><span><s>0</s> sold out</span><span>— size not in this colour</span><span>✋ sizes typed by hand (🔄 Refresh won't overwrite them)</span></div>
@@ -119,7 +129,7 @@
   ];
   var params = new URLSearchParams(location.search);
   var demo = params.get('demo') === '1';
-  var state = { slots: {}, entries: {}, settings: { textSize: 20, minText: 12, width: 2, mode: 'cards' } };
+  var state = { slots: {}, entries: {}, settings: { textSize: 20, minText: 12, width: 2, mode: 'cards', pops: true } };
   var drafts = {};
   var grid = document.getElementById('grid');
 
@@ -165,7 +175,7 @@
     return (d.colors || []).map(function (c) {
       var z = (c.sizes || []).filter(function (x) { return x.remain > 0; }).sort(function (a, b) { return sizeKey(a.z) - sizeKey(b.z); })
         .map(function (x) { return (x.remain <= 2 ? '!' : '') + x.z; });
-      return { c: /^(អាវ|ខោ|ឈុត|អាវក្រៅ|ខោខ្លី|ខោជើងវែង|ស្បែកជើង|មួក)$/.test(c.c || '') ? '' : (c.c || ''), sizes: z };
+      return { c: /^(អាវ|ខោ|ឈុត|ស្បែកជើង|មួក)/.test(c.c || '') ? '' : (c.c || ''), sizes: z };
     }).filter(function (c) { return c.sizes.length; });
   }
   function derived(slot) {
@@ -226,15 +236,13 @@
   }
   function liveLogKey(code) { return 'live_log:' + String(code).trim().toUpperCase().replace(/\//g, '-'); }
 
-  /* Save: label, price, fit and weights go into the code's Live Log entry (permanent, every future live);
-     colour/size lines are stream-only and only stored on the card when they differ from Vrich. */
-  function saveCard(s, v) {
+  /* ---------- inline editing (edit mode): every change saves by itself ----------
+     Price, fit and weights → that code's Live Log entry (permanent, every future live).
+     Label → this card only (stream). Nothing to press "Save". */
+  var TYPEP = /^(អាវ|ខោ|ឈុត|ស្បែកជើង|មួក)/;
+  function colorName(c) { return TYPEP.test(c || '') ? '' : (c || ''); }
+  function saveEntry(s, change) {
     var d = state.slots[s.id], code = String(d.code).toUpperCase();
-    var colorsChanged = JSON.stringify(v.colors) !== JSON.stringify(vrichColors(d));
-    var slotPayload = JSON.parse(JSON.stringify(d));
-    if (colorsChanged) slotPayload.manual = { colors: v.colors }; else delete slotPayload.manual;
-    var lbl = v.label.trim();
-    if (lbl && lbl !== defaultLabel(s.id, state.entries[code])) slotPayload.label = lbl; else delete slotPayload.label;
     function merge(old) {
       var e = old ? JSON.parse(JSON.stringify(old)) : {
         code: code, showWeight: true,
@@ -242,13 +250,11 @@
         weights: {}
       };
       if (!old) e.colorsText = e.colors.map(function (c) { return c.color + ':' + c.sizes.join(' '); }).join('\n');
-      e.fit = v.fit; e.price = v.price.trim().replace(/\$/g, '');
-      var w = Object.assign({}, e.weights || {});
-      v.weights.forEach(function (x) { if (x.s) w[x.s] = x.k; });
-      e.weights = w; e.updatedAt = new Date().toISOString();
+      e.weights = Object.assign({}, e.weights || {});
+      change(e); e.updatedAt = new Date().toISOString();
       return e;
     }
-    if (demo) { state.entries[code] = merge(state.entries[code]); state.slots[s.id] = slotPayload; return Promise.resolve(); }
+    if (demo) { state.entries[code] = merge(state.entries[code]); render(); return Promise.resolve(); }
     var db = firebase.firestore(), ref = kvc.doc(liveLogKey(code));
     return ref.get({ source: 'server' }).then(function (snap) {
       var old = snap.exists ? snap.data().data : null;
@@ -257,57 +263,36 @@
       mark[code] = new Date().toISOString();
       batch.set(ref, { data: merge(old), updatedAt: ts });
       batch.set(kvc.doc('live_log_remote_edits'), { data: mark, updatedAt: ts }, { merge: true });
-      batch.set(kvc.doc('live_overlay_' + s.id), { data: JSON.stringify(slotPayload), updatedAt: new Date() });
       return batch.commit();
     });
   }
-
-  function productEditor(s, card) {
-    var d = state.slots[s.id];
-    var dr = drafts[s.id]; if (!dr || !dr.dirty) dr = drafts[s.id] = { v: derived(s), dirty: false };
-    var v = dr.v, msg = el('div', 'msg', dr.dirty ? 'Not saved yet' : (d.manual ? '✋ Colours/sizes typed by hand (stream only)' : 'Showing Vrich stock + Live Log'));
-    function touch() { dr.dirty = true; msg.textContent = 'Not saved yet'; }
-    var ed = el('div', 'ed'); ed.appendChild(el('h3', null, '✏️ CUSTOMERS SEE — ' + v.code));
-    var r = el('div', 'row2'); r.style.gridTemplateColumns = 'minmax(0,2fr) minmax(0,1fr)';
-    var lblField = field('Label on this card (stream only)', v.label, function (x) { v.label = x; touch(); markChips(); });
-    r.appendChild(lblField);
-    r.appendChild(field('Price — saved in Live Log', v.price, function (x) { v.price = x; touch(); }));
-    ed.appendChild(r);
-    var lchips = el('div', 'chips');
-    function markChips() { lchips.querySelectorAll('.chip').forEach(function (x) { x.classList.toggle('on', x.textContent === v.label.trim()); }); }
-    STD_LABELS.forEach(function (t) {
-      var c = el('button', 'chip', t); c.type = 'button';
-      c.onclick = function () { v.label = t; lblField.querySelector('input').value = t; touch(); markChips(); };
-      lchips.appendChild(c);
+  function saveLabel(s, lbl) {
+    var d = state.slots[s.id], payload = JSON.parse(JSON.stringify(d));
+    lbl = String(lbl || '').trim();
+    if (lbl && lbl !== defaultLabel(s.id, state.entries[String(d.code).toUpperCase()])) payload.label = lbl; else delete payload.label;
+    return write(s.id, payload);
+  }
+  function flash(input, ok) {
+    input.classList.remove('saving');
+    input.classList.add(ok ? 'saved' : 'failed');
+    setTimeout(function () { input.classList.remove('saved'); }, 1200);
+  }
+  function editable(value, cls, placeholder, onSave) {
+    var i = document.createElement('input'); i.className = cls; i.value = value || ''; i.placeholder = placeholder || '';
+    var start = i.value;
+    i.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); i.blur(); } if (e.key === 'Escape') { i.value = start; i.blur(); } });
+    i.addEventListener('change', function () {
+      if (i.value.trim() === start.trim()) return;
+      i.classList.add('saving');
+      onSave(i.value.trim()).then(function () { start = i.value; flash(i, true); }, function (err) { flash(i, false); alert('Not saved: ' + err.message); });
     });
-    ed.appendChild(lchips); markChips();
-    var fitL = el('label'); fitL.appendChild(document.createTextNode('Fit'));
-    var chips = el('div', 'chips');
-    FITS.concat(['']).forEach(function (f) {
-      var c = el('button', 'chip' + (v.fit === f ? ' on' : ''), f || '✕ None'); c.type = 'button';
-      c.onclick = function () { v.fit = f; touch(); chips.querySelectorAll('.chip').forEach(function (x) { x.classList.toggle('on', x === c); }); };
-      chips.appendChild(c);
-    });
-    fitL.appendChild(chips); ed.appendChild(fitL);
-    ed.appendChild(field('Weights (one size per line) — saved in Live Log', weightsToText(v.weights.filter(function (w) { return w.k; })) + (v.weights.some(function (w) { return !w.k; }) ? '\n' + v.weights.filter(function (w) { return !w.k; }).map(function (w) { return w.s + ': '; }).join('\n') : ''),
-      function (x) { v.weights = textToWeights(x); touch(); }, true, 'L: 50-60 · empty sizes are listed so you can fill them in'));
-    ed.appendChild(field('Colours and sizes — stream only (from Vrich stock)', colorsToText(v.colors), function (x) { v.colors = textToColors(x); touch(); }, true, 'ខ្មៅ: L XL 2XL — ! before a size shows it orange, e.g. !4XL. Changing these marks the card ✋ and 🔄 Refresh will skip it.'));
-    var acts = el('div', 'acts');
-    acts.appendChild(button('💾 Save (Live Log + stream)', 'save', function () {
-      msg.textContent = 'Saving…';
-      saveCard(s, v).then(function () { delete drafts[s.id]; msg.textContent = '✅ Saved to Live Log'; render(); }).catch(function (e) { msg.textContent = '❌ ' + e.message; });
-    }));
-    if (d.manual) acts.appendChild(button('↩ Use Vrich stock again', '', function () {
-      var payload = JSON.parse(JSON.stringify(d)); delete payload.manual;
-      write(s.id, payload).then(function () { delete drafts[s.id]; render(); }).catch(function (e) { msg.textContent = '❌ ' + e.message; });
-    }));
-    if (dr.dirty) acts.appendChild(button('Undo changes', '', function () { delete drafts[s.id]; render(); }));
-    acts.appendChild(button('✕ Remove from stream', 'danger', function () {
-      if (!confirm('Remove ' + (d.code || 'this card') + ' from the stream? (Live Log is not changed)')) return;
-      write(s.id, null).then(function () { delete drafts[s.id]; render(); }).catch(function (e) { msg.textContent = '❌ ' + e.message; });
-    }));
-    ed.appendChild(acts); ed.appendChild(msg);
-    card.appendChild(ed);
+    return i;
+  }
+  function picker(options, current, onPick) {
+    var sel = document.createElement('select'); sel.className = 'pick';
+    options.forEach(function (o) { var op = document.createElement('option'); op.value = o.v; op.textContent = o.t; if (o.v === current) op.selected = true; sel.appendChild(op); });
+    sel.addEventListener('change', function () { sel.classList.add('saving'); onPick(sel.value).then(function () { flash(sel, true); }, function (err) { flash(sel, false); alert('Not saved: ' + err.message); }); });
+    return sel;
   }
 
   function promoCard() {
@@ -341,40 +326,74 @@
 
   function productCard(s) {
     var d = state.slots[s.id], entry = state.entries[String(d.code).toUpperCase()];
-    var colors = (d.colors || []).map(function (c) { return { c: /^(អាវ|ខោ|ឈុត|អាវក្រៅ|ខោខ្លី|ខោជើងវែង|ស្បែកជើង|មួក)$/.test(c.c || '') ? '' : (c.c || ''), m: c.sizes || [] }; });
+    var colors = (d.colors || []).map(function (c) { return { c: colorName(c.c), m: c.sizes || [] }; });
     var allSizes = {};
     colors.forEach(function (c) { c.m.forEach(function (z) { allSizes[z.z] = 1; }); });
     var sizes = Object.keys(allSizes).sort(function (a, b) { return sizeKey(a) - sizeKey(b); });
+    var label = d.label || defaultLabel(s.id, entry);
+    var fit = (entry && entry.fit) || '';
+    var price = String((entry && entry.price) || d.price || '').replace(/\$/g, '');
 
-    var card = el('div', 'card'); card.style.setProperty('--accent', 'var(--' + s.id + ')');
+    var card = el('div', 'card'); card.style.setProperty('--accent', 'var(--' + s.id + ')'); card.dataset.slot = s.id;
     var top = el('div', 'top'); top.appendChild(el('span', 'slot', s.name));
     if (d.manual) top.appendChild(el('span', 'hand-tag', '✋ Sizes typed by hand'));
-    var a = ago(d.at); top.appendChild(el('span', 'age' + (a.old ? ' old' : ''), a.t)); card.appendChild(top);
+    var a = ago(d.at); top.appendChild(el('span', 'age' + (a.old ? ' old' : ''), a.t));
+    if (editing) {
+      var rm = el('button', 'xbtn', '✕'); rm.type = 'button'; rm.title = 'Remove from stream (Live Log is not changed)';
+      rm.onclick = function () { if (confirm('Remove ' + d.code + ' from the stream?')) write(s.id, null).catch(function (e) { alert(e.message); }); };
+      top.appendChild(rm);
+    }
+    card.appendChild(top);
 
     var cr = el('div', 'codeRow'); cr.appendChild(el('span', 'code', d.code));
-    cr.appendChild(el('span', 'price', money((entry && entry.price) || d.price))); card.appendChild(cr);
-    var fit = (entry && entry.fit) || '';
-    var meta = el('div', 'meta', (d.label || defaultLabel(s.id, entry)) + ' · ' + colors.length + ' ពណ៌ · ' + sizes.length + ' sizes');
-    if (fit) meta.appendChild(el('span', 'fit', fit));
+    if (editing) {
+      var pw = el('span', 'pwrap'); pw.appendChild(editable(price, 'pin', 'price', function (v) { return saveEntry(s, function (e) { e.price = v.replace(/\$/g, ''); }); }));
+      pw.appendChild(el('span', 'price', '$')); cr.appendChild(pw);
+    } else cr.appendChild(el('span', 'price', money(price)));
+    card.appendChild(cr);
+
+    var meta = el('div', 'meta');
+    if (editing) {
+      var opts = STD_LABELS.map(function (t) { return { v: t, t: t }; });
+      if (STD_LABELS.indexOf(label) < 0) opts.unshift({ v: label, t: label });
+      opts.push({ v: '__other', t: '✏️ Other…' });
+      meta.appendChild(picker(opts, label, function (v) {
+        if (v === '__other') { var t = prompt('Label for this card', label); if (!t) { render(); return Promise.resolve(); } v = t; }
+        return saveLabel(s, v);
+      }));
+      meta.appendChild(picker([{ v: '', t: 'No fit' }].concat(FITS.map(function (f) { return { v: f, t: f }; })), fit,
+        function (v) { return saveEntry(s, function (e) { e.fit = v; }); }));
+      if (d.manual) {
+        var back = el('button', 'act', '↩ Use Vrich stock'); back.type = 'button';
+        back.onclick = function () { var p = JSON.parse(JSON.stringify(d)); delete p.manual; write(s.id, p).catch(function (e) { alert(e.message); }); };
+        meta.appendChild(back);
+      }
+    } else {
+      meta.textContent = label + ' · ' + colors.length + ' ពណ៌ · ' + sizes.length + ' sizes';
+      if (fit) meta.appendChild(el('span', 'fit', fit));
+    }
     card.appendChild(meta);
 
     var w = (entry && entry.weights) || {};
     var inStock = sizes.filter(function (z) { return colors.some(function (c) { return c.m.some(function (x) { return x.z === z && x.remain > 0; }); }); });
     var missing = inStock.filter(function (z) { return !String(w[z] || '').trim(); });
-    {
-      if (!entry) card.appendChild(el('div', 'warn', '⚠ Not in Live Log — customers see no weight or fit for this code'));
-      else if (missing.length) card.appendChild(el('div', 'warn', '⚠ No weight for ' + missing.join(', ') + ' — fix here (✏️ Edit mode) or in Live Log'));
-      var wi = weightIssues(w); if (entry && wi.length) card.appendChild(el('div', 'warn', '⚠ Check weights: ' + wi.join(' · ')));
-    }
+    var wStock = {}; inStock.forEach(function (z) { if (w[z]) wStock[z] = w[z]; });
+    if (!entry) card.appendChild(el('div', 'warn', editing ? '⚠ Not in Live Log — type the weights below and it is added' : '⚠ Not in Live Log — customers see no weight or fit'));
+    else if (missing.length) card.appendChild(el('div', 'warn', '⚠ No weight for ' + missing.join(', ') + (editing ? ' — type it in the KG column' : '')));
+    var wi = weightIssues(wStock); if (entry && wi.length) card.appendChild(el('div', 'warn', '⚠ Check weights: ' + wi.join(' · ')));
 
     if (colors.length) {
-      var tbl = el('div', 'tbl'); tbl.style.gridTemplateColumns = '50px 84px repeat(' + colors.length + ', minmax(0, 1fr))';
-      tbl.appendChild(el('span', 'h', 'SIZE')); tbl.appendChild(el('span', 'h', 'KG'));
+      var tbl = el('div', 'tbl'); tbl.style.gridTemplateColumns = '50px ' + (editing ? '104px' : '84px') + ' repeat(' + colors.length + ', minmax(0, 1fr))';
+      tbl.appendChild(el('span', 'h', 'SIZE')); tbl.appendChild(el('span', 'h', editing ? 'KG ✏️' : 'KG'));
       colors.forEach(function (c) { tbl.appendChild(el('span', 'h', c.c || 'stock')); });
       sizes.forEach(function (z) {
         tbl.appendChild(el('span', 'sz', z));
         var kg = String(w[z] || '').trim();
-        tbl.appendChild(el('span', 'kg' + (kg ? '' : ' none'), kg || 'no kg'));
+        if (editing) {
+          tbl.appendChild(editable(kg, 'kgin' + (kg ? '' : ' none'), 'kg?', function (v) {
+            return saveEntry(s, function (e) { if (v) e.weights[z] = v.replace(/\s*kg$/i, ''); else delete e.weights[z]; });
+          }));
+        } else tbl.appendChild(el('span', 'kg' + (kg ? '' : ' none'), kg || 'no kg'));
         colors.forEach(function (c) {
           var x = null; c.m.forEach(function (y) { if (y.z === z) x = y; });
           if (!x) { tbl.appendChild(el('span', 'n na', '—')); return; }
@@ -384,7 +403,6 @@
       });
       card.appendChild(tbl);
     }
-    if (editing) productEditor(s, card);
     return { card: card, weight: 2 + Math.max(colors.length, 1) };
   }
 
@@ -400,6 +418,9 @@
     document.getElementById('v_minText').textContent = st.minText;
     document.getElementById('v_width').textContent = st.width + '/6';
     document.getElementById('modeBtn').textContent = st.mode === 'text' ? '🅰 Text mode (safe) — tap for Cards' : '🃏 Cards — tap for safe Text mode';
+    var pb = document.getElementById('popsBtn');
+    pb.textContent = st.pops === false ? '📣 Thank-you pop-ups: Off — tap to turn on' : '📣 Thank-you pop-ups: On — tap to turn off';
+    pb.classList.toggle('on', st.pops !== false);
 
     var filled = SLOTS.filter(function (s) { var d = state.slots[s.id]; return d && d.code; });
     var promo = state.slots.promo;
@@ -426,6 +447,9 @@
       var next = JSON.parse(JSON.stringify(st)); next[k] = v; writeSettings(next);
     };
   });
+  document.getElementById('popsBtn').onclick = function () {
+    var next = JSON.parse(JSON.stringify(state.settings)); next.pops = next.pops === false; writeSettings(next);
+  };
   document.getElementById('modeBtn').onclick = function () {
     var next = JSON.parse(JSON.stringify(state.settings)); next.mode = next.mode === 'text' ? 'cards' : 'text'; writeSettings(next);
   };
@@ -485,15 +509,18 @@
   ['promo'].concat(SLOTS.map(function (s) { return s.id; })).forEach(function (id) {
     kvc.doc('live_overlay_' + id).onSnapshot({ includeMetadataChanges: true }, function (snap) {
       onMeta(snap);
-      var before = JSON.stringify(state.slots[id] || null);
+      var prev = state.slots[id], before = JSON.stringify(prev || null);
       state.slots[id] = parseData(snap);
-      if (JSON.stringify(state.slots[id] || null) !== before && drafts[id] && !drafts[id].dirty) delete drafts[id];
-      syncEntries(); requestRender();
+      var now = state.slots[id];
+      if (JSON.stringify(now || null) !== before && drafts[id] && !drafts[id].dirty) delete drafts[id];
+      syncEntries();
+      /* a new code sent from Vrich always shows straight away, even while someone is typing elsewhere */
+      if ((prev && prev.code) !== (now && now.code)) render(); else requestRender();
     }, function () { setConn(false, 'Connection problem — showing the last stock received'); });
   });
   kvc.doc('live_overlay_settings').onSnapshot(function (snap) {
     var d = parseData(snap) || {};
-    ['textSize', 'minText', 'width', 'mode'].forEach(function (k) { if (d[k] != null) state.settings[k] = d[k]; });
+    ['textSize', 'minText', 'width', 'mode', 'pops'].forEach(function (k) { if (d[k] != null) state.settings[k] = d[k]; });
     requestRender();
   }, function () {});
 })();
