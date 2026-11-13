@@ -12,6 +12,8 @@
   Options in the link:
     ?slot=shirt|pants|hand|hand2   show only that one card (place it yourself in OBS)
     ?demo=1                        sample cards, no database (for setting up OBS)
+  v1.14: with 3+ product cards on stream, the newest 2 stay full and older ones become one-line chips
+         (label · code · price) so shoppers are not faced with everything at once.
 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Noto+Sans+Khmer:wght@400;500;700&display=swap" rel="stylesheet">
@@ -97,6 +99,12 @@
   .text .inner { gap: 0.1em; }
   .text .head, .text .codeRow { justify-content: flex-start; }
   .text .code { font-size: 1.1em; }
+  /* v1.14: older cards shrink to one line (label · code · price) */
+  .card.compact { padding: 0.35em 0.7em; }
+  .card.compact .codeRow { align-items: baseline; justify-content: flex-start; gap: 0.5em; }
+  .card.compact .label { font-size: 0.8em; }
+  .card.compact .code { font-size: 1.05em; }
+  .card.compact .price { font-size: 0.95em; }
 </style>
 </head>
 <body>
@@ -227,6 +235,13 @@
       card.dataset.key = m.key; card.dataset.at = m.at; card.dataset.promo = '1';
       return card;
     }
+    if (m.compact) {
+      var cc = el('div', 'codeRow'); cc.appendChild(el('span', 'label', m.label));
+      cc.appendChild(el('span', 'code', m.code)); cc.appendChild(el('span', 'price', m.price));
+      inner.appendChild(cc); card.classList.add('compact');
+      card.dataset.key = m.key; card.dataset.at = m.at; card.dataset.compact = '1';
+      return card;
+    }
     var head = el('div', 'head'); head.appendChild(el('span', 'label', m.label));
     if (m.fit) head.appendChild(el('span', 'fit', m.fit));
     inner.appendChild(head);
@@ -264,6 +279,11 @@
     var st = state.settings;
     var models = SLOTS.filter(function (s) { return !onlySlot || s.id === onlySlot; }).map(model).filter(Boolean)
       .filter(function (m) { return dropped.indexOf(m.key) < 0; });
+    /* newest 2 product cards stay full; older ones become one-line chips */
+    if (!onlySlot) models.filter(function (m) { return !m.promo; })
+      .sort(function (a, b) { return String(b.at).localeCompare(String(a.at)); })
+      .forEach(function (m, i) { m.compact = i >= 2; });
+    models = models.filter(function (m) { return !m.compact; }).concat(models.filter(function (m) { return m.compact; }));  /* chips sit under the full cards */
     stage.classList.toggle('text', st.mode === 'text');
     stage.classList.toggle('glass', st.style === 'glass' && st.mode !== 'text');
     var LUX = ['smoked', 'champagne', 'espresso', 'titanium'], luxOn = LUX.indexOf(st.style) >= 0 && st.mode !== 'text';
@@ -291,7 +311,7 @@
     var shared = base;
     cards.forEach(function (card) {
       card.style.fontSize = base + 'px';
-      if (card.dataset.promo) return;  /* giveaway text wraps instead */
+      if (card.dataset.promo || card.dataset.compact) return;  /* giveaway wraps; chips are short */
       var inner = card.firstChild, head = inner.firstChild;
       head.style.display = 'none'; var natural = inner.scrollWidth; head.style.display = '';
       shared = Math.min(shared, (wLimit - 3) / (natural / base + 1.45));

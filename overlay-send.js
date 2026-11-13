@@ -236,7 +236,7 @@
       return { bad: true, html: '⚠ Check weights in Live Log:<br>' + issues.join('<br>') };
     }).catch(function () { return { bad: true, html: '⚠ Could not read Live Log — check the connection' }; });
   }
-  var DEF = { textSize: 20, minText: 12, width: 2, mode: 'cards', pops: true };
+  var DEF = { textSize: 20, minText: 12, width: 2, mode: 'cards', pops: true, style: 'solid' };
   function getSettings() { return getSlot('settings').then(function (d) { var o = {}; for (var k in DEF) o[k] = d && d[k] != null ? d[k] : DEF[k]; return o; }); }
   function setSettings(o) { return put('settings', o); }
 

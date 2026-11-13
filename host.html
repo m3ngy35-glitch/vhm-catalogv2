@@ -6,10 +6,13 @@
 <title>VHM Host Screen</title>
 <!--
   VHM host screen.
-  View mode (default): read only — stock grid, weights and warnings for every card on stream.
-  Edit mode (?edit=1, or the ✏️ button): fix what customers see on the stream overlay, run the giveaway card,
-  and change overlay text size / width / Cards-or-Text. Writes only kv/live_overlay_* documents.
-  ?demo=1 sample data (edits stay on this page).   ?theme=light|dark
+  v1.14 "quiet edit": the screen always shows the clean read view, and editing is always on.
+    · Tap a price or KG cell to type (Enter saves, Esc undoes).
+    · Tap a card (or its ⋯) to open its tools: label, fit, item type, note, Use Vrich stock, remove.
+      The tools close on ✓ Done, a tap outside the card, or after 20 s untouched.
+    · ⚙ in the top bar opens the overlay look, giveaway, size guides and the colour key.
+  ?view=1  read only (no editing at all)    ?demo=1 sample data (edits stay on this page)    ?theme=light|dark
+  Writes only kv/live_overlay_* and kv/live_log:* documents, same as v1.13.
 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
@@ -38,7 +41,8 @@
   .tbtn { font-weight: 600; font-size: 15px; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--sub); background: transparent; color: var(--text); cursor: pointer; min-height: 40px; }
   .tbtn.on { background: var(--save); border-color: var(--save); color: #fff; }
   #look { display: none; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 16px; background: var(--card); border-radius: 12px; font-size: 16px; }
-  body.edit #look { display: flex; }
+  body.look #look { display: flex; }
+  body.locked #lookBtn { display: none; }
   #look .grp { display: flex; align-items: center; gap: 6px; margin-right: 14px; }
   #look b { min-width: 40px; text-align: center; }
   .sm { min-width: 40px; min-height: 40px; border-radius: 8px; border: 0; background: var(--btn); color: var(--text); font-weight: 700; font-size: 18px; cursor: pointer; }
@@ -85,10 +89,20 @@
   .msg { font-size: 14px; color: var(--sub); min-height: 18px; }
   .xbtn { min-width: 34px; min-height: 34px; border-radius: 8px; border: 1px solid var(--bad); background: transparent; color: var(--bad); font-weight: 700; cursor: pointer; }
   .pwrap { display: inline-flex; align-items: baseline; gap: 2px; }
-  .pin { width: 96px; font: 700 26px 'Space Grotesk', sans-serif; color: var(--accent); background: var(--field); border: 1px dashed var(--line); border-radius: 8px; padding: 2px 8px; }
+  /* quiet edit: editable cells look like the read view, with a dotted underline as the only hint */
+  .pin { width: 4.4em; font: 700 26px 'Space Grotesk', sans-serif; color: var(--accent); background: transparent; border: 0; border-bottom: 2px dotted var(--line); border-radius: 0; padding: 0 2px; }
+  .pin:focus { background: var(--field); border-radius: 6px; }
   .pick { font: 700 17px 'Kantumruy Pro', system-ui, sans-serif; color: var(--text); background: var(--field); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; margin-right: 8px; min-height: 40px; }
   .meta .act { min-height: 40px; }
-  .kgin { width: 100%; box-sizing: border-box; text-align: center; padding: 8px 2px; border-radius: 8px; border: 1px dashed var(--line); background: var(--wBg); color: var(--text); font: 700 20px 'Space Grotesk', sans-serif; }
+  .kgin { width: 100%; box-sizing: border-box; text-align: center; padding: 8px 2px; border-radius: 8px; border: 0; border-bottom: 2px dotted var(--line); background: var(--wBg); color: var(--text); font: 700 21px 'Space Grotesk', sans-serif; }
+  .card.open { box-shadow: 0 0 0 2px var(--accent); }
+  .tools { min-width: 40px; min-height: 36px; border-radius: 8px; border: 1px solid var(--line); background: transparent; color: var(--sub); font-weight: 700; font-size: 18px; cursor: pointer; line-height: 1; }
+  .card.open .tools { background: var(--accent); border-color: var(--accent); color: #141714; }
+  .ed .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .ed .row .pick { margin-right: 0; }
+  .soldout { font-size: 15px; color: var(--outText); }
+  .top .sp { margin-left: auto; }
+  #look .legend { flex-basis: 100%; font-size: 14px; }
   .kgin.none { background: var(--warnBg); color: var(--warnText); }
   .kgin:focus, .pin:focus { outline: 2px solid var(--accent); border-style: solid; }
   .saving { opacity: .6; } .saved { outline: 2px solid var(--pants) !important; } .failed { outline: 2px solid var(--bad) !important; }
@@ -107,7 +121,7 @@
   <span><span class="dot"></span><b id="conn">Connecting…</b></span>
   <span class="sub" id="note">Stock changes only when an admin sends it from Vrich</span>
   <span class="sp"></span>
-  <button type="button" class="tbtn" id="editBtn">✏️ Edit mode</button>
+  <button type="button" class="tbtn" id="lookBtn">⚙ Look &amp; giveaway</button>
   <button type="button" class="tbtn" id="theme">☀ Light</button>
 </div>
 <div id="look">
@@ -120,9 +134,10 @@
   <button class="tbtn" id="popsBtn">📣 Thank-you pop-ups: On</button>
   <button class="tbtn" id="giveBtn">🎁 Giveaway</button>
   <button class="tbtn" id="guideBtn">📏 Size guides</button>
+  <button class="tbtn" id="lookClose">▴ Close</button>
+  <div class="legend"><span><b>5</b> pieces left</span><span class="l"><b style="color:inherit">2</b> only 1–2 left</span><span><s>0</s> sold out in that colour</span><span>— size not in this colour</span><span>✋ sizes typed by hand (🔄 Refresh won't overwrite them)</span><span>Dotted line = tap to type · tap a card for its tools</span></div>
 </div>
 <div id="grid"></div>
-<div class="legend"><span><b>5</b> pieces left</span><span class="l"><b style="color:inherit">2</b> only 1–2 left</span><span><s>0</s> sold out</span><span>— size not in this colour</span><span>✋ sizes typed by hand (🔄 Refresh won't overwrite them)</span></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
@@ -145,22 +160,46 @@
   function store(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} }
   function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
 
-  /* theme + edit mode: remembered on this computer */
+  /* v1.14 quiet edit: editing is always on (unless ?view=1); tools open per card only when tapped */
   var theme = params.get('theme') || load('vhm_host_theme') || 'dark';
-  var editing = params.get('edit') === '1' || load('vhm_host_edit') === '1';
-  var promoOpen = load('vhm_host_promo_open') === '1';  /* giveaway panel hidden unless opened */
-  var guidesOpen = load('vhm_host_guides_open') === '1';
-  var themeBtn = document.getElementById('theme'), editBtn = document.getElementById('editBtn');
+  var editing = params.get('view') !== '1';
+  store('vhm_host_edit', null);  /* old v1.13 setting, no longer used */
+  var lookOpen = false;          /* ⚙ panel: always starts closed so the live screen starts clean */
+  var promoOpen = false, guidesOpen = false;
+  var openCard = null;           /* 'slot:CODE' whose tools are open, or 'promo' */
+  var lastTouch = 0, IDLE_MS = 20000;
+  var themeBtn = document.getElementById('theme'), lookBtn = document.getElementById('lookBtn');
   function applyChrome() {
     document.body.classList.toggle('light', theme === 'light');
-    document.body.classList.toggle('edit', editing);
+    document.body.classList.toggle('locked', !editing);
+    document.body.classList.toggle('look', editing && lookOpen);
     themeBtn.textContent = theme === 'light' ? '☾ Dark' : '☀ Light';
-    editBtn.textContent = editing ? '✓ Done editing' : '✏️ Edit mode';
-    editBtn.classList.toggle('on', editing);
+    lookBtn.classList.toggle('on', lookOpen);
   }
   themeBtn.onclick = function () { theme = theme === 'light' ? 'dark' : 'light'; store('vhm_host_theme', theme); applyChrome(); };
-  editBtn.onclick = function () { editing = !editing; store('vhm_host_edit', editing ? '1' : null); drafts = {}; applyChrome(); render(); };
+  function setLook(on) {
+    lookOpen = on;
+    if (!on) { promoOpen = false; guidesOpen = false; drafts = {}; }
+    applyChrome(); render();
+  }
+  lookBtn.onclick = function () { setLook(!lookOpen); };
+  document.getElementById('lookClose').onclick = function () { setLook(false); };
   applyChrome();
+
+  function setOpen(key) { openCard = key; lastTouch = Date.now(); render(); }
+  /* tap outside the open card closes its tools */
+  document.addEventListener('pointerdown', function (e) {
+    if (!openCard) return;
+    var c = e.target.closest && e.target.closest('.card');
+    if (c && c.dataset.key === openCard) { lastTouch = Date.now(); return; }
+    if (c && c.dataset.key) return;  /* tapping another card: its own click handler switches */
+    if (e.target.closest && e.target.closest('#look, #lookBtn')) return;
+    openCard = null; requestRender();
+  }, true);
+  document.addEventListener('keydown', function () { if (openCard) lastTouch = Date.now(); }, true);
+  setInterval(function () {
+    if (openCard && openCard !== 'promo' && Date.now() - lastTouch > IDLE_MS && !busyTyping()) { openCard = null; render(); }
+  }, 2000);
 
   function sizeKey(s) { var i = ORDER.indexOf(s); if (i >= 0) return i; var n = parseFloat(s); return isNaN(n) ? 999 : 100 + n; }
   function money(p) { p = String(p || '').trim(); if (!p) return ''; return /\$/.test(p) ? p : p + '$'; }
@@ -354,7 +393,7 @@
     var card = el('div', 'card'); card.style.setProperty('--accent', 'var(--sub)');
     var top = el('div', 'top'); top.appendChild(el('span', 'slot', '📏 SIZE GUIDES'));
     var hide = el('button', 'xbtn', '▾'); hide.type = 'button'; hide.style.borderColor = 'var(--line)'; hide.style.color = 'var(--sub)';
-    hide.onclick = function () { guidesOpen = false; store('vhm_host_guides_open', null); render(); };
+    hide.onclick = function () { guidesOpen = false; render(); };
     top.appendChild(hide); card.appendChild(top);
     card.appendChild(el('div', 'meta', 'Used for any code with no weight of its own. A code\'s own weights always win.'));
     ['shirt'].forEach(function (k) {
@@ -374,14 +413,18 @@
     var card = el('div', 'card'); card.style.setProperty('--accent', 'var(--promo)');
     var top = el('div', 'top'); top.appendChild(el('span', 'slot', '🎁 GIVEAWAY'));
     top.appendChild(el('span', 'age' + (d.show ? '' : ' old'), d.show ? 'on stream' : 'hidden'));
-    if (editing) {
+    if (editing && promoOpen) {
       var hide = el('button', 'xbtn', '▾'); hide.type = 'button'; hide.title = 'Hide this panel (the giveaway on stream is not changed)';
       hide.style.borderColor = 'var(--line)'; hide.style.color = 'var(--sub)';
-      hide.onclick = function () { promoOpen = false; store('vhm_host_promo_open', null); render(); };
+      hide.onclick = function () { promoOpen = false; drafts = {}; render(); };
       top.appendChild(hide);
+    } else if (editing) {
+      var po = el('button', 'tools', '⋯'); po.type = 'button'; po.title = 'Edit the giveaway';
+      po.onclick = function () { promoOpen = true; render(); };
+      top.appendChild(po);
     }
     card.appendChild(top);
-    if (!editing) {
+    if (!editing || !promoOpen) {
       if (d.title) card.appendChild(el('div', 'promoTitle', d.title));
       var pl = el('div', 'promoLines'); (d.lines || []).forEach(function (t) { pl.appendChild(el('div', null, t)); }); card.appendChild(pl);
       return card;
@@ -421,63 +464,47 @@
     }
     var note = String((entry && entry.note) || '').trim();
 
-    var card = el('div', 'card'); card.style.setProperty('--accent', 'var(--' + s.id + ')'); card.dataset.slot = s.id;
+    var key = s.id + ':' + String(d.code).toUpperCase(), isOpen = editing && openCard === key;
+    var card = el('div', 'card' + (isOpen ? ' open' : '')); card.style.setProperty('--accent', 'var(--' + s.id + ')'); card.dataset.slot = s.id; card.dataset.key = key;
+    if (editing) card.addEventListener('click', function (e) {
+      if (e.target.closest('input, select, textarea, button, .ed')) return;
+      setOpen(isOpen ? null : key);
+    });
     var top = el('div', 'top'); top.appendChild(el('span', 'slot', s.name));
-    if (d.manual) top.appendChild(el('span', 'hand-tag', '✋ Sizes typed by hand'));
+    if (d.manual) top.appendChild(el('span', 'hand-tag', '✋ typed by hand'));
     var a = ago(d.at); top.appendChild(el('span', 'age' + (a.old ? ' old' : ''), a.t));
     if (editing) {
-      var rm = el('button', 'xbtn', '✕'); rm.type = 'button'; rm.title = 'Remove from stream (Live Log is not changed)';
-      rm.onclick = function () { if (confirm('Remove ' + d.code + ' from the stream?')) write(s.id, null).catch(function (e) { alert(e.message); }); };
-      top.appendChild(rm);
+      top.appendChild(el('span', 'sp'));
+      var tb = el('button', 'tools', isOpen ? '✓' : '⋯'); tb.type = 'button'; tb.title = isOpen ? 'Close tools' : 'Label, fit, type, note, remove';
+      tb.onclick = function () { setOpen(isOpen ? null : key); };
+      top.appendChild(tb);
     }
     card.appendChild(top);
 
+    /* code + price: price is typed straight in (dotted line) */
     var cr = el('div', 'codeRow'); cr.appendChild(el('span', 'code', d.code));
     if (editing) {
-      var pw = el('span', 'pwrap'); pw.appendChild(editable(price, 'pin', 'price', function (v) { return saveEntry(s, function (e) { e.price = v.replace(/\$/g, ''); }); }));
+      var pin = editable(price, 'pin', 'price', function (v) { return saveEntry(s, function (e) { e.price = v.replace(/\$/g, ''); }); });
+      var fitW = function () { pin.style.width = Math.max(3, (pin.value || pin.placeholder).length + 0.5) + 'ch'; };
+      pin.addEventListener('input', fitW); fitW();
+      var pw = el('span', 'pwrap'); pw.appendChild(pin);
       pw.appendChild(el('span', 'price', '$')); cr.appendChild(pw);
     } else cr.appendChild(el('span', 'price', money(price)));
     card.appendChild(cr);
 
-    var meta = el('div', 'meta');
-    if (editing) {
-      var opts = STD_LABELS.map(function (t) { return { v: t, t: t }; });
-      if (STD_LABELS.indexOf(label) < 0) opts.unshift({ v: label, t: label });
-      opts.push({ v: '__other', t: '✏️ Other…' });
-      meta.appendChild(picker(opts, label, function (v) {
-        if (v === '__other') { var t = prompt('Label for this card', label); if (!t) { render(); return Promise.resolve(); } v = t; }
-        return saveLabel(s, v);
-      }));
-      if (K.kg || fit) meta.appendChild(picker([{ v: '', t: 'No fit' }].concat(FITS.map(function (f) { return { v: f, t: f }; })), fit,
-        function (v) { return saveEntry(s, function (e) { e.fit = v; }); }));
-      var setKind = (entry && KINDS[entry.kind]) ? entry.kind : '';
-      meta.appendChild(picker([{ v: '', t: 'Auto: ' + KINDS[kind].t }].concat(Object.keys(KINDS).map(function (k) { return { v: k, t: KINDS[k].t }; })), setKind,
-        function (v) { return saveEntry(s, function (e) { if (v) e.kind = v; else delete e.kind; }); }));
-      if (d.manual) {
-        var back = el('button', 'act', '↩ Use Vrich stock'); back.type = 'button';
-        back.onclick = function () { var p = JSON.parse(JSON.stringify(d)); delete p.manual; write(s.id, p).catch(function (e) { alert(e.message); }); };
-        meta.appendChild(back);
-      }
-    } else {
-      var kw = KINDS[kind].t.split(' · ')[0];
-      meta.textContent = label + (label.indexOf(kw) >= 0 ? '' : ' · ' + kw) + ' · ' + colors.length + ' ពណ៌' + (K.nosize ? '' : ' · ' + sizes.length + (kind === 'belt' ? ' lengths' : ' sizes'));
-      if (fit) meta.appendChild(el('span', 'fit', fit));
-    }
+    /* one quiet line: label + fit (no counts) */
+    var meta = el('div', 'meta', label); if (fit) meta.appendChild(el('span', 'fit', fit));
     card.appendChild(meta);
-    if (editing) {
-      var nl = el('label', 'notel'); nl.appendChild(document.createTextNode('📝 Note on stream'));
-      nl.appendChild(editable(note, 'notein', K.nosize ? 'e.g. ទំហំតែមួយ · Free size' : (kind === 'belt' ? 'e.g. ប្រវែង 110cm = ចង្កេះ 28–32' : 'e.g. ចង្កេះ 29 = 74cm'),
-        function (v) { return saveEntry(s, function (e) { if (v) e.note = v; else delete e.note; }); }));
-      card.appendChild(nl);
-    } else if (note) card.appendChild(el('div', 'notev', '📝 ' + note));
+    if (note) card.appendChild(el('div', 'notev', '📝 ' + note));
 
     var w = (entry && entry.weights) || {};
     var inStock = sizes.filter(function (z) { return colors.some(function (c) { return c.m.some(function (x) { return x.z === z && x.remain > 0; }); }); });
+    var soldOut = sizes.filter(function (z) { return inStock.indexOf(z) < 0; });
     var missing = (!K.kg || K.optional) ? [] : inStock.filter(function (z) { return !String(w[z] || guide[z] || '').trim(); });
     var wStock = {}; inStock.forEach(function (z) { if (w[z]) wStock[z] = w[z]; });
-    if (!entry && K.kg && missing.length) card.appendChild(el('div', 'warn', editing ? '⚠ Not in Live Log — type the weights below and it is added' : '⚠ Not in Live Log — customers see no weight or fit'));
-    else if (missing.length) card.appendChild(el('div', 'warn', '⚠ No weight for ' + missing.join(', ') + (editing ? ' — type it in the KG column' : '')));
-    var wi = weightIssues(wStock); if (entry && wi.length) card.appendChild(el('div', 'warn', '⚠ Check weights: ' + wi.join(' · ')));
+    if (!entry && K.kg && missing.length) card.appendChild(el('div', 'warn', editing ? '⚠ Not in Live Log — type the kg below' : '⚠ Not in Live Log — no weight or fit on stream'));
+    else if (missing.length) card.appendChild(el('div', 'warn', '⚠ No kg for ' + missing.join(', ')));
+    var wi = weightIssues(wStock); if (entry && wi.length) card.appendChild(el('div', 'warn', '⚠ Check kg: ' + wi.join(' · ')));
 
     if (colors.length && K.nosize) {
       /* glasses, masks…: pieces left per colour */
@@ -490,12 +517,14 @@
         nt.appendChild(el('span', 'n' + (n === 0 ? ' out' : n <= 2 ? ' low' : ''), String(n)));
       });
       card.appendChild(nt);
+    } else if (colors.length && !inStock.length) {
+      card.appendChild(el('div', 'warn', 'អស់ស្តុក — every size is sold out'));
     } else if (colors.length) {
-      var kcol = K.kg ? (editing ? '104px ' : '84px ') : '';
+      var kcol = K.kg ? '90px ' : '';
       var tbl = el('div', 'tbl'); tbl.style.gridTemplateColumns = (kind === 'belt' ? '74px ' : '50px ') + kcol + 'repeat(' + colors.length + ', minmax(0, 1fr))';
-      tbl.appendChild(el('span', 'h', kind === 'belt' ? 'LENGTH' : 'SIZE')); if (K.kg) tbl.appendChild(el('span', 'h', editing ? 'KG ✏️' : 'KG'));
+      tbl.appendChild(el('span', 'h', kind === 'belt' ? 'LENGTH' : 'SIZE')); if (K.kg) tbl.appendChild(el('span', 'h', 'KG'));
       colors.forEach(function (c) { tbl.appendChild(el('span', 'h', c.c || 'stock')); });
-      sizes.forEach(function (z) {
+      inStock.forEach(function (z) {  /* sizes sold out in every colour are listed once below, not as a row */
         tbl.appendChild(el('span', 'sz', showSize(z, kind)));
         var kg = String(w[z] || '').trim(), gk = String(guide[z] || '').trim();
         if (!K.kg) { /* belts: the size is the length, no weight column */ }
@@ -512,12 +541,45 @@
         });
       });
       card.appendChild(tbl);
+      if (soldOut.length) card.appendChild(el('div', 'soldout', 'Sold out: ' + soldOut.map(function (z) { return showSize(z, kind); }).join(', ')));
+    }
+
+    /* tools: only for the card that was tapped */
+    if (isOpen) {
+      var ed = el('div', 'ed');
+      ed.appendChild(el('h3', null, 'TOOLS · ' + d.code));
+      var row = el('div', 'row');
+      var opts = STD_LABELS.map(function (t) { return { v: t, t: t }; });
+      if (STD_LABELS.indexOf(label) < 0) opts.unshift({ v: label, t: label });
+      opts.push({ v: '__other', t: '✏️ Other…' });
+      row.appendChild(picker(opts, label, function (v) {
+        if (v === '__other') { var t = prompt('Label for this card', label); if (!t) { render(); return Promise.resolve(); } v = t; }
+        return saveLabel(s, v);
+      }));
+      if (K.kg || fit) row.appendChild(picker([{ v: '', t: 'No fit' }].concat(FITS.map(function (f) { return { v: f, t: f }; })), fit,
+        function (v) { return saveEntry(s, function (e) { e.fit = v; }); }));
+      var setKind = (entry && KINDS[entry.kind]) ? entry.kind : '';
+      row.appendChild(picker([{ v: '', t: 'Auto: ' + KINDS[kind].t }].concat(Object.keys(KINDS).map(function (k) { return { v: k, t: KINDS[k].t }; })), setKind,
+        function (v) { return saveEntry(s, function (e) { if (v) e.kind = v; else delete e.kind; }); }));
+      ed.appendChild(row);
+      var nl = el('label', 'notel'); nl.appendChild(document.createTextNode('📝 Note on stream'));
+      nl.appendChild(editable(note, 'notein', K.nosize ? 'e.g. ទំហំតែមួយ · Free size' : (kind === 'belt' ? 'e.g. ប្រវែង 110cm = ចង្កេះ 28–32' : 'e.g. ចង្កេះ 29 = 74cm'),
+        function (v) { return saveEntry(s, function (e) { if (v) e.note = v; else delete e.note; }); }));
+      ed.appendChild(nl);
+      var acts = el('div', 'acts');
+      if (d.manual) acts.appendChild(button('↩ Use Vrich stock', '', function () { var p = JSON.parse(JSON.stringify(d)); delete p.manual; write(s.id, p).catch(function (e) { alert(e.message); }); }));
+      acts.appendChild(button('✕ Remove from stream', 'danger', function () {
+        if (confirm('Remove ' + d.code + ' from the stream?')) { openCard = null; write(s.id, null).catch(function (e) { alert(e.message); }); }
+      }));
+      acts.appendChild(button('✓ Done', 'save', function () { setOpen(null); }));
+      ed.appendChild(acts);
+      card.appendChild(ed);
     }
     return { card: card, weight: 2 + Math.max(colors.length, 1) };
   }
 
   var pending = false;
-  function busyTyping() { var a = document.activeElement; return editing && a && grid.contains(a) && /INPUT|TEXTAREA/.test(a.tagName); }
+  function busyTyping() { var a = document.activeElement; return editing && a && grid.contains(a) && /INPUT|TEXTAREA|SELECT/.test(a.tagName); }
   function requestRender() { if (busyTyping()) { pending = true; return; } render(); }
   document.addEventListener('focusout', function () { if (pending) setTimeout(function () { if (!busyTyping() && pending) { pending = false; render(); } }, 50); });
 
@@ -537,14 +599,14 @@
     var filled = SLOTS.filter(function (s) { var d = state.slots[s.id]; return d && d.code; });
     var promo = state.slots.promo;
     var gb = document.getElementById('giveBtn');
-    gb.textContent = (promoOpen ? '🎁 Giveaway panel: open' : '🎁 Giveaway panel: hidden') + (promo && promo.show ? ' · on stream' : '');
+    gb.textContent = (promoOpen ? '🎁 Giveaway editor: open' : '🎁 Giveaway') + (promo && promo.show ? ' · on stream' : '');
     gb.classList.toggle('on', !!(promo && promo.show));
-    var showPromo = editing ? promoOpen : !!(promo && promo.show);
+    var showPromo = (editing && promoOpen) || !!(promo && promo.show);
     document.getElementById('guideBtn').textContent = guidesOpen ? '📏 Size guides: open' : '📏 Size guides';
     grid.innerHTML = '';
     var cols = [];
     if (editing && guidesOpen) { grid.appendChild(guidesCard()); cols.push(2); }
-    if (showPromo) { grid.appendChild(promoCard()); cols.push(editing ? 3 : 2); }
+    if (showPromo) { grid.appendChild(promoCard()); cols.push(editing && promoOpen ? 3 : 2); }
     filled.forEach(function (s) { var r = productCard(s); grid.appendChild(r.card); cols.push(r.weight); });
     if (!filled.length) {
       grid.appendChild(el('div', 'empty', 'No product on stream yet — admin sends a code from Vrich (📺 VHM Overlay)'));
@@ -564,8 +626,8 @@
       var next = JSON.parse(JSON.stringify(st)); next[k] = v; writeSettings(next);
     };
   });
-  document.getElementById('guideBtn').onclick = function () { guidesOpen = !guidesOpen; store('vhm_host_guides_open', guidesOpen ? '1' : null); render(); };
-  document.getElementById('giveBtn').onclick = function () { promoOpen = !promoOpen; store('vhm_host_promo_open', promoOpen ? '1' : null); render(); };
+  document.getElementById('guideBtn').onclick = function () { guidesOpen = !guidesOpen; render(); };
+  document.getElementById('giveBtn').onclick = function () { promoOpen = !promoOpen; if (!promoOpen) delete drafts.promo; render(); };
   document.getElementById('styleBtn').onclick = function () {
     var order = ['solid', 'smoked', 'champagne', 'espresso', 'titanium', 'glass', 'frost'], next = JSON.parse(JSON.stringify(state.settings));
     next.style = order[(order.indexOf(next.style || 'solid') + 1) % order.length]; writeSettings(next);
