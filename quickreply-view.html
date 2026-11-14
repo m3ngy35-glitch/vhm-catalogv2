@@ -523,16 +523,17 @@ function slipBody(e, box){
   const btns = h('div', {class:'upbtns'});
   const file = ()=> new File([dataUrlToBlob(got.image)], fname, {type:'image/jpeg'});
   let canShare = false; try{ canShare = !!(navigator.canShare && navigator.canShare({files:[file()]})); }catch(err){}
-  if (canShare) btns.append(h('button', {type:'button', class:'btn primary', onclick: async ()=>{ note.textContent = ''; try{ await navigator.share({files:[file()]}); }catch(err){ if (err && err.name !== 'AbortError') note.textContent = 'Share failed — use Copy picture'; } }}, '↗ Share'));
-  btns.append(h('button', {type:'button', class:'btn ' + (canShare ? '' : 'primary'), onclick: async (ev)=>{
+  if (canShare) btns.append(h('button', {type:'button', class:'btn primary', onclick: async ()=>{ note.textContent = ''; try{ await navigator.share({files:[file()]}); }catch(err){ if (err && err.name !== 'AbortError') note.textContent = 'Share failed — use Save picture'; } }}, '↗ Share'));
+  btns.append(h('button', {type:'button', class:'btn ' + (canShare ? '' : 'primary'), onclick: (ev)=>{
     const b = ev.currentTarget; note.textContent = '';
     try{
-      if (!navigator.clipboard || !window.ClipboardItem) throw new Error('no image clipboard');
-      await navigator.clipboard.write([new ClipboardItem({'image/png': toPng(got.image)})]);
-      flash(b, '✓ Copied');
-    }catch(err){ note.textContent = 'Could not copy — long-press the picture to copy or save'; }
-  }}, '🖼 Copy picture'));
-  if (!canShare) btns.append(h('a', {class:'btn', href:got.image, download:fname}, '⬇ Save'));
+      const url = URL.createObjectURL(dataUrlToBlob(got.image));
+      const a = h('a', {href:url, download:fname});
+      document.body.append(a); a.click(); a.remove();
+      setTimeout(()=> URL.revokeObjectURL(url), 30000);
+      flash(b, '✓ Saved');
+    }catch(err){ note.textContent = 'Could not save — long-press the picture to save'; }
+  }}, '⬇ Save picture'));
   box.append(btns, note);
 }
 function loadSlip(e, box){
