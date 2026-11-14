@@ -13,6 +13,10 @@
     · ⚙ in the top bar opens the overlay look, giveaway, size guides and the colour key.
   ?view=1  read only (no editing at all)    ?demo=1 sample data (edits stay on this page)    ?theme=light|dark
   Writes only kv/live_overlay_* and kv/live_log:* documents, same as v1.13.
+  v1.15: · 📌 Our note under each code: typed straight on the card, only on this host screen (never on stream).
+           Saved per code in kv/live_host_notes, so it comes back the next time that code is on stream.
+         · In-hand cards (អាវលើដៃ / ខោលើដៃ): the label is typed straight on the card — pick or type, no pop-up.
+           The label box in the card tools works the same way (no pop-up) for every card.
 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
@@ -112,6 +116,13 @@
   .notel { display: flex; flex-direction: column; gap: 3px; font-size: 14px; color: var(--sub); font-weight: 600; }
   .notein { font: 600 17px 'Kantumruy Pro', system-ui, sans-serif; color: var(--text); background: var(--field); border: 1px dashed var(--line); border-radius: 8px; padding: 7px 10px; }
   .notev { font-size: 17px; font-weight: 600; color: var(--sub); }
+  .hnote { width: 100%; font: 600 18px 'Kantumruy Pro', system-ui, sans-serif; color: var(--warnText); background: transparent; border: 0; border-bottom: 2px dotted var(--line); padding: 4px 2px; }
+  .hnote:focus { background: var(--field); border-radius: 6px; }
+  .hnote::placeholder { color: var(--sub); font-weight: 400; opacity: .8; }
+  .hnotev { font-size: 18px; font-weight: 600; color: var(--warnText); }
+  .lblin { font: 600 18px 'Kantumruy Pro', system-ui, sans-serif; color: var(--sub); background: transparent; border: 0; border-bottom: 2px dotted var(--line); padding: 2px 2px; width: 9em; }
+  .lblin:focus { background: var(--field); border-radius: 6px; color: var(--text); }
+  .ed .lblin { background: var(--field); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; min-height: 40px; color: var(--text); }
   .legend { display: flex; gap: 22px; font-size: 16px; color: var(--sub); flex-wrap: wrap; }
   .legend b { color: var(--text); } .legend .l { color: var(--lowText); }
 </style>
@@ -138,6 +149,7 @@
   <div class="legend"><span><b>5</b> pieces left</span><span class="l"><b style="color:inherit">2</b> only 1–2 left</span><span><s>0</s> sold out in that colour</span><span>— size not in this colour</span><span>✋ sizes typed by hand (🔄 Refresh won't overwrite them)</span><span>Dotted line = tap to type · tap a card for its tools</span></div>
 </div>
 <div id="grid"></div>
+<datalist id="stdLabels"><option value="អាវលើខ្លួន"><option value="ខោលើខ្លួន"><option value="អាវលើដៃ"><option value="ខោលើដៃ"></datalist>
 
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
@@ -153,7 +165,7 @@
   ];
   var params = new URLSearchParams(location.search);
   var demo = params.get('demo') === '1';
-  var state = { guides: {}, slots: {}, entries: {}, settings: { textSize: 20, minText: 12, width: 2, mode: 'cards', pops: true, style: 'solid' } };
+  var state = { guides: {}, slots: {}, entries: {}, hostNotes: {}, settings: { textSize: 20, minText: 12, width: 2, mode: 'cards', pops: true, style: 'solid' } };
   var drafts = {};
   var grid = document.getElementById('grid');
 
@@ -358,6 +370,26 @@
     if (lbl && lbl !== cardLabel(s.id, dd, state.entries[String(d.code).toUpperCase()])) payload.label = lbl; else delete payload.label;
     return write(s.id, payload);
   }
+  /* 📌 our own note per code: host screen only, kept in one doc (Live Log saves can't wipe it) */
+  function saveHostNote(code, v) {
+    code = String(code).trim().toUpperCase();
+    function apply(m) { m = Object.assign({}, m || {}); if (v) m[code] = v; else delete m[code]; return m; }
+    if (demo) { state.hostNotes = apply(state.hostNotes); render(); return Promise.resolve(); }
+    var ref = kvc.doc('live_host_notes');
+    return ref.get({ source: 'server' }).then(function (snap) {
+      var old = snap.exists ? snap.data().data : null;
+      if (typeof old === 'string') { try { old = JSON.parse(old); } catch (e) { old = null; } }
+      var next = apply(old); state.hostNotes = next;
+      return ref.set({ data: JSON.stringify(next), updatedAt: new Date() });
+    });
+  }
+  /* label typed straight in: pick a standard one from the list or type your own; empty = back to automatic */
+  function labelInput(s, label) {
+    var i = editable(label, 'lblin', 'label', function (v) { return saveLabel(s, v); });
+    i.setAttribute('list', 'stdLabels'); i.title = 'Pick or type a label · empty = automatic';
+    i.addEventListener('focus', function () { i.select(); });
+    return i;
+  }
   function flash(input, ok) {
     input.classList.remove('saving');
     input.classList.add(ok ? 'saved' : 'failed');
@@ -492,8 +524,16 @@
     } else cr.appendChild(el('span', 'price', money(price)));
     card.appendChild(cr);
 
-    /* one quiet line: label + fit (no counts) */
-    var meta = el('div', 'meta', label); if (fit) meta.appendChild(el('span', 'fit', fit));
+    /* 📌 our note: right under the code, host screen only */
+    var hn = String((state.hostNotes || {})[String(d.code).toUpperCase()] || '').trim();
+    if (editing) card.appendChild(editable(hn, 'hnote', '📌 Our note (only on this screen, not on stream)', function (v) { return saveHostNote(d.code, v); }));
+    else if (hn) card.appendChild(el('div', 'hnotev', '📌 ' + hn));
+
+    /* one quiet line: label + fit (no counts). In-hand cards: label typed straight in */
+    var meta = el('div', 'meta');
+    if (editing && (s.id === 'hand' || s.id === 'hand2')) meta.appendChild(labelInput(s, label));
+    else meta.appendChild(document.createTextNode(label));
+    if (fit) meta.appendChild(el('span', 'fit', fit));
     card.appendChild(meta);
     if (note) card.appendChild(el('div', 'notev', '📝 ' + note));
 
@@ -549,13 +589,7 @@
       var ed = el('div', 'ed');
       ed.appendChild(el('h3', null, 'TOOLS · ' + d.code));
       var row = el('div', 'row');
-      var opts = STD_LABELS.map(function (t) { return { v: t, t: t }; });
-      if (STD_LABELS.indexOf(label) < 0) opts.unshift({ v: label, t: label });
-      opts.push({ v: '__other', t: '✏️ Other…' });
-      row.appendChild(picker(opts, label, function (v) {
-        if (v === '__other') { var t = prompt('Label for this card', label); if (!t) { render(); return Promise.resolve(); } v = t; }
-        return saveLabel(s, v);
-      }));
+      row.appendChild(labelInput(s, label));
       if (K.kg || fit) row.appendChild(picker([{ v: '', t: 'No fit' }].concat(FITS.map(function (f) { return { v: f, t: f }; })), fit,
         function (v) { return saveEntry(s, function (e) { e.fit = v; }); }));
       var setKind = (entry && KINDS[entry.kind]) ? entry.kind : '';
@@ -658,6 +692,7 @@
       E369: { garmentType: 'អាវលើខ្លួន', fit: 'រាងស្លុីម', price: '6.60', weights: { L: '50-60', XL: '60-70', '2XL': '70-80', '3XL': '80-85', '4XL': '85-90' } },
       E136: { garmentType: 'អាវលើដៃ', fit: 'រាងរលុង', price: '6.40', weights: { L: '60-70' } }
     };
+    state.hostNotes = { E369: 'ពណ៌កាហ្វេ ថ្មីមកដល់ · និយាយពីក្រណាត់ត្រជាក់' };
     setConn(true, 'Demo data — edits stay on this page'); render(); return;
   }
 
@@ -720,6 +755,7 @@
   kvc.doc('live_overlay_session').onSnapshot(function (snap) { rec.session = snap.exists ? parseData(snap) : null; showRec(); }, function () {});
   kvc.doc('live_overlay_shown').onSnapshot(function (snap) { var c = snap.exists && snap.data().codes; rec.shown = c && typeof c === 'object' ? Object.keys(c).length : 0; showRec(); }, function () {});
   setInterval(showRec, 30000);
+  kvc.doc('live_host_notes').onSnapshot(function (snap) { state.hostNotes = parseData(snap) || {}; requestRender(); }, function () {});
   kvc.doc('live_overlay_guides').onSnapshot(function (snap) { state.guides = parseData(snap) || {}; requestRender(); }, function () {});
   kvc.doc('live_overlay_settings').onSnapshot(function (snap) {
     var d = parseData(snap) || {};

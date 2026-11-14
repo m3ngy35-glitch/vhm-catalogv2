@@ -12,6 +12,8 @@
   Options in the link:
     ?slot=shirt|pants|hand|hand2   show only that one card (place it yourself in OBS)
     ?demo=1                        sample cards, no database (for setting up OBS)
+  v1.15: no folding — 3+ cards all stay full cards, as before v1.14 (if they no longer fit the screen,
+         the oldest is hidden, same as before). Tighter spacing — less gap between colour rows and weight rows, same layout and text size.
   v1.14: with 3+ product cards on stream, the newest 2 stay full and older ones become one-line chips
          (label · code · price) so shoppers are not faced with everything at once.
 -->
@@ -22,9 +24,9 @@
   #stage { position: absolute; left: 0; top: 0; width: 540px; height: 960px; transform-origin: 0 0;
            font-family: Roboto, 'Noto Sans Khmer', -apple-system, 'Helvetica Neue', Arial, sans-serif; color: #fff; }
   #col { position: absolute; top: 134px; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
-  .card { box-sizing: border-box; padding: 0.55em 0.75em 0.6em 0.7em; background: rgba(14,16,15,0.82);
+  .card { box-sizing: border-box; padding: 0.42em 0.75em 0.45em 0.7em; background: rgba(14,16,15,0.82);
           border-left: 3px solid var(--accent); border-radius: 10px; box-shadow: 0 6px 18px rgba(0,0,0,0.22); }
-  .inner { width: max-content; display: flex; flex-direction: column; gap: 0.35em; }
+  .inner { width: max-content; display: flex; flex-direction: column; gap: 0.22em; }
   .head { display: flex; flex-wrap: wrap; row-gap: 0.15em; justify-content: space-between; align-items: center; gap: 0.6em; }
   .label { font-size: 0.86em; font-weight: 700; color: #E1E4E1; white-space: nowrap; }
   .fit { padding: 0 0.55em; background: var(--accent); color: #171510; border-radius: 999px; font-size: 0.86em; font-weight: 700; white-space: nowrap; }
@@ -35,14 +37,14 @@
   .card[data-promo] { max-width: 100%; }
   .card[data-promo] .inner { width: auto; max-width: 100%; }
   .card[data-promo] .line, .card[data-promo] .promoTitle { white-space: normal; overflow-wrap: anywhere; }
-  .line { white-space: nowrap; font-weight: 700; line-height: 1.5; }
+  .line { white-space: nowrap; font-weight: 700; line-height: 1.28; }
   .line .c { margin-right: 0.55em; white-space: nowrap; word-break: keep-all; }
   .line .z { margin-right: 0.5em; }
   .line .low { color: var(--low); }
   .line .dim, .line.dim { color: #C9CEC9; font-weight: 500; }
   .line.small { font-size: 0.86em; line-height: 1.3; }
-  .weights { display: flex; flex-direction: column; padding-top: 0.3em; border-top: 1px solid rgba(255,255,255,0.14); }
-  .w { white-space: nowrap; font-weight: 700; line-height: 1.5; }
+  .weights { display: flex; flex-direction: column; padding-top: 0.2em; border-top: 1px solid rgba(255,255,255,0.14); }
+  .w { white-space: nowrap; font-weight: 700; line-height: 1.22; }
   .w .s { display: inline-block; min-width: 2.6em; }
   .w .k { color: var(--accent); }
   .note { font-size: 0.86em; font-weight: 700; color: #E1E4E1; white-space: normal; max-width: 13em; line-height: 1.35; padding-top: 0.25em; border-top: 1px solid rgba(255,255,255,0.14); }
@@ -279,11 +281,7 @@
     var st = state.settings;
     var models = SLOTS.filter(function (s) { return !onlySlot || s.id === onlySlot; }).map(model).filter(Boolean)
       .filter(function (m) { return dropped.indexOf(m.key) < 0; });
-    /* newest 2 product cards stay full; older ones become one-line chips */
-    if (!onlySlot) models.filter(function (m) { return !m.promo; })
-      .sort(function (a, b) { return String(b.at).localeCompare(String(a.at)); })
-      .forEach(function (m, i) { m.compact = i >= 2; });
-    models = models.filter(function (m) { return !m.compact; }).concat(models.filter(function (m) { return m.compact; }));  /* chips sit under the full cards */
+    /* v1.15: no folding — every product shows as a full card again (v1.14 one-line chips removed) */
     stage.classList.toggle('text', st.mode === 'text');
     stage.classList.toggle('glass', st.style === 'glass' && st.mode !== 'text');
     var LUX = ['smoked', 'champagne', 'espresso', 'titanium'], luxOn = LUX.indexOf(st.style) >= 0 && st.mode !== 'text';
