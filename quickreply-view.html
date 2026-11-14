@@ -88,6 +88,7 @@ footer input{width:20px;height:20px}
   main{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start;padding-bottom:140px}
   #p-reply,#p-up,#p-size{grid-column:1}
   #p-answers{grid-column:2;grid-row:1 / span 2}
+  #p-slips{grid-column:2}
   .panel{display:block!important}
   .copybar{display:block!important}
 }
@@ -107,6 +108,17 @@ header h1{min-width:0;overflow-wrap:anywhere}
 .tabs button{min-width:0}
 @media (prefers-reduced-motion:reduce){*{animation:none!important}}
 .sr{position:absolute;left:-999px;width:1px;height:1px;overflow:hidden}
+.sl{background:#fff;border:1px solid var(--line);border-radius:12px;margin-bottom:8px}
+.sl.new{border-color:var(--accent-line);box-shadow:inset 4px 0 0 var(--accent)}
+.sl>button.sh{display:flex;align-items:center;gap:12px;width:100%;min-height:56px;padding:8px 12px;border:0;background:transparent;text-align:left}
+.sl .no{font-size:26px;font-weight:900;min-width:44px;text-align:center;line-height:1}
+.sl .who{flex:1;min-width:0}
+.sl .who b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sl .who span{font-size:13px;color:var(--muted)}
+.sl .sb{padding:0 12px 12px}
+.sl .sb img{width:100%;border:1px solid var(--line);border-radius:10px;display:block;margin-bottom:8px}
+.sl .sb .upbtns{grid-template-columns:1fr 1fr}
+.daysep{font-size:13px;font-weight:700;color:var(--muted);margin:12px 2px 6px}
 .field{font-size:0}
 </style>
 </head>
@@ -125,6 +137,7 @@ header h1{min-width:0;overflow-wrap:anywhere}
   <div class="tabs" role="tablist" id="tabs">
     <button role="tab" id="tab-reply" aria-selected="true" data-tab="reply">Reply</button>
     <button role="tab" id="tab-size" aria-selected="false" data-tab="size">ទំហំ<span class="hide-s"> · Size</span></button>
+    <button role="tab" id="tab-slips" aria-selected="false" data-tab="slips">Slips<span class="nb" id="slBadge" hidden></span></button>
     <button role="tab" id="tab-answers" aria-selected="false" data-tab="answers">Answers</button>
     <button role="tab" id="tab-up" aria-selected="false" data-tab="up">News<span class="nb" id="upBadge" hidden>NEW</span></button>
   </div>
@@ -142,6 +155,12 @@ header h1{min-width:0;overflow-wrap:anywhere}
     </section>
 
     <section class="panel" id="p-size" aria-label="Size chart and size recommendation" hidden></section>
+
+    <section class="panel" id="p-slips" aria-label="Printed slips" hidden>
+      <div id="slBanner"></div>
+      <div class="row"><label class="field" style="flex:1 1 100%"><span class="sr">Search slips</span><input id="slSearch" type="search" autocomplete="off" placeholder="No. / order / name / phone"></label></div>
+      <div id="slList"></div>
+    </section>
 
     <section class="panel" id="p-answers" aria-label="Saved answers" hidden>
       <div id="ansBanner"></div>
@@ -471,18 +490,112 @@ function watchConfig(){
   }catch(e){ cfgErr = fbErr(e); renderAnswers(); }
 }
 
+/* ---------------- printed slips (address pictures sent by the print PC: kv/qr_slips_index + kv/qr_slip_<order>) ---------------- */
+const SL_SEEN = 'vhm_qr_view_slips_seen';
+const sl = { list:[], err:'', first:true, open:'' };
+const slImg = {};                                   // order -> {image, at} (loaded on tap)
+function slNewCount(){ const seen = Number(lsGet(SL_SEEN)) || 0; return sl.list.filter(e => (e.at || 0) > seen).length; }
+function updateSlBadge(){ const n = slNewCount(); $('slBadge').hidden = !n; $('slBadge').textContent = n > 99 ? '99+' : String(n); }
+function markSlSeen(){ if (sl.list.length){ const mx = Math.max.apply(null, sl.list.map(e => e.at || 0)); lsSet(SL_SEEN, String(mx)); } updateSlBadge(); }
+function dayLabel(ms){
+  const d = new Date(ms), t = new Date(); const y = new Date(); y.setDate(t.getDate() - 1);
+  if (d.toDateString() === t.toDateString()) return 'Today';
+  if (d.toDateString() === y.toDateString()) return 'Yesterday';
+  return d.toLocaleDateString([], {weekday:'short', day:'numeric', month:'short'});
+}
+function dataUrlToBlob(u){ const p = u.split(','), mime = (p[0].match(/:(.*?);/) || [])[1] || 'image/jpeg', bin = atob(p[1]); const a = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i); return new Blob([a], {type:mime}); }
+function toPng(u){ return new Promise((res, rej)=>{ const im = new Image(); im.onload = ()=>{ const c = document.createElement('canvas'); c.width = im.naturalWidth; c.height = im.naturalHeight; c.getContext('2d').drawImage(im, 0, 0); c.toBlob(b => b ? res(b) : rej(new Error('toBlob failed')), 'image/png'); }; im.onerror = ()=> rej(new Error('image decode failed')); im.src = u; }); }
+function slipBody(e, box){
+  box.innerHTML = '';
+  const got = slImg[e.order];
+  if (!got){ box.append(h('div', {class:'fine'}, 'Loading picture…')); return; }
+  if (got.err){ box.append(h('div', {class:'banner bad'}, 'Could not load picture. ', h('button', {type:'button', class:'btn sm', onclick:()=>{ delete slImg[e.order]; loadSlip(e, box); }}, 'Try again'))); return; }
+  if (!got.image){ box.append(h('div', {class:'banner warn'}, 'Picture no longer saved (older than 7 days).')); return; }
+  const fname = 'VHM_' + e.no + '_' + e.order + '.jpg';
+  box.append(h('img', {src:got.image, alt:'Address picture for order ' + e.order}));
+  const note = h('div', {class:'fine'});
+  const flash = (b, t)=>{ const old = b.textContent; b.textContent = t; b.classList.add('copied'); setTimeout(()=>{ b.textContent = old; b.classList.remove('copied'); }, 1800); };
+  const btns = h('div', {class:'upbtns'});
+  const file = ()=> new File([dataUrlToBlob(got.image)], fname, {type:'image/jpeg'});
+  let canShare = false; try{ canShare = !!(navigator.canShare && navigator.canShare({files:[file()]})); }catch(err){}
+  if (canShare) btns.append(h('button', {type:'button', class:'btn primary', onclick: async ()=>{ note.textContent = ''; try{ await navigator.share({files:[file()]}); }catch(err){ if (err && err.name !== 'AbortError') note.textContent = 'Share failed — use Copy picture'; } }}, '↗ Share'));
+  btns.append(h('button', {type:'button', class:'btn ' + (canShare ? '' : 'primary'), onclick: async (ev)=>{
+    const b = ev.currentTarget; note.textContent = '';
+    try{
+      if (!navigator.clipboard || !window.ClipboardItem) throw new Error('no image clipboard');
+      await navigator.clipboard.write([new ClipboardItem({'image/png': toPng(got.image)})]);
+      flash(b, '✓ Copied');
+    }catch(err){ note.textContent = 'Could not copy — long-press the picture to copy or save'; }
+  }}, '🖼 Copy picture'));
+  if (!canShare) btns.append(h('a', {class:'btn', href:got.image, download:fname}, '⬇ Save'));
+  box.append(btns, note);
+}
+function loadSlip(e, box){
+  slipBody(e, box);
+  firestore_().collection('kv').doc('qr_slip_' + e.order).get().then(doc => {
+    const d = doc.exists && doc.data() && doc.data().data;
+    slImg[e.order] = { image: d && d.image || '' };
+    slipBody(e, box);
+  }).catch(err => { slImg[e.order] = { err: fbErr(err) }; slipBody(e, box); });
+}
+function drawSlips(){
+  const list = $('slList'); list.innerHTML = '';
+  const ban = $('slBanner'); ban.innerHTML = '';
+  if (sl.err) ban.append(h('div', {class:'banner bad', role:'alert'}, 'Could not load slips'));
+  const q = nt($('slSearch').value);
+  const items = sl.list.filter(e => !q || q.split(' ').every(t => nt([e.no, e.order, e.name, e.phone, e.staff].join(' ')).includes(t)));
+  if (!items.length){ list.append(h('div', {class:'empty'}, q ? 'No slip matches.' : 'No printed slips yet.')); return; }
+  const seen = Number(lsGet(SL_SEEN)) || 0;
+  let lastDay = '';
+  items.slice(0, 150).forEach(e => {
+    const day = dayLabel(e.at || 0);
+    if (day !== lastDay){ list.append(h('div', {class:'daysep'}, day)); lastDay = day; }
+    const box = h('div', {class:'sb', hidden: sl.open !== e.order});
+    const card = h('div', {class:'sl' + ((e.at || 0) > seen ? ' new' : '')},
+      h('button', {type:'button', class:'sh', 'aria-expanded': sl.open === e.order ? 'true' : 'false', onclick:(ev)=>{
+        const open = sl.open !== e.order;
+        sl.open = open ? e.order : '';
+        list.querySelectorAll('.sb').forEach(x => { if (x !== box) x.hidden = true; });
+        list.querySelectorAll('button.sh').forEach(x => x.setAttribute('aria-expanded', 'false'));
+        box.hidden = !open; ev.currentTarget.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (open){ if (slImg[e.order]) slipBody(e, box); else loadSlip(e, box); }
+      }},
+        h('span', {class:'no'}, e.no || '–'),
+        h('span', {class:'who'}, h('b', null, e.name || '(no name)'), h('span', null, '#' + e.order + (e.staff ? ' · ' + e.staff : '') + (e.at ? ' · ' + fmtTime(e.at) : '') + (e.phone ? ' · ' + e.phone : '')))),
+      box);
+    if (sl.open === e.order){ if (slImg[e.order]) slipBody(e, box); else loadSlip(e, box); }
+    list.append(card);
+  });
+}
+function watchSlips(){
+  try{
+    firestore_().collection('kv').doc('qr_slips_index').onSnapshot((doc)=>{
+      sl.err = '';
+      const d = doc.exists && doc.data() && doc.data().data;
+      const before = sl.list.length ? Math.max.apply(null, sl.list.map(e => e.at || 0)) : 0;
+      sl.list = (d && Array.isArray(d.list) ? d.list : []).filter(e => e && e.order).sort((a, b) => (b.at || 0) - (a.at || 0));
+      const after = sl.list.length ? Math.max.apply(null, sl.list.map(e => e.at || 0)) : 0;
+      if (!sl.first && after > before && navigator.vibrate) try{ navigator.vibrate(120); }catch(e){}
+      sl.first = false;
+      if (tab === 'slips' && !document.hidden) markSlSeen(); else updateSlBadge();
+      drawSlips();
+    }, (err)=>{ sl.err = fbErr(err); drawSlips(); });
+  }catch(e){ sl.err = fbErr(e); drawSlips(); }
+}
+
 /* ---------------- tabs / layout ---------------- */
 let tab = 'reply';
 const wide = () => matchMedia('(min-width:900px)').matches;
 function setTab(t){
   tab = t;
-  ['reply','size','answers','up'].forEach(x => {
+  ['reply','size','slips','answers','up'].forEach(x => {
     const on = x === t;
     $('tab-' + x).setAttribute('aria-selected', on ? 'true' : 'false');
     $('p-' + x).hidden = !on && !wide();
   });
   syncCopybar();
   if (t === 'up') markUpSeen(); else updateUpBadges();
+  if (t === 'slips'){ markSlSeen(); }
 }
 function syncCopybar(){ $('copybar').hidden = !rep.text || !(tab === 'reply' || wide()); }
 function onResize(){ setTab(tab); document.documentElement.style.setProperty('--hh', $('hdr').offsetHeight + 'px'); }
@@ -491,6 +604,7 @@ function onResize(){ setTab(tab); document.documentElement.style.setProperty('--
 document.querySelectorAll('#tabs button').forEach(b => b.addEventListener('click', ()=> setTab(b.dataset.tab)));
 $('upAlertBtn').addEventListener('click', ()=> setTab('up'));
 $('ansSearch').addEventListener('input', drawAnswerList);
+$('slSearch').addEventListener('input', drawSlips);
 $('ansCat').addEventListener('change', drawAnswerList);
 $('ansLang').addEventListener('change', (e)=>{ lsSet('vhm_qr_view_lang', e.target.value); drawAnswerList(); });
 $('autoCopy').checked = lsGet('vhm_qr_view_autocopy') !== '0';
@@ -510,7 +624,7 @@ try{
   if (qc && sizePanel){ sizePanel.setCode(qc); tab = 'size'; }
 }catch(e){}
 
-renderNameSelect(); watchConfig(); watchUpsell();
+renderNameSelect(); watchConfig(); watchUpsell(); watchSlips();
 watchName(getSavedName());
 onResize();
 </script>
