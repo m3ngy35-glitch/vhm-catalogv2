@@ -119,6 +119,9 @@ header h1{min-width:0;overflow-wrap:anywhere}
 .sl .sb img{width:100%;border:1px solid var(--line);border-radius:10px;display:block;margin-bottom:8px}
 .sl .sb .upbtns{grid-template-columns:1fr 1fr}
 .daysep{font-size:13px;font-weight:700;color:var(--muted);margin:12px 2px 6px}
+.sl .no.msg{font-size:24px}
+.sl i.tg{font-style:normal;font-size:11px;font-weight:800;border-radius:5px;padding:0 6px;margin-right:2px;background:#ece6dd;color:#2a2a2a}
+.sl i.tg.msg{background:#f3e4d2;color:#9a6430}
 .field{font-size:0}
 </style>
 </head>
@@ -492,7 +495,9 @@ function watchConfig(){
 
 /* ---------------- printed slips (address pictures sent by the print PC: kv/qr_slips_index + kv/qr_slip_<order>) ---------------- */
 const SL_SEEN = 'vhm_qr_view_slips_seen';
-const sl = { list:[], err:'', first:true, open:'' };
+const sl = { list:[], slips:[], msgs:[], err:'', first:true, open:'' };
+const slKey = e => e.kind + ':' + e.order;
+const slDoc = e => (e.kind === 'msg' ? 'qr_msg_' : 'qr_slip_') + e.order;
 const slImg = {};                                   // order -> {image, at} (loaded on tap)
 function slNewCount(){ const seen = Number(lsGet(SL_SEEN)) || 0; return sl.list.filter(e => (e.at || 0) > seen).length; }
 function updateSlBadge(){ const n = slNewCount(); $('slBadge').hidden = !n; $('slBadge').textContent = n > 99 ? '99+' : String(n); }
@@ -507,11 +512,11 @@ function dataUrlToBlob(u){ const p = u.split(','), mime = (p[0].match(/:(.*?);/)
 function toPng(u){ return new Promise((res, rej)=>{ const im = new Image(); im.onload = ()=>{ const c = document.createElement('canvas'); c.width = im.naturalWidth; c.height = im.naturalHeight; c.getContext('2d').drawImage(im, 0, 0); c.toBlob(b => b ? res(b) : rej(new Error('toBlob failed')), 'image/png'); }; im.onerror = ()=> rej(new Error('image decode failed')); im.src = u; }); }
 function slipBody(e, box){
   box.innerHTML = '';
-  const got = slImg[e.order];
+  const got = slImg[slKey(e)];
   if (!got){ box.append(h('div', {class:'fine'}, 'Loading picture…')); return; }
-  if (got.err){ box.append(h('div', {class:'banner bad'}, 'Could not load picture. ', h('button', {type:'button', class:'btn sm', onclick:()=>{ delete slImg[e.order]; loadSlip(e, box); }}, 'Try again'))); return; }
+  if (got.err){ box.append(h('div', {class:'banner bad'}, 'Could not load picture. ', h('button', {type:'button', class:'btn sm', onclick:()=>{ delete slImg[slKey(e)]; loadSlip(e, box); }}, 'Try again'))); return; }
   if (!got.image){ box.append(h('div', {class:'banner warn'}, 'Picture no longer saved (older than 7 days).')); return; }
-  const fname = 'VHM_' + e.no + '_' + e.order + '.jpg';
+  const fname = (e.kind === 'msg' ? 'VHM_order_' + e.order : 'VHM_' + e.no + '_' + e.order) + '.jpg';
   box.append(h('img', {src:got.image, alt:'Address picture for order ' + e.order}));
   const note = h('div', {class:'fine'});
   const flash = (b, t)=>{ const old = b.textContent; b.textContent = t; b.classList.add('copied'); setTimeout(()=>{ b.textContent = old; b.classList.remove('copied'); }, 1800); };
@@ -532,11 +537,11 @@ function slipBody(e, box){
 }
 function loadSlip(e, box){
   slipBody(e, box);
-  firestore_().collection('kv').doc('qr_slip_' + e.order).get().then(doc => {
+  firestore_().collection('kv').doc(slDoc(e)).get().then(doc => {
     const d = doc.exists && doc.data() && doc.data().data;
-    slImg[e.order] = { image: d && d.image || '' };
+    slImg[slKey(e)] = { image: d && d.image || '' };
     slipBody(e, box);
-  }).catch(err => { slImg[e.order] = { err: fbErr(err) }; slipBody(e, box); });
+  }).catch(err => { slImg[slKey(e)] = { err: fbErr(err) }; slipBody(e, box); });
 }
 function drawSlips(){
   const list = $('slList'); list.innerHTML = '';
@@ -544,43 +549,53 @@ function drawSlips(){
   if (sl.err) ban.append(h('div', {class:'banner bad', role:'alert'}, 'Could not load slips'));
   const q = nt($('slSearch').value);
   const items = sl.list.filter(e => !q || q.split(' ').every(t => nt([e.no, e.order, e.name, e.phone, e.staff].join(' ')).includes(t)));
-  if (!items.length){ list.append(h('div', {class:'empty'}, q ? 'No slip matches.' : 'No printed slips yet.')); return; }
+  if (!items.length){ list.append(h('div', {class:'empty'}, q ? 'No match.' : 'No pictures yet.')); return; }
   const seen = Number(lsGet(SL_SEEN)) || 0;
   let lastDay = '';
   items.slice(0, 150).forEach(e => {
     const day = dayLabel(e.at || 0);
     if (day !== lastDay){ list.append(h('div', {class:'daysep'}, day)); lastDay = day; }
-    const box = h('div', {class:'sb', hidden: sl.open !== e.order});
+    const k = slKey(e);
+    const box = h('div', {class:'sb', hidden: sl.open !== k});
     const card = h('div', {class:'sl' + ((e.at || 0) > seen ? ' new' : '')},
-      h('button', {type:'button', class:'sh', 'aria-expanded': sl.open === e.order ? 'true' : 'false', onclick:(ev)=>{
-        const open = sl.open !== e.order;
-        sl.open = open ? e.order : '';
+      h('button', {type:'button', class:'sh', 'aria-expanded': sl.open === k ? 'true' : 'false', onclick:(ev)=>{
+        const open = sl.open !== k;
+        sl.open = open ? k : '';
         list.querySelectorAll('.sb').forEach(x => { if (x !== box) x.hidden = true; });
         list.querySelectorAll('button.sh').forEach(x => x.setAttribute('aria-expanded', 'false'));
         box.hidden = !open; ev.currentTarget.setAttribute('aria-expanded', open ? 'true' : 'false');
-        if (open){ if (slImg[e.order]) slipBody(e, box); else loadSlip(e, box); }
+        if (open){ if (slImg[k]) slipBody(e, box); else loadSlip(e, box); }
       }},
-        h('span', {class:'no'}, e.no || '–'),
-        h('span', {class:'who'}, h('b', null, e.name || '(no name)'), h('span', null, '#' + e.order + (e.staff ? ' · ' + e.staff : '') + (e.at ? ' · ' + fmtTime(e.at) : '') + (e.phone ? ' · ' + e.phone : '')))),
+        h('span', {class:'no' + (e.kind === 'msg' ? ' msg' : '')}, e.kind === 'msg' ? '🧾' : (e.no || '–')),
+        h('span', {class:'who'}, h('b', null, e.name || '(no name)'), h('span', null, h('i', {class:'tg ' + e.kind}, e.kind === 'msg' ? 'សារការកម្មង់' : 'បោះពុម្ពរួច'), ' #' + e.order + (e.staff ? ' · ' + e.staff : '') + (e.at ? ' · ' + fmtTime(e.at) : '') + (e.phone ? ' · ' + e.phone : '')))),
       box);
-    if (sl.open === e.order){ if (slImg[e.order]) slipBody(e, box); else loadSlip(e, box); }
+    if (sl.open === k){ if (slImg[k]) slipBody(e, box); else loadSlip(e, box); }
     list.append(card);
   });
 }
+function mergeSlips(){
+  const before = sl.list.length ? Math.max.apply(null, sl.list.map(e => e.at || 0)) : 0;
+  sl.list = sl.slips.concat(sl.msgs).sort((a, b) => (b.at || 0) - (a.at || 0));
+  const after = sl.list.length ? Math.max.apply(null, sl.list.map(e => e.at || 0)) : 0;
+  if (!sl.first && after > before && navigator.vibrate) try{ navigator.vibrate(120); }catch(e){}
+  if (tab === 'slips' && !document.hidden) markSlSeen(); else updateSlBadge();
+  drawSlips();
+}
 function watchSlips(){
-  try{
-    firestore_().collection('kv').doc('qr_slips_index').onSnapshot((doc)=>{
-      sl.err = '';
-      const d = doc.exists && doc.data() && doc.data().data;
-      const before = sl.list.length ? Math.max.apply(null, sl.list.map(e => e.at || 0)) : 0;
-      sl.list = (d && Array.isArray(d.list) ? d.list : []).filter(e => e && e.order).sort((a, b) => (b.at || 0) - (a.at || 0));
-      const after = sl.list.length ? Math.max.apply(null, sl.list.map(e => e.at || 0)) : 0;
-      if (!sl.first && after > before && navigator.vibrate) try{ navigator.vibrate(120); }catch(e){}
-      sl.first = false;
-      if (tab === 'slips' && !document.hidden) markSlSeen(); else updateSlBadge();
-      drawSlips();
-    }, (err)=>{ sl.err = fbErr(err); drawSlips(); });
-  }catch(e){ sl.err = fbErr(e); drawSlips(); }
+  const src = [['qr_slips_index', 'slips', 'slip'], ['qr_msgs_index', 'msgs', 'msg']];
+  let pending = src.length;
+  src.forEach(([docId, field, kind]) => {
+    try{
+      firestore_().collection('kv').doc(docId).onSnapshot((doc)=>{
+        sl.err = '';
+        const d = doc.exists && doc.data() && doc.data().data;
+        sl[field] = (d && Array.isArray(d.list) ? d.list : []).filter(e => e && e.order).map(e => Object.assign({}, e, {kind}));
+        if (pending > 0) pending--;
+        if (pending === 0 && sl.first){ mergeSlips(); sl.first = false; return; }
+        if (!sl.first) mergeSlips();
+      }, (err)=>{ sl.err = fbErr(err); if (pending > 0) pending--; sl.first = false; mergeSlips(); });
+    }catch(e){ sl.err = fbErr(e); drawSlips(); }
+  });
 }
 
 /* ---------------- tabs / layout ---------------- */
