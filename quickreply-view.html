@@ -160,6 +160,15 @@ header h1{min-width:0;overflow-wrap:anywhere}
     <section class="panel" id="p-size" aria-label="Size chart and size recommendation" hidden></section>
 
     <section class="panel" id="p-slips" aria-label="Printed slips" hidden>
+      <form id="slLogin" class="banner info" hidden autocomplete="on">
+        <b>🔒 ចូលគណនីបោះពុម្ព · Sign in to see slips</b>
+        <div class="row" style="margin:8px 0 0">
+          <label class="field" style="flex:1 1 100%">Email<input id="slEmail" type="email" autocomplete="username" spellcheck="false"></label>
+          <label class="field" style="flex:1 1 100%">Password<input id="slPass" type="password" autocomplete="current-password"></label>
+          <button class="btn primary" type="submit" id="slIn" style="flex:1 1 100%">ចូល · Sign in</button>
+        </div>
+        <div class="fine" id="slLoginMsg">ធ្វើតែម្តងលើទូរស័ព្ទនេះ · Only once on this phone.</div>
+      </form>
       <div id="slBanner"></div>
       <div class="row"><label class="field" style="flex:1 1 100%"><span class="sr">Search slips</span><input id="slSearch" type="search" autocomplete="off" placeholder="No. / order / name / phone"></label></div>
       <div id="slList"></div>
@@ -194,6 +203,7 @@ header h1{min-width:0;overflow-wrap:anywhere}
 
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <script src="size-chart.js"></script>
 <script>
 'use strict';
@@ -493,11 +503,16 @@ function watchConfig(){
   }catch(e){ cfgErr = fbErr(e); renderAnswers(); }
 }
 
-/* ---------------- printed slips (address pictures sent by the print PC: kv/qr_slips_index + kv/qr_slip_<order>) ---------------- */
+/* ---------------- printed slips (address pictures sent by the print PC: print_qr/slips_index + print_qr/slip_<order> [signed in], and the old kv/qr_slips_index + kv/qr_slip_<order> during the switch-over) ---------------- */
 const SL_SEEN = 'vhm_qr_view_slips_seen';
-const sl = { list:[], slips:[], msgs:[], err:'', first:true, open:'' };
+const SL_BOOT = Date.now();   // no vibration for what is already there when the page opens
+const sl = { list:[], slips:[], msgs:[], pslips:[], pmsgs:[], err:'', first:true, open:'' };
 const slKey = e => e.kind + ':' + e.order;
-const slDoc = e => (e.kind === 'msg' ? 'qr_msg_' : 'qr_slip_') + e.order;
+// src 'pq' = new locked place (print_qr, needs the print account); 'kv' = old open place (until every print PC uses the extension)
+const PRINT_EMAIL = 'vhmenofficial@gmail.com';
+const slRef = e => e.src === 'pq'
+  ? firestore_().collection('print_qr').doc((e.kind === 'msg' ? 'msg_' : 'slip_') + e.order)
+  : firestore_().collection('kv').doc((e.kind === 'msg' ? 'qr_msg_' : 'qr_slip_') + e.order);
 const slImg = {};                                   // order -> {image, at} (loaded on tap)
 function slNewCount(){ const seen = Number(lsGet(SL_SEEN)) || 0; return sl.list.filter(e => (e.at || 0) > seen).length; }
 function updateSlBadge(){ const n = slNewCount(); $('slBadge').hidden = !n; $('slBadge').textContent = n > 99 ? '99+' : String(n); }
@@ -538,7 +553,7 @@ function slipBody(e, box){
 }
 function loadSlip(e, box){
   slipBody(e, box);
-  firestore_().collection('kv').doc(slDoc(e)).get().then(doc => {
+  slRef(e).get().then(doc => {
     const d = doc.exists && doc.data() && doc.data().data;
     slImg[slKey(e)] = { image: d && d.image || '' };
     slipBody(e, box);
@@ -576,26 +591,55 @@ function drawSlips(){
 }
 function mergeSlips(){
   const before = sl.list.length ? Math.max.apply(null, sl.list.map(e => e.at || 0)) : 0;
-  sl.list = sl.slips.concat(sl.msgs).sort((a, b) => (b.at || 0) - (a.at || 0));
+  const seenK = {};
+  sl.list = sl.pslips.concat(sl.pmsgs, sl.slips, sl.msgs)
+    .filter(e => { const k = slKey(e); if (seenK[k]) return false; seenK[k] = 1; return true; })   // same order in both places: keep the new one
+    .sort((a, b) => (b.at || 0) - (a.at || 0));
   const after = sl.list.length ? Math.max.apply(null, sl.list.map(e => e.at || 0)) : 0;
-  if (!sl.first && after > before && navigator.vibrate) try{ navigator.vibrate(120); }catch(e){}
+  if (Date.now() - SL_BOOT > 5000 && after > before && navigator.vibrate) try{ navigator.vibrate(120); }catch(e){}
   if (tab === 'slips' && !document.hidden) markSlSeen(); else updateSlBadge();
   drawSlips();
 }
-function watchSlips(){
-  const src = [['qr_slips_index', 'slips', 'slip'], ['qr_msgs_index', 'msgs', 'msg']];
-  let pending = src.length;
+function watchIndexes(coll, src, items, onErr){
+  const unsubs = [];
   src.forEach(([docId, field, kind]) => {
     try{
-      firestore_().collection('kv').doc(docId).onSnapshot((doc)=>{
+      unsubs.push(firestore_().collection(coll).doc(docId).onSnapshot((doc)=>{
         sl.err = '';
         const d = doc.exists && doc.data() && doc.data().data;
-        sl[field] = (d && Array.isArray(d.list) ? d.list : []).filter(e => e && e.order).map(e => Object.assign({}, e, {kind}));
-        if (pending > 0) pending--;
-        if (pending === 0 && sl.first){ mergeSlips(); sl.first = false; return; }
-        if (!sl.first) mergeSlips();
-      }, (err)=>{ sl.err = fbErr(err); if (pending > 0) pending--; sl.first = false; mergeSlips(); });
+        sl[field] = (d && Array.isArray(d.list) ? d.list : []).filter(e => e && e.order).map(e => Object.assign({}, e, {kind, src:items}));
+        sl.first = false; mergeSlips();
+      }, (err)=>{ onErr ? onErr(err) : (sl.err = fbErr(err)); sl.first = false; mergeSlips(); }));
     }catch(e){ sl.err = fbErr(e); drawSlips(); }
+  });
+  return () => unsubs.forEach(u => { try{ u(); }catch(e){} });
+}
+let slUnsubNew = null;
+function watchSlips(){
+  // old open place (bookmarklet PCs)
+  watchIndexes('kv', [['qr_slips_index', 'slips', 'slip'], ['qr_msgs_index', 'msgs', 'msg']], 'kv');
+  // new locked place (extension PCs) — only after signing in with the print account
+  let auth = null;
+  try{ firestore_(); auth = firebase.auth(); }catch(e){ $('slLoginMsg').textContent = 'Sign-in unavailable: ' + (e && e.message || e); $('slLogin').hidden = false; return; }
+  $('slEmail').value = PRINT_EMAIL;
+  auth.onAuthStateChanged(user => {
+    if (slUnsubNew){ slUnsubNew(); slUnsubNew = null; }
+    const ok = !!(user && user.email === PRINT_EMAIL);
+    $('slLogin').hidden = ok;
+    if (!ok){ sl.pslips = []; sl.pmsgs = []; mergeSlips(); return; }
+    slUnsubNew = watchIndexes('print_qr', [['slips_index', 'pslips', 'slip'], ['msgs_index', 'pmsgs', 'msg']], 'pq', (err)=>{
+      sl.err = fbErr(err);
+      if (String(err && err.code).includes('permission-denied')) { $('slLoginMsg').textContent = 'Firebase refused this account. Sign in again.'; $('slLogin').hidden = false; }
+    });
+  });
+  $('slLogin').addEventListener('submit', (ev)=>{
+    ev.preventDefault();
+    const btn = $('slIn'), msg = $('slLoginMsg');
+    btn.disabled = true; msg.textContent = '…';
+    auth.signInWithEmailAndPassword($('slEmail').value.trim(), $('slPass').value)
+      .then(()=>{ $('slPass').value = ''; msg.textContent = ''; })
+      .catch(err => { msg.textContent = 'ចូលមិនបាន · Sign-in failed: ' + (err && (err.code || err.message) || err); })
+      .then(()=>{ btn.disabled = false; });
   });
 }
 
